@@ -1,5 +1,5 @@
 module CircuitScape
 
-# package code goes here
+include("network.jl")
 
 end # module
