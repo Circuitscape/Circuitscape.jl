@@ -22,9 +22,9 @@ function thing(network_file, current_file)
     # Read currents
     c = Int.(vec(readcsv(current_file)) + 1)
 
-    voltages = single_ground_all_pair_resistances(A, g, c)
+    resistances = single_ground_all_pair_resistances(A, g, c)
 
-    A,c, voltages
+    resistances
 end
 
 function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::Vector{T})
@@ -32,6 +32,7 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
     debug("There are $numpoints points")
     cc = connected_components(g)
     debug("There are $(length(cc)) connected components")
+    resistances = -1 * ones(numpoints, numpoints) 
 
     cond = laplacian(a)
 
@@ -51,12 +52,20 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
             curr = zeros(size(g, 1))
             curr[pt1] = -1
             curr[pt2] = 1
+            println("Conductance matrix")
+            Base.print_matrix(STDOUT, cond)
             println('\n')
+            @show curr
             volt = cg(cond, curr)
-            postprocess(volt[1], c, pt1, pt2)
+            @show volt
+            postprocess(volt[1], c, pt1, pt2, resistances)
         end
         cond[pt1,pt1] = d
     end
+    for i = 1:size(resistances,1)
+        resistances[i,i] = 0
+    end
+    resistances
 end
 
 function laplacian(G::SparseMatrixCSC)
@@ -64,7 +73,7 @@ function laplacian(G::SparseMatrixCSC)
     G = -G + spdiagm(vec(sum(G, 1)))
 end
 
-function postprocess(volt, cond, p1, p2)
+function postprocess(volt, cond, p1, p2, resistances)
     fname = "/tmp/voltages_$(p1)_$(p2).txt"
 
     open(fname, "a") do f
@@ -73,4 +82,6 @@ function postprocess(volt, cond, p1, p2)
             write(f, '\n')
         end
     end
+
+    r = resistances[p1, p2] = resistances[p2, p1] = volt[p2] - volt[p1]
 end
