@@ -53,6 +53,7 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
             curr[pt2] = 1
             println('\n')
             volt = cg(cond, curr)
+            postprocess(volt[1], c, pt1, pt2)
         end
         cond[pt1,pt1] = d
     end
@@ -61,4 +62,15 @@ end
 function laplacian(G::SparseMatrixCSC)
     G = G - spdiagm(diag(G))
     G = -G + spdiagm(vec(sum(G, 1)))
+end
+
+function postprocess(volt, cond, p1, p2)
+    fname = "/tmp/voltages_$(p1)_$(p2).txt"
+
+    open(fname, "a") do f
+        for i in eachindex(cond)
+            write(f, string(p1), '\t', string(cond[i]), '\t', string(volt[cond[i]] - volt[p1]))
+            write(f, '\n')
+        end
+    end
 end
