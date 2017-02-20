@@ -6,15 +6,7 @@ Logging.configure(level = DEBUG)
 function thing(network_file, current_file)
 
     # Read network file
-    a = readdlm(network_file, ' ')
-
-    # Create sparse matrix
-    i = Int.(a[:,1] + 1)
-    j = Int.(a[:,2] + 1)
-    val = float.(a[:,3])
-    m = max(i[end], j[end])
-    A = sparse(i, j, val, m, m)
-    A = A + A'
+    A = read_graph(network_file)
 
     # Create graph
     g = Graph(A)
