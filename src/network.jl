@@ -3,7 +3,7 @@ using LightGraphs
 using IterativeSolvers
 Logging.configure(level = DEBUG)
 
-function thing(network_file, current_file)
+function network(network_file, current_file)
 
     # Read network file
     A = read_graph(network_file)
@@ -48,7 +48,7 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
             Base.print_matrix(STDOUT, cond)
             println('\n')
             @show curr
-            volt = cg(cond, curr)
+            volt = gmres(cond, curr)
             @show volt
             postprocess(volt[1], c, pt1, pt2, resistances)
         end
