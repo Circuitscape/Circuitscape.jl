@@ -3,7 +3,7 @@ using LightGraphs
 using IterativeSolvers
 Logging.configure(level = DEBUG)
 
-function network(network_file, current_file)
+function network_pairwise(network_file, current_file)
 
     # Read network file
     A = read_graph(network_file)
@@ -78,5 +78,10 @@ function compute_network(a::Inifile)
     network_file = get(a, "Habitat raster or graph", "habitat_file")
     current_file = get(a, "Options for pairwise and one-to-all and all-to-one modes",
                         "point_file")
-    network(network_file, current_file)
+    scenario = get(a, "Circuitscape mode", "scenario")
+    if scenario == "pairwise"
+        return network_pairwise(network_file, current_file)
+    elseif scenario == "advanced"
+        # advanced logic
+    end
 end
