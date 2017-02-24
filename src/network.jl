@@ -44,12 +44,8 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
             curr = zeros(size(g, 1))
             curr[pt1] = -1
             curr[pt2] = 1
-            println("Conductance matrix")
-            Base.print_matrix(STDOUT, cond)
             println('\n')
-            @show curr
             volt = gmres(cond, curr)
-            @show volt
             postprocess(volt[1], c, pt1, pt2, resistances)
         end
         cond[pt1,pt1] = d
@@ -76,4 +72,11 @@ function postprocess(volt, cond, p1, p2, resistances)
     end
 
     r = resistances[p1, p2] = resistances[p2, p1] = volt[p2] - volt[p1]
+end
+
+function compute_network(a::Inifile)
+    network_file = get(a, "Habitat raster or graph", "habitat_file")
+    current_file = get(a, "Options for pairwise and one-to-all and all-to-one modes",
+                        "point_file")
+    network(network_file, current_file)
 end

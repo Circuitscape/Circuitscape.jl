@@ -84,4 +84,7 @@ function Config(;version = v"0", connect_four_neighbors_only = false,
 end
 
 function ConfigFile(path::String)
+    a = Inifile()
+    read(a, path)
+    a
 end
