@@ -1,19 +1,3 @@
-function network_pairwise(network_file, current_file)
-
-    # Read network file
-    A = read_graph(network_file)
-
-    # Create graph
-    g = Graph(A)
-
-    # Read currents
-    c = Int.(vec(readcsv(current_file)) + 1)
-
-    resistances = single_ground_all_pair_resistances(A, g, c)
-
-    resistances
-end
-
 function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::Vector{T})
     numpoints = size(c, 1)
     cc = connected_components(g)
@@ -89,11 +73,15 @@ end
 
 function compute_network(a::Inifile)
     network_file = get(a, "Habitat raster or graph", "habitat_file")
-    current_file = get(a, "Options for pairwise and one-to-all and all-to-one modes",
+    point_file = get(a, "Options for pairwise and one-to-all and all-to-one modes",
                         "point_file")
+    A = read_graph(network_file)
+    g = Graph(A)
     scenario = get(a, "Circuitscape mode", "scenario")
     if scenario == "pairwise"
-        return network_pairwise(network_file, current_file)
+        fp = read_focal_points(point_file)
+        resistances = single_ground_all_pair_resistances(A, g, fp)
+        return resistances
     elseif scenario == "advanced"
         # advanced logic
     end

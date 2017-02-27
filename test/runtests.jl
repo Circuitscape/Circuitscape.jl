@@ -1,10 +1,6 @@
 using CircuitScape
 using Base.Test
 
-# Ask Julia to download Python packages 
-ENV["PYTHON"] = ""
-Pkg.build("PyCall")
-
 # Simple test with one connected component
 r = compute("sgNetworkVerify2.ini")
 x = readdlm("sgNetworkVerify2_resistances.out")

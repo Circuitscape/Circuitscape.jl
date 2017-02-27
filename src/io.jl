@@ -16,3 +16,5 @@ function load_graph(gpath::String)
     v = Float64.(g[:,3])
     i,j,v
 end
+
+read_focal_points(path::String) = Int.(vec(readcsv(path)) + 1)
