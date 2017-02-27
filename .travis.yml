@@ -7,13 +7,12 @@ julia:
   - 0.5
 notifications:
   email: false
+env: 
+  - PYTHON=""
 # uncomment the following lines to override the default test script
-script:
-  - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
-  - julia -e 'Pkg.clone(pwd()); Pkg.build("CircuitScape")'
-  - julia -e 'ENV["PYTHON"] = ""'
-  - julia -e 'Pkg.build("PyCall")'
-  - julia -e 'Pkg.test("CircuitScape"; coverage=true)'
+# script:
+#   - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
+#   - julia -e 'Pkg.clone(pwd()); Pkg.build("CircuitScape"); Pkg.test("CircuitScape"; coverage=true)'
 after_success:
   # push coverage results to Coveralls
   - julia -e 'cd(Pkg.dir("CircuitScape")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
