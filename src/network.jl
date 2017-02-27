@@ -75,7 +75,7 @@ function compute_network(a::Inifile)
     network_file = get(a, "Habitat raster or graph", "habitat_file")
     point_file = get(a, "Options for pairwise and one-to-all and all-to-one modes",
                         "point_file")
-    A = read_graph(network_file)
+    A = read_graph(a, network_file)
     g = Graph(A)
     scenario = get(a, "Circuitscape mode", "scenario")
     if scenario == "pairwise"
