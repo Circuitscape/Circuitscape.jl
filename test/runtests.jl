@@ -14,3 +14,10 @@ x = readdlm("sgNetworkVerify1_resistances.out")
 x = x[2:end, 2:end]
 
 @test sumabs2(x - r) < 1e-6
+
+# Network test with multiple cc and resistance specified
+r = compute("sgNetworkVerify3.ini")
+x = readdlm("sgNetworkVerify3_resistances.out")
+x = x[2:end, 2:end]
+
+@test sumabs2(x - r) < 1e-6
