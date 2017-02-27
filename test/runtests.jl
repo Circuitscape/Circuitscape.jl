@@ -16,4 +16,4 @@ r = compute("sgNetworkVerify1.ini")
 x = readdlm("sgNetworkVerify1_resistances.out")
 x = x[2:end, 2:end]
 
-@test r ≈ x
+@test sumabs2(x - r) < 1e-6
