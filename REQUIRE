@@ -3,3 +3,4 @@ IterativeSolvers
 Logging
 IniFile
 LightGraphs
+PyAMG
