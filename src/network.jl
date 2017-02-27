@@ -1,8 +1,3 @@
-using Logging
-using LightGraphs
-using IterativeSolvers
-Logging.configure(level = DEBUG)
-
 function network_pairwise(network_file, current_file)
 
     # Read network file
@@ -37,6 +32,7 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
         pt1 = ingraph(rcc, c[i])
         d = cond_pruned[pt1, pt1]
         cond_pruned[pt1, pt1] = 0
+        M = aspreconditioner(SmoothedAggregationSolver(cond_pruned))
         for j = i+1:numpoints
             pt2 = ingraph(rcc, c[j])
             if pt2 == 0
@@ -49,7 +45,7 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
             curr[pt1] = -1
             curr[pt2] = 1
             println('\n')
-            volt = cg(cond_pruned, curr)
+            volt = cg(cond_pruned, curr, M; tol = 1e-6, maxiter = 100000)
             postprocess(volt[1], c, i, j, resistances, pt1, pt2)
         end
         cond_pruned[pt1,pt1] = d
