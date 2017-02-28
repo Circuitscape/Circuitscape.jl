@@ -35,3 +35,10 @@ x = readdlm("mgNetworkVerify2_voltages.txt")
 x = x[:,2]
 
 @test sumabs2(x - r) < 1e-6 
+
+# Network test with advanced mode and both multiple grounds and sources
+r = compute("mgNetworkVerify3.ini")
+x = readdlm("mgNetworkVerify3_voltages.txt")
+x = x[:,2]
+
+@test sumabs2(x - r) < 1e-6 
