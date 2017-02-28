@@ -22,3 +22,9 @@ function load_graph(gpath::String)
 end
 
 read_focal_points(path::String) = Int.(vec(readcsv(path)) + 1)
+
+function read_point_strengths(path::String)
+    a = readdlm(path)
+    a[:,1] = a[:,1] + 1
+    a
+end
