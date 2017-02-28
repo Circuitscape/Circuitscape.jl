@@ -22,9 +22,16 @@ x = x[2:end, 2:end]
 
 @test sumabs2(x - r) < 1e-6
 
-# Network test with advanced mode
+# Simple Network test with advanced mode
 r = compute("mgNetworkVerify1.ini")
 x = readdlm("mgNetworkVerify1_voltages.txt")
+x = x[:,2]
+
+@test sumabs2(x - r) < 1e-6 
+
+# Network test with advanced mode and multiple grounds
+r = compute("mgNetworkVerify2.ini")
+x = readdlm("mgNetworkVerify2_voltages.txt")
 x = x[:,2]
 
 @test sumabs2(x - r) < 1e-6 
