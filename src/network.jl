@@ -104,15 +104,20 @@ function advanced(cfg::Inifile, a::SparseMatrixCSC, g::Graph, source_map, ground
     if length(ind_nzeros) == 0
         finitegrounds = [-9999]
     end
-    for i in eachindex(ind_zeros)
-        a = del_row_col(a, Int(ground_map[i,1]))
-    end
     is_res = get(cfg, "Options for advanced mode", "ground_file_is_resistances")
     if is_res == "True"
         ground_vals = 1 ./ ground_vals
     end
+    for i in eachindex(ground_vals)
+        if ground_vals[i] == Inf
+            ground_vals[i] = 0
+        end
+    end
     if finitegrounds[1] != -9999
-        a = a + spdiagm(ground_vals, size(a, 1), size(a, 1))
+        a = a + spdiagm(ground_vals, 0, size(a, 1), size(a, 1))
+    end
+    for i in ind_zeros
+        a = del_row_col(a, Int(ground_map[i,1]))
     end
     M = aspreconditioner(SmoothedAggregationSolver(a))
     curr = zeros(size(a, 1))
@@ -121,8 +126,9 @@ function advanced(cfg::Inifile, a::SparseMatrixCSC, g::Graph, source_map, ground
     volt = cg(a, curr, M; tol = 1e-6, maxiter = 100000)
     ground_indices = ground_map[:,1]
     k = 1
+    ground_zeros = ground_indices[ind_zeros]
     for i = 1:size(v, 1)
-        if i in ground_indices
+        if i in ground_zeros
             continue
         else
             v[i] = volt[1][k]
