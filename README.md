@@ -1,6 +1,6 @@
 # CircuitScape
 
-Linux, OSX: [![Build Status](https://travis-ci.org/ranjanan/CircuitScape.jl.svg?branch=master)](https://travis-ci.org/ranjanan/CircuitScape.jl)
+Linux: [![Build Status](https://travis-ci.org/ranjanan/CircuitScape.jl.svg?branch=master)](https://travis-ci.org/ranjanan/CircuitScape.jl)
 
 [![Coverage Status](https://coveralls.io/repos/ranjanan/CircuitScape.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/ranjanan/CircuitScape.jl?branch=master)
 
