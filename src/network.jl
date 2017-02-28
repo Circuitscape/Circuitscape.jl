@@ -83,6 +83,57 @@ function compute_network(a::Inifile)
         resistances = single_ground_all_pair_resistances(A, g, fp)
         return resistances
     elseif scenario == "advanced"
-        # advanced logic
+        source_file = get(a, "Options for advanced mode", "source_file")
+        ground_file = get(a, "Options for advanced mode", "ground_file")
+        source_map = read_point_strengths(source_file)
+        ground_map = read_point_strengths(ground_file)
+        voltages = advanced(a, A, g, source_map, ground_map)
+        return voltages
     end
+end
+
+function advanced(cfg::Inifile, a::SparseMatrixCSC, g::Graph, source_map, ground_map)
+    a = laplacian(a)
+    cc = connected_components(g)
+    debug("There are $(size(a, 1)) points and $(length(cc)) connected components")
+    v = zeros(size(a, 1))
+    ground_vals = ground_map[:,2]
+    ind_zeros = find(x -> x == 0, ground_map[:,2]) 
+    ind_nzeros = find(x -> x != 0, ground_map[:,2]) 
+    finitegrounds = zeros(1)
+    if length(ind_nzeros) == 0
+        finitegrounds = [-9999]
+    end
+    for i in eachindex(ind_zeros)
+        a = del_row_col(a, Int(ground_map[i,1]))
+    end
+    is_res = get(cfg, "Options for advanced mode", "ground_file_is_resistances")
+    if is_res == "True"
+        ground_vals = 1 ./ ground_vals
+    end
+    if finitegrounds[1] != -9999
+        a = a + spdiagm(ground_vals, size(a, 1), size(a, 1))
+    end
+    M = aspreconditioner(SmoothedAggregationSolver(a))
+    curr = zeros(size(a, 1))
+    curr_indices = Int.(source_map[:,1])
+    curr[curr_indices] = source_map[:,2]
+    volt = cg(a, curr, M; tol = 1e-6, maxiter = 100000)
+    ground_indices = ground_map[:,1]
+    k = 1
+    for i = 1:size(v, 1)
+        if i in ground_indices
+            continue
+        else
+            v[i] = volt[1][k]
+            k += 1
+        end
+    end
+    v
+end
+
+function del_row_col(a, n::Int)
+    l = size(a, 1)
+    ind = union(1:n-1, n+1:l)
+    a[ind, ind]
 end
