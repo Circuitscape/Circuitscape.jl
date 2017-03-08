@@ -1,3 +1,16 @@
+const AAGRID = 2
+
+immutable RasterMeta
+    ncols::Int64
+    nrows::Int64
+    xllcorner::Float64
+    yllcorner::Float64
+    cellsize::Float64
+    nodata::Int64
+    file_type::Int64
+end
+
+
 function read_graph(a::Inifile, gpath::String)
     i,j,v = load_graph(gpath)
     idx = findfirst(x -> x < 1, i)
@@ -27,4 +40,79 @@ function read_point_strengths(path::String)
     a = readdlm(path)
     a[:,1] = a[:,1] + 1
     a
+end
+
+function read_cell_map(habitat_file, is_res)
+    cell_map, rastermeta = _ascii_grid_reader(habitat_file)
+
+    gmap = similar(cell_map)
+    ind = find(x -> x == -9999, cell_map)
+    if is_res
+        if count(x -> x == 0, cellmap) > 0
+            throw("Error: zero resistance values are not currently supported for habitat maps. Use a short-circuit region file instead.")
+        else
+            for i in eachindex(cellmap)
+                gmap[i] = 1./cellmap[i]
+            end
+            gmap[ind] = 0 
+        end
+    else
+        for i in eachindex(cell_map)
+            if i in ind
+                gmap[i] = 0
+            else
+                gmap[i] = cell_map[i]
+            end
+        end
+    end
+    gmap, rastermeta
+end
+
+function _ascii_grid_reader(file)
+    rastermeta = _ascii_grid_read_header(file)
+    readdlm(file; skipstart = 6), rastermeta
+end
+
+function _ascii_grid_read_header(habitat_file)
+    file_type = _guess_file_type(habitat_file)
+    f = open(habitat_file, "r")
+    ncols = parse(Int, split(readline(f))[2])
+    nrows = parse(Int, split(readline(f))[2])
+    xllcorner = float(split(readline(f))[2])
+    yllcorner = float(split(readline(f))[2])
+    cellsize = float(split(readline(f))[2])
+    nodata = parse(Int, split(readline(f))[2])
+    RasterMeta(ncols, nrows, xllcorner, yllcorner, cellsize, nodata, file_type)
+end
+
+_guess_file_type(filename) = AAGRID
+
+function read_polymap(file, habitatmeta; nodata_as = 0, resample = true)
+    #rastermeta = _ascii_grid_read_header(file)
+    polymap, rastermeta = _ascii_grid_reader(file)
+
+    ind = find(x -> x == rastermeta.nodata, polymap)
+    if rastermeta.nodata != -1
+        polymap[ind] = nodata_as
+    end
+            
+    if rastermeta.cellsize != habitatmeta.cellsize
+        warn("cellsize is not the same")
+    elseif rastermeta.ncols != habitatmeta.ncols
+        warn("ncols is not the same")
+    elseif rastermeta.nrows != habitatmeta.nrows
+        warn("nrows is not the same")
+    elseif rastermeta.yllcorner != habitatmeta.yllcorner
+        warn("yllcorner is not the same")
+    elseif rastermeta.xllcorner != habitatmeta.xllcorner
+        warn("xllcorner is not the same")
+    end
+
+    polymap
+end
+
+function read_point_map(file, habitatmeta)
+    filetype = _guess_file_type(file)
+    points_rc = read_polymap(file, habitatmeta)
+    findnz(points_rc)
 end

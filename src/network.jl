@@ -1,7 +1,7 @@
 function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::Vector{T})
     numpoints = size(c, 1)
     cc = connected_components(g)
-    debug("There are $numpoints nodes and $(length(cc)) connected components")
+    debug("There are $numpoints focal points and $(length(cc)) connected components")
     resistances = -1 * ones(numpoints, numpoints) 
 
     cond = laplacian(a)
@@ -26,11 +26,14 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
             debug("pt1 = $pt1, pt2 = $pt2")
             p +=1
             curr = zeros(size(cond_pruned, 1))
-            curr[pt1] = -1
-            curr[pt2] = 1
-            println('\n')
-            volt = cg(cond_pruned, curr, M; tol = 1e-6, maxiter = 100000)
-            postprocess(volt[1], c, i, j, resistances, pt1, pt2)
+            z = zeros(size(cond_pruned, 1))
+            if pt1 != pt2
+                curr[pt1] = -1
+                curr[pt2] = 1
+                volt = cg(cond_pruned, curr, M; tol = 1e-6, maxiter = 100000)
+                z = volt[1]
+            end
+            postprocess(z, c, i, j, resistances, pt1, pt2)
         end
         cond_pruned[pt1,pt1] = d
     end

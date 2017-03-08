@@ -11,9 +11,12 @@ Inputs:
 """
 function compute(path::String)
     cfg = ConfigFile(path)
-    if get(cfg, "Circuitscape mode", "data_type") == "network"
+    data_type = get(cfg, "Circuitscape mode", "data_type")
+    if data_type == "network"
         result = compute_network(cfg)
         return result
     else
+        result = compute_raster(cfg)
+        return result
     end
 end
