@@ -1,6 +1,8 @@
 using CircuitScape
 using Base.Test
 
+include("internal.jl")
+
 # Simple test with one connected component
 r = compute("input/network/sgNetworkVerify2.ini")
 x = readdlm("output_verify/sgNetworkVerify2_resistances.out")
