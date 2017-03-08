@@ -83,15 +83,31 @@ function pairwise_module(gmap, polymap, points_rc)
 end
 
 res_avg(x, y) = 1 / ((1/x + 1/y) / 2)
+
 function construct_node_map(gmap, polymap)
-   nodemap = zeros(size(gmap)) 
-   ind = find(gmap) # Replace by more sophisticated logic later
-   nodemap[ind] = 1:length(ind)
-   ind_sc = find(polymap)
-   for i  = 2:length(ind_sc)
-       nodemap[ind_sc[i]] = nodemap[ind_sc[i-1]]
-   end
-   ind_notsc = setdiff(ind, ind_sc)  
-   nodemap[ind_notsc] -= 1
-   nodemap 
+    nodemap = zeros(size(gmap)) 
+    d = Dict{Int, Vector{Int}}()
+    for i in unique(polymap)
+        d[i] = find(x -> x == i, polymap)
+    end
+    k = 1
+    for i in find(gmap)
+        if i in d[0]
+            nodemap[i] = k
+            k += 1
+        else
+            for key in keys(d)
+                if i in d[key]
+                    if i == first(d[key])
+                        nodemap[i] += k
+                        k += 1
+                    else
+                        nodemap[i] = nodemap[first(d[key])]
+                    end
+                end
+            end
+        end
+    end
+
+nodemap 
 end
