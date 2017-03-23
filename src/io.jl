@@ -1,4 +1,5 @@
 const AAGRID = 2
+const TXT = 3
 
 immutable RasterMeta
     ncols::Int64
@@ -44,33 +45,29 @@ end
 
 function read_cell_map(habitat_file, is_res)
     cell_map, rastermeta = _ascii_grid_reader(habitat_file)
-
     gmap = similar(cell_map)
     ind = find(x -> x == -9999, cell_map)
+    
     if is_res
-        if count(x -> x == 0, cellmap) > 0
+        if count(x -> x == 0, cell_map) > 0
             throw("Error: zero resistance values are not currently supported for habitat maps. Use a short-circuit region file instead.")
         else
-            for i in eachindex(cellmap)
-                gmap[i] = 1./cellmap[i]
+            for i in eachindex(cell_map)
+                gmap[i] =  1 ./ cell_map[i]
             end
-            gmap[ind] = 0 
+            gmap[ind] = 0
         end
     else
-        for i in eachindex(cell_map)
-            if i in ind
-                gmap[i] = 0
-            else
-                gmap[i] = cell_map[i]
-            end
-        end
+        copy!(gmap, cell_map)
+        gmap[ind] = 0
     end
     gmap, rastermeta
 end
 
 function _ascii_grid_reader(file)
     rastermeta = _ascii_grid_read_header(file)
-    readdlm(file; skipstart = 6), rastermeta
+    g = readdlm(file; skipstart = 6)
+    g, rastermeta
 end
 
 function _ascii_grid_read_header(habitat_file)
@@ -85,7 +82,15 @@ function _ascii_grid_read_header(habitat_file)
     RasterMeta(ncols, nrows, xllcorner, yllcorner, cellsize, nodata, file_type)
 end
 
-_guess_file_type(filename) = AAGRID
+function _guess_file_type(filename) 
+    if endswith(filename, ".asc")
+        return AAGRID
+    elseif endswith(filename, ".txt")
+        return TXT
+    else
+        throw("Check file format")
+    end
+end
 
 function read_polymap(file, habitatmeta; nodata_as = 0, resample = true)
     #rastermeta = _ascii_grid_read_header(file)
@@ -113,6 +118,11 @@ end
 
 function read_point_map(file, habitatmeta)
     filetype = _guess_file_type(file)
-    points_rc = read_polymap(file, habitatmeta)
+    points_rc = filetype == AAGRID ? read_polymap(file, habitatmeta) : read_txt_points(file)
     findnz(points_rc)
 end
+
+function read_txt_points(file)
+    readdlm(file)
+end
+
