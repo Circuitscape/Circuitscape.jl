@@ -1,3 +1,4 @@
+using JLD
 function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::Vector{T})
     numpoints = size(c, 1)
     t = @elapsed begin cc = connected_components(g) end
@@ -15,10 +16,10 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
         t = @elapsed rcc = rightcc(cc, c[i])
         cond_pruned = cond[rcc, rcc]
         t = @elapsed pt1 = ingraph(rcc, c[i])
-        d = cond_pruned[pt1, pt1]
-        cond_pruned[pt1, pt1] = 0
-        t = @elapsed M = aspreconditioner(SmoothedAggregationSolver(cond_pruned))
-        println("Time for preconditioning = $t")
+        #d = cond_pruned[pt1, pt1]
+        #cond_pruned[pt1, pt1] = 0
+        #t = @elapsed M = aspreconditioner(SmoothedAggregationSolver(cond_pruned))
+        #println("Time for preconditioning = $t")
         l = @elapsed for j = i+1:numpoints
             pt2 = ingraph(rcc, c[j])
             if pt2 == 0
@@ -32,15 +33,15 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
             if pt1 != pt2
                 curr[pt1] = -1
                 curr[pt2] = 1
-            t = @elapsed cg!(z, cond_pruned, curr, M; tol = 1e-6, maxiter = 100000)
-            #t = @elapsed z = cond_pruned \ curr
+            #t = @elapsed cg!(z, cond_pruned, curr, M; tol = 1e-6, maxiter = 100000)
+            t = @elapsed z = cholfact(Hermitian(cond_pruned)) \ curr
             println("time for cg = $t")
             end
             t = @elapsed postprocess(z, c, i, j, resistances, pt1, pt2)
             println("time for postprocess = $t")
         end
         println("time for inner loop = $l")
-        cond_pruned[pt1,pt1] = d
+        #cond_pruned[pt1,pt1] = d
     end
     println("time for outer loop = $k")
     debug("solved $p equations")
