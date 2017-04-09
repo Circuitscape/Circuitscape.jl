@@ -51,3 +51,11 @@ x = readdlm("output_verify/sgVerify2_resistances.out")
 x = x[2:end, 2:end]
 
 @test sumabs2(x - r) < 1e-6
+
+# Another raster test, sort points map
+r = compute("input/raster/1/sgVerify1.ini")
+x = readdlm("output_verify/sgVerify1_resistances.out")
+x = x[2:end, 2:end]
+
+@test sumabs2(x - r) < 1e-6
+
