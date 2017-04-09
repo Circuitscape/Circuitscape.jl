@@ -48,22 +48,17 @@ function read_cell_map(habitat_file, is_res)
     gmap = similar(cell_map)
     ind = find(x -> x == -9999, cell_map)
     if is_res
-        if count(x -> x == 0, cellmap) > 0
+        if count(x -> x == 0, cell_map) > 0
             throw("Error: zero resistance values are not currently supported for habitat maps. Use a short-circuit region file instead.")
         else
-            for i in eachindex(cellmap)
-                gmap[i] = 1./cellmap[i]
+            for i in eachindex(cell_map)
+                gmap[i] = 1./cell_map[i]
             end
             gmap[ind] = 0 
         end
     else
-        for i in eachindex(cell_map)
-            if i in ind
-                gmap[i] = 0
-            else
-                gmap[i] = cell_map[i]
-            end
-        end
+        copy!(gmap, cell_map)
+        gmap[ind] = 0
     end
     gmap, rastermeta
 end
@@ -114,5 +109,21 @@ end
 function read_point_map(file, habitatmeta)
     filetype = _guess_file_type(file)
     points_rc = read_polymap(file, habitatmeta)
-    findnz(points_rc)
+    (i,j,v) = findnz(points_rc)
+    ind = find(x -> x < 0, v)
+
+    # Get rid of negative resistances
+    for index in ind
+        deleteat!(i, index)
+        deleteat!(j, index)
+        deleteat!(v, index)
+    end
+
+    # Sort them 
+    idx = sortperm(v)
+    i = i[idx]
+    j = j[idx]
+    v = v[idx]
+    
+    i, j, v
 end

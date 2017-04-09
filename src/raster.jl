@@ -15,7 +15,8 @@ function load_maps(cfg::Inifile)
     # Read raster map
     info("Reading Maps")
     habitat_file = get(cfg, "Habitat raster or graph", "habitat_file")
-    is_res = get(cfg, "Habitat raster or graph", "habitat_file_is_resistances") == "True"
+    is_res = get(cfg, "Habitat raster or graph", "habitat_map_is_resistances") == "True"
+
     cellmap, habitatmeta = read_cell_map(habitat_file, is_res)
 
     # Read polygon map
@@ -109,5 +110,5 @@ function construct_node_map(gmap, polymap)
         end
     end
 
-nodemap 
+    nodemap 
 end

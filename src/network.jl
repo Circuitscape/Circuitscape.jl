@@ -1,23 +1,34 @@
 function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::Vector{T})
     numpoints = size(c, 1)
     cc = connected_components(g)
-    debug("There are $numpoints focal points and $(length(cc)) connected components")
+    debug("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
     resistances = -1 * ones(numpoints, numpoints) 
 
     cond = laplacian(a)
 
     volt = Vector{Float64}(size(g, 1))
     total = Int(numpoints * (numpoints-1) / 2)
+    cond_pruned = sprand(1,1,0.1)
+    d = 0
+    M = 1
+    pt1 = 1
+    rcc = Vector{Int64}()
     
     p = 0 
     for i = 1:numpoints
-        rcc = rightcc(cc, c[i])
-        cond_pruned = cond[rcc, rcc]
-        pt1 = ingraph(rcc, c[i])
-        d = cond_pruned[pt1, pt1]
-        cond_pruned[pt1, pt1] = 0
-        M = aspreconditioner(SmoothedAggregationSolver(cond_pruned))
+        if c[i] != 0
+            rcc = rightcc(cc, c[i])
+            cond_pruned = cond[rcc, rcc]
+            pt1 = ingraph(rcc, c[i])
+            d = cond_pruned[pt1, pt1]
+            cond_pruned[pt1, pt1] = 0
+            M = aspreconditioner(SmoothedAggregationSolver(cond_pruned))
+        end
         for j = i+1:numpoints
+            if c[i] == 0
+                resistances[i,j] = resistances[j,i] = -1
+                continue
+            end
             pt2 = ingraph(rcc, c[j])
             if pt2 == 0
                 continue
