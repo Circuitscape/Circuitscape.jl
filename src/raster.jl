@@ -41,7 +41,7 @@ function pairwise_module(gmap, polymap, points_rc)
 
     point_file_contains_polygons = length(points_rc[1]) != length(unique(points_rc[3]))
 
-    if !point_file_contains_polygons
+    #if !point_file_contains_polygons
         nodemap = construct_node_map(gmap, polymap)
         I = Int64[]
         J = Int64[]
@@ -79,7 +79,7 @@ function pairwise_module(gmap, polymap, points_rc)
 
         resistances = single_ground_all_pair_resistances(a, g, c)
         return resistances
-    end
+    #end
     return nothing
 end
 
