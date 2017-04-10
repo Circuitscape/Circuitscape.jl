@@ -1,4 +1,5 @@
 const AAGRID = 2
+const TXTLIST = 3
 
 immutable RasterMeta
     ncols::Int64
@@ -6,7 +7,7 @@ immutable RasterMeta
     xllcorner::Float64
     yllcorner::Float64
     cellsize::Float64
-    nodata::Int64
+    nodata::Float64
     file_type::Int64
 end
 
@@ -65,7 +66,19 @@ end
 
 function _ascii_grid_reader(file)
     rastermeta = _ascii_grid_read_header(file)
-    readdlm(file; skipstart = 6), rastermeta
+    c = Array{Float64,2}()
+    ss = 6
+    if rastermeta.nodata == -Inf
+        ss = 5
+    end
+    try
+        c = readdlm(file, Float64; skipstart = ss)
+    catch
+        c = readdlm(file; skipstart = ss)
+        c = c[:, 1:end-1]
+        map!(Float64, c)
+    end
+    c, rastermeta
 end
 
 function _ascii_grid_read_header(habitat_file)
@@ -76,11 +89,24 @@ function _ascii_grid_read_header(habitat_file)
     xllcorner = float(split(readline(f))[2])
     yllcorner = float(split(readline(f))[2])
     cellsize = float(split(readline(f))[2])
-    nodata = parse(Int, split(readline(f))[2])
+    #nodata = parse(Int, split(readline(f))[2])
+    nodata = -Inf
+    s = split(readline(f))
+    if contains(s[1], "NODATA") || contains(s[1], "nodata")
+        nodata = float(s[2])
+    end 
     RasterMeta(ncols, nrows, xllcorner, yllcorner, cellsize, nodata, file_type)
 end
 
-_guess_file_type(filename) = AAGRID
+function _guess_file_type(filename) 
+    if endswith(filename, ".asc")
+        return AAGRID
+    elseif endswith(filename, ".txt")
+        return TXTLIST
+    else
+        throw("Check file format")
+    end
+end
 
 function read_polymap(file, habitatmeta; nodata_as = 0, resample = true)
     #rastermeta = _ascii_grid_read_header(file)
@@ -108,8 +134,21 @@ end
 
 function read_point_map(file, habitatmeta)
     filetype = _guess_file_type(file)
-    points_rc = read_polymap(file, habitatmeta)
-    (i,j,v) = findnz(points_rc)
+    points_rc = filetype == TXTLIST ? readdlm(file) : read_polymap(file, habitatmeta)
+
+    i = Int64[]
+    j = Int64[]
+    v = Int64[]
+    if filetype == TXTLIST
+        I = points_rc[:,2]
+        J = points_rc[:,3]
+        v = points_rc[:,1]
+        i  = ceil(Int, habitatmeta.nrows - (J - habitatmeta.yllcorner) / habitatmeta.cellsize)
+        j = ceil(Int, (I - habitatmeta.xllcorner) / habitatmeta.cellsize)
+    else
+        (i,j,v) = findnz(points_rc)
+    end
+
     ind = find(x -> x < 0, v)
 
     # Get rid of negative resistances
