@@ -87,23 +87,28 @@ res_avg(x, y) = 1 / ((1/x + 1/y) / 2)
 
 function construct_node_map(gmap, polymap)
     nodemap = zeros(size(gmap)) 
-    d = Dict{Int, Vector{Int}}()
-    for i in unique(polymap)
-        d[i] = find(x -> x == i, polymap)
-    end
-    k = 1
-    for i in find(gmap)
-        if i in d[0]
-            nodemap[i] = k
-            k += 1
-        else
-            for key in keys(d)
-                if i in d[key]
-                    if i == first(d[key])
-                        nodemap[i] += k
-                        k += 1
-                    else
-                        nodemap[i] = nodemap[first(d[key])]
+    if isempty(polymap)
+         ind = find(x -> x > 0, gmap)
+         nodemap[ind] = 1:length(ind)
+    else
+        d = Dict{Int, Vector{Int}}()
+        for i in unique(polymap)
+            d[i] = find(x -> x == i, polymap)
+        end
+        k = 1
+        for i in find(gmap)
+            if i in d[0]
+                nodemap[i] = k
+                k += 1
+            else
+                for key in keys(d)
+                    if i in d[key]
+                        if i == first(d[key])
+                            nodemap[i] += k
+                            k += 1
+                        else
+                            nodemap[i] = nodemap[first(d[key])]
+                        end
                     end
                 end
             end

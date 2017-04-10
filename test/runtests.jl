@@ -65,3 +65,10 @@ x = readdlm("output_verify/sgVerify7_resistances.out")
 x = x[2:end, 2:end]
 
 @test sumabs2(x - r) < 1e-6
+
+# Raster test, no polygon
+r = compute("input/raster/4/sgVerify4.ini")
+x = readdlm("output_verify/sgVerify4_resistances.out")
+x = x[2:end, 2:end]
+
+@test sumabs2(x - r) < 1e-6
