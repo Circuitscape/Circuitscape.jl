@@ -7,7 +7,7 @@ function compute_raster(cfg::Inifile)
     four_neighbors = get(cfg, "Connection scheme for raster habitat data",
                                 "connect_four_neighbors_only") == "True"
     average_resistances = get(cfg, "Connection scheme for raster habitat data",
-                                "connect_using_average_resistances") == "True"
+                                "connect_using_avg_resistances") == "True"
 
     resistances = pairwise_module(gmap, polymap, points_rc, four_neighbors, 
                                     average_resistances)
