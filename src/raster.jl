@@ -4,8 +4,13 @@ function compute_raster(cfg::Inifile)
     gmap, polymap, points_rc = load_maps(cfg)
     c = count(x -> x > 0, gmap)
     info("Resistance/Conductance map has $c nodes")
+    four_neighbors = get(cfg, "Connection scheme for raster habitat data",
+                                "connect_four_neighbors_only") == "True"
+    average_resistances = get(cfg, "Connection scheme for raster habitat data",
+                                "connect_using_average_resistances") == "True"
 
-    resistances = pairwise_module(gmap, polymap, points_rc)
+    resistances = pairwise_module(gmap, polymap, points_rc, four_neighbors, 
+                                    average_resistances)
 
     #gmap, polymap, points_rc
 end
@@ -37,9 +42,10 @@ function load_maps(cfg::Inifile)
     cellmap, polymap, points_rc
 end
 
-function pairwise_module(gmap, polymap, points_rc)
+function pairwise_module(gmap, polymap, points_rc, four_neighbors, average_resistances)
 
     point_file_contains_polygons = length(points_rc[1]) != length(unique(points_rc[3]))
+    f = average_resistances ? res_avg : cond_avg
 
     #if !point_file_contains_polygons
         nodemap = construct_node_map(gmap, polymap)
@@ -55,14 +61,29 @@ function pairwise_module(gmap, polymap, points_rc)
                     if j != size(gmap, 2) && nodemap[i,j+1] != 0
                         push!(I, nodemap[i,j])
                         push!(J, nodemap[i,j+1])
-                        push!(V, res_avg(gmap[i,j], gmap[i,j+1]))
+                        push!(V, f(gmap[i,j], gmap[i,j+1]))
                     end
 
                     # Vertical neighbour
                     if i != size(gmap, 1) && nodemap[i+1, j] != 0
                         push!(I, nodemap[i,j])
                         push!(J, nodemap[i+1,j])
-                        push!(V, res_avg(gmap[i,j], gmap[i+1,j]))
+                        push!(V, f(gmap[i,j], gmap[i+1,j]))
+                    end
+
+                    if !four_neighbors
+                        # Diagonal neighbour
+                        if i != size(gmap, 1) && j != size(gmap, 2) && nodemap[i+1, j+1] != 0
+                            push!(I, nodemap[i,j])
+                            push!(J, nodemap[i+1,j+1])
+                            push!(V, weird_avg(gmap[i,j], gmap[i+1,j+1]))
+                        end
+                        
+                        if i != 1 && j != size(gmap, 2) && nodemap[i-1, j+1] != 0
+                            push!(I, nodemap[i,j])
+                            push!(J, nodemap[i-1,j+1])
+                            push!(V, weird_avg(gmap[i,j], gmap[i-1,j+1]))
+                        end
                     end
                 end
             end
@@ -84,6 +105,8 @@ function pairwise_module(gmap, polymap, points_rc)
 end
 
 res_avg(x, y) = 1 / ((1/x + 1/y) / 2)
+cond_avg(x, y) = (x + y) / 2
+weird_avg(x,y) = (x + y) / (2*√2)
 
 function construct_node_map(gmap, polymap)
     nodemap = zeros(size(gmap)) 
