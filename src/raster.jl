@@ -74,7 +74,7 @@ function pairwise_module(gmap, polymap, points_rc, four_neighbors, average_resis
             pt1 = pts[i]
             for j = i+1:size(pts, 1)
                 pt2 = pts[j]
-                newpoly = create_new_polymap(polymap, points_rc, pt1, pt2)
+                newpoly = create_new_polymap(gmap, polymap, points_rc, pt1, pt2)
 
                 nodemap = construct_node_map(gmap, newpoly)
                 a, g = construct_graph(gmap, nodemap, f, four_neighbors)
@@ -141,36 +141,45 @@ function construct_graph(gmap, nodemap, f, four_neighbors)
     a, g
 end
 
-function create_new_polymap(polymap, points_rc, pt1, pt2)
+function create_new_polymap(gmap, polymap, points_rc, pt1, pt2)
 
-    newpoly = deepcopy(polymap)
-    k = maximum(polymap)
-    f(x) = (points_rc[1][x], points_rc[2][x])
-    for p in (pt1, pt2)
-        # find the locations of the point
-        idx = find(x -> x == p, points_rc[3])
+    if isempty(polymap)
+        newpoly = zeros(size(gmap)...)
+        id1 = find(x -> x == pt1, points_rc[3])
+        id2 = find(x -> x == pt2, points_rc[3])
+        newpoly[points_rc[1][id1], points_rc[2][id1]] = pt1
+        newpoly[points_rc[1][id2], points_rc[2][id2]] = pt2
+        return newpoly
+    else
+        newpoly = deepcopy(polymap)
+        k = maximum(polymap)
+        f(x) = (points_rc[1][x], points_rc[2][x])
+        for p in (pt1, pt2)
+            # find the locations of the point
+            idx = find(x -> x == p, points_rc[3])
 
-        if length(idx) == 1
-            continue
-        end
-        allzero = mapreduce(x -> polymap[f(x)...] == 0, &, idx)
-        if allzero 
-            map(x -> newpoly[f(x)...] = k + 1, idx)
-            k += 1
-        else
-            nz = filter(x -> polymap[f(x)...]!= 0, idx)
-            if length(nz) == 1
-                map(x -> newpoly[f(x)...] = polymap[overlap[1]], idx)
-            else
-                coords = map(x -> f(x), nz)
-                vals = map(x -> polymap[x...], coords)
-                overlap = findin(polymap, vals)
-                newpoly[overlap] = k + 1
+            if length(idx) == 1
+                continue
+            end
+            allzero = mapreduce(x -> polymap[f(x)...] == 0, &, idx)
+            if allzero 
+                map(x -> newpoly[f(x)...] = k + 1, idx)
                 k += 1
+            else
+                nz = filter(x -> polymap[f(x)...]!= 0, idx)
+                if length(nz) == 1
+                    map(x -> newpoly[f(x)...] = polymap[overlap[1]], idx)
+                else
+                    coords = map(x -> f(x), nz)
+                    vals = map(x -> polymap[x...], coords)
+                    overlap = findin(polymap, vals)
+                    newpoly[overlap] = k + 1
+                    k += 1
+                end
             end
         end
+        return newpoly
     end
-    newpoly
 end
 
 res_avg(x, y) = 1 / ((1/x + 1/y) / 2)
