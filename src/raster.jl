@@ -45,11 +45,12 @@ end
 function pairwise_module(gmap, polymap, points_rc, four_neighbors, average_resistances)
 
     point_file_contains_polygons = length(points_rc[1]) != length(unique(points_rc[3]))
-    f = average_resistances ? res_avg : cond_avg
+    f1 = average_resistances ? res_avg : cond_avg
+    f2 = average_resistances ? weirder_avg : weird_avg
 
     if !point_file_contains_polygons
         nodemap = construct_node_map(gmap, polymap)
-        a, g = construct_graph(gmap, nodemap, f, four_neighbors)
+        a, g = construct_graph(gmap, nodemap, f1, f2, four_neighbors)
 
         c = zeros(Int, length(points_rc[3]))
         for (i,v) in enumerate(zip(points_rc[1], points_rc[2]))
@@ -77,7 +78,7 @@ function pairwise_module(gmap, polymap, points_rc, four_neighbors, average_resis
                 newpoly = create_new_polymap(gmap, polymap, points_rc, pt1, pt2)
 
                 nodemap = construct_node_map(gmap, newpoly)
-                a, g = construct_graph(gmap, nodemap, f, four_neighbors)
+                a, g = construct_graph(gmap, nodemap, f1, f2, four_neighbors)
                 x,y = 0,0
                 x = find(x -> x == pt1, points_rc[3])[1]
                 y = find(x -> x == pt2, points_rc[3])[1]
@@ -94,7 +95,7 @@ function pairwise_module(gmap, polymap, points_rc, four_neighbors, average_resis
     return nothing
 end
 
-function construct_graph(gmap, nodemap, f, four_neighbors)
+function construct_graph(gmap, nodemap, f1, f2, four_neighbors)
     I = Int64[]
     J = Int64[]
     V = Float64[]
@@ -107,14 +108,14 @@ function construct_graph(gmap, nodemap, f, four_neighbors)
                 if j != size(gmap, 2) && nodemap[i,j+1] != 0
                     push!(I, nodemap[i,j])
                     push!(J, nodemap[i,j+1])
-                    push!(V, f(gmap[i,j], gmap[i,j+1]))
+                    push!(V, f1(gmap[i,j], gmap[i,j+1]))
                 end
 
                 # Vertical neighbour
                 if i != size(gmap, 1) && nodemap[i+1, j] != 0
                     push!(I, nodemap[i,j])
                     push!(J, nodemap[i+1,j])
-                    push!(V, f(gmap[i,j], gmap[i+1,j]))
+                    push!(V, f1(gmap[i,j], gmap[i+1,j]))
                 end
 
                 if !four_neighbors
@@ -122,13 +123,13 @@ function construct_graph(gmap, nodemap, f, four_neighbors)
                     if i != size(gmap, 1) && j != size(gmap, 2) && nodemap[i+1, j+1] != 0
                         push!(I, nodemap[i,j])
                         push!(J, nodemap[i+1,j+1])
-                        push!(V, weird_avg(gmap[i,j], gmap[i+1,j+1]))
+                        push!(V, f2(gmap[i,j], gmap[i+1,j+1]))
                     end
                     
                     if i != 1 && j != size(gmap, 2) && nodemap[i-1, j+1] != 0
                         push!(I, nodemap[i,j])
                         push!(J, nodemap[i-1,j+1])
-                        push!(V, weird_avg(gmap[i,j], gmap[i-1,j+1]))
+                        push!(V, f2(gmap[i,j], gmap[i-1,j+1]))
                     end
                 end
             end
@@ -143,17 +144,18 @@ end
 
 function create_new_polymap(gmap, polymap, points_rc, pt1, pt2)
 
+    f(x) = (points_rc[1][x], points_rc[2][x])
+
     if isempty(polymap)
         newpoly = zeros(size(gmap)...)
         id1 = find(x -> x == pt1, points_rc[3])
         id2 = find(x -> x == pt2, points_rc[3])
-        newpoly[points_rc[1][id1], points_rc[2][id1]] = pt1
-        newpoly[points_rc[1][id2], points_rc[2][id2]] = pt2
+        map(x -> newpoly[f(x)...] = pt1, id1)
+        map(x -> newpoly[f(x)...] = pt2, id2)
         return newpoly
     else
         newpoly = deepcopy(polymap)
         k = maximum(polymap)
-        f(x) = (points_rc[1][x], points_rc[2][x])
         for p in (pt1, pt2)
             # find the locations of the point
             idx = find(x -> x == p, points_rc[3])
@@ -185,6 +187,7 @@ end
 res_avg(x, y) = 1 / ((1/x + 1/y) / 2)
 cond_avg(x, y) = (x + y) / 2
 weird_avg(x,y) = (x + y) / (2*√2)
+weirder_avg(x, y) = 1 / (√2 * (1/x + 1/y) / 2)
 
 function construct_node_map(gmap, polymap)
     nodemap = zeros(size(gmap)) 
@@ -205,10 +208,16 @@ function construct_node_map(gmap, polymap)
                 for key in keys(d)
                     if i in d[key]
                         if i == first(d[key])
-                            nodemap[i] += k
+                            nodemap[i] = k
                             k += 1
                         else
-                            nodemap[i] = nodemap[first(d[key])]
+                            if polymap[first(d[key])] != 0 && nodemap[first(d[key])] == 0
+                                nodemap[i] = k
+                                nodemap[first(d[key])] = k
+                                k += 1
+                            else
+                                nodemap[i] = nodemap[first(d[key])]
+                            end
                         end
                     end
                 end
