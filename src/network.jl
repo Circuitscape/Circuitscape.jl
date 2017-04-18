@@ -107,6 +107,9 @@ function compute_network(a::Inifile)
 end
 
 function advanced(cfg::Inifile, a::SparseMatrixCSC, g::Graph, source_map, ground_map; nodemap = Array{Float64,2}())
+
+    cc = connected_components(g)
+    debug("There are $(size(a, 1)) points and $(length(cc)) connected components")
     mode = get(cfg, "Circuitscape mode", "data_type")
     if mode == "raster"
         (i1, j1, v1) = findnz(source_map)
@@ -138,8 +141,6 @@ function advanced(cfg::Inifile, a::SparseMatrixCSC, g::Graph, source_map, ground
         return volt
     else
         a = laplacian(a)
-        cc = connected_components(g)
-        debug("There are $(size(a, 1)) points and $(length(cc)) connected components")
         v = zeros(size(a, 1))
         ground_vals = ground_map[:,2]
         ind_zeros = find(x -> x == 0, ground_map[:,2]) 
