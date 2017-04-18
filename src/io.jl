@@ -113,7 +113,7 @@ function read_polymap(file, habitatmeta; nodata_as = 0, resample = true)
     polymap, rastermeta = _ascii_grid_reader(file)
 
     ind = find(x -> x == rastermeta.nodata, polymap)
-    if rastermeta.nodata != -1
+    if nodata_as != -1
         polymap[ind] = nodata_as
     end
             
@@ -165,4 +165,43 @@ function read_point_map(file, habitatmeta)
     v = v[idx]
     
     i, j, v
+end
+
+function read_source_and_ground_maps(source_file, ground_file, habitatmeta, is_res)
+
+    ground_map = Array{Float64,2}()
+    source_map = Array{Float64,2}()
+
+    filetype = _guess_file_type(ground_file)
+
+    if filetype == AAGRID
+        ground_map = read_polymap(ground_file, habitatmeta; nodata_as = -1)
+        ground_map = map(Float64, ground_map)
+    else
+        rc = readdlm(ground_file, Int)
+        ground_map = -9999 * ones(habitatmeta.nrows, habitatmeta.ncols)
+        ground_map[rc[:,2], rc[:,3]] = rc[:,1]
+    end
+
+    filetype = _guess_file_type(source_file)
+
+    if filetype == AAGRID
+        source_map = read_polymap(source_file, habitatmeta)
+        source_map = map(Float64, source_map)
+    else
+        rc = readdlm(source_file, Int)
+        source_map = -9999 * ones(habitatmeta.nrows, habitatmeta.ncols)
+        source_map[rc[:,2], rc[:,3]] = rc[:,1]
+    end
+
+    if is_res
+        ind = find(x -> x == -9999, ground_map)
+        ground_map = 1 ./ ground_map
+        ground_map[ind] = 0
+    else
+        ind = find(x -> x == -9999, ground_map)
+        ground_map[ind] = 0
+    end
+
+    source_map, ground_map
 end
