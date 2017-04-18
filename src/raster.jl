@@ -1,7 +1,19 @@
+immutable RasterData
+    cellmap::Array{Float64,2}
+    polymap::Array{Float64,2}
+    source_map::Array{Float64,2}
+    ground_map::Array{Float64,2}
+    points_rc::Tuple{Vector{Int},Vector{Int},Vector{Float64}}
+end
+
 function compute_raster(cfg::Inifile)
 
     # Read inputs
-    gmap, polymap, points_rc = load_maps(cfg)
+    # gmap, polymap, points_rc = load_maps(cfg)
+    rdata = load_maps(cfg)
+    gmap = rdata.cellmap
+    polymap = rdata.polymap
+    points_rc = rdata.points_rc
     c = count(x -> x > 0, gmap)
     info("Resistance/Conductance map has $c nodes")
     four_neighbors = get(cfg, "Connection scheme for raster habitat data",
@@ -9,9 +21,15 @@ function compute_raster(cfg::Inifile)
     average_resistances = get(cfg, "Connection scheme for raster habitat data",
                                 "connect_using_avg_resistances") == "True"
 
-    resistances = pairwise_module(gmap, polymap, points_rc, four_neighbors, 
-                                    average_resistances)
-
+    scenario = get(cfg, "Circuitscape mode", "scenario")
+    if scenario == "pairwise"
+        resistances = pairwise_module(gmap, polymap, points_rc, four_neighbors, 
+                                        average_resistances)
+    elseif scenario == "advanced"
+        nodemap = construct_node_map(gmap, polymap)
+        a,g = construct_graph(gmap, nodemap, average_resistances, four_neighbors)
+        voltages = advanced(cfg, a, g, rdata.source_map, rdata.ground_map, nodemap = nodemap)
+    end
     #gmap, polymap, points_rc
 end
 
@@ -29,28 +47,34 @@ function load_maps(cfg::Inifile)
     polymap_file = get(cfg, "Short circuit regions (aka polygons)", "polygon_file")
     polymap = use_polygons ? read_polymap(polymap_file, habitatmeta) : Array{Float64,2}()
 
-    scenario = get(cfg, "Circuitscape Mode", "scenario")
+    scenario = get(cfg, "Circuitscape mode", "scenario")
     point_file = get(cfg, "Options for pairwise and one-to-all and all-to-one modes",
                             "point_file")
 
+    # Default source and ground maps
+    source_map = Array{Float64,2}()
+    ground_map = Array{Float64,2}()
+
     points_rc = (Vector{Int}(), Vector{Int}(), Vector{Float64}())
     if scenario == "advanced"
+        source_file = get(cfg, "Options for advanced mode", "source_file")
+        ground_file = get(cfg, "Options for advanced mode", "ground_file")
+        is_res = get(cfg, "Options for advanced mode", "ground_file_is_resistances") == "True"
+        source_map, ground_map = read_source_and_ground_maps(source_file, ground_file, habitatmeta, is_res)
     else
         points_rc = read_point_map(point_file, habitatmeta)
     end
 
-    cellmap, polymap, points_rc
+    RasterData(cellmap, polymap, source_map, ground_map, points_rc)
 end
 
 function pairwise_module(gmap, polymap, points_rc, four_neighbors, average_resistances)
 
     point_file_contains_polygons = length(points_rc[1]) != length(unique(points_rc[3]))
-    f1 = average_resistances ? res_avg : cond_avg
-    f2 = average_resistances ? weirder_avg : weird_avg
 
     if !point_file_contains_polygons
         nodemap = construct_node_map(gmap, polymap)
-        a, g = construct_graph(gmap, nodemap, f1, f2, four_neighbors)
+        a, g = construct_graph(gmap, nodemap, average_resistances, four_neighbors)
 
         c = zeros(Int, length(points_rc[3]))
         for (i,v) in enumerate(zip(points_rc[1], points_rc[2]))
@@ -78,7 +102,7 @@ function pairwise_module(gmap, polymap, points_rc, four_neighbors, average_resis
                 newpoly = create_new_polymap(gmap, polymap, points_rc, pt1, pt2)
 
                 nodemap = construct_node_map(gmap, newpoly)
-                a, g = construct_graph(gmap, nodemap, f1, f2, four_neighbors)
+                a, g = construct_graph(gmap, nodemap, average_resistances, four_neighbors)
                 x,y = 0,0
                 x = find(x -> x == pt1, points_rc[3])[1]
                 y = find(x -> x == pt2, points_rc[3])[1]
@@ -95,7 +119,9 @@ function pairwise_module(gmap, polymap, points_rc, four_neighbors, average_resis
     return nothing
 end
 
-function construct_graph(gmap, nodemap, f1, f2, four_neighbors)
+function construct_graph(gmap, nodemap, average_resistances, four_neighbors)
+    f1 = average_resistances ? res_avg : cond_avg
+    f2 = average_resistances ? weirder_avg : weird_avg
     I = Int64[]
     J = Int64[]
     V = Float64[]
@@ -224,6 +250,14 @@ function construct_node_map(gmap, polymap)
             end
         end
     end
+    for i in eachindex(polymap)
+        if polymap[i] != 0 && nodemap[i] == 0
+            val = polymap[i] 
+            ind = findfirst(x -> x == val, polymap)
+            nodemap[i] = nodemap[ind]
+        end
+    end
 
     nodemap 
 end
+
