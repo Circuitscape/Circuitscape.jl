@@ -129,13 +129,22 @@ function advanced(cfg::Inifile, a::SparseMatrixCSC, g::Graph, source_map, ground
             end
         end
         sources, grounds, finitegrounds = resolve_conflicts(sources, grounds)
-        a = laplacian(a)
-        voltages = multiple_solver(a, g, sources, grounds, finitegrounds)
         volt = zeros(size(nodemap))
         ind = find(nodemap)
-        for i in eachindex(volt)
-            if i in ind
-                volt[i] = voltages[Int(nodemap[i])]
+        for c in cc
+            a_local = laplacian(a[c, c])
+            s_local = sources[c]
+            g_local = grounds[c]
+            f_local = finitegrounds[c]
+            voltages = multiple_solver(a_local, g, s_local, g_local, f_local)
+            for i in eachindex(volt)
+                if i in ind
+                    val = Int(nodemap[i])
+                    if val in c
+                        idx = findfirst(x -> x == val, c)
+                        volt[i] = voltages[idx] 
+                    end
+                end
             end
         end
         return volt
