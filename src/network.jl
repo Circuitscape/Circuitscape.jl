@@ -217,7 +217,7 @@ function multiple_solver(a, g, sources, grounds, finitegrounds)
     volt = cg(a, sources, M; tol = 1e-6, maxiter = 100000)
 
     # Replace the inf with 0
-    voltages = zeros(length(volt[1]) + 1)
+    voltages = zeros(length(volt[1]) + length(infgrounds))
     k = 1
     for i = 1:size(voltages, 1)
         if i in infgrounds
