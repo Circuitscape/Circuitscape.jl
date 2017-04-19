@@ -78,6 +78,7 @@ function _ascii_grid_reader(file)
         c = c[:, 1:end-1]
         map!(Float64, c)
     end
+    map!(x -> x == rastermeta.nodata ? -9999. : x , c)
     c, rastermeta
 end
 
