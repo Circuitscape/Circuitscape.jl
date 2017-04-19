@@ -153,3 +153,9 @@ r = compute("input/raster/advanced/4/mgVerify4.ini")
 x = readdlm("output_verify/mgVerify4_voltmap.asc", skipstart = 6)
 
 @test sumabs2(x - r) < 1e-6
+
+# Another Raster advanced test
+r = compute("input/raster/advanced/5/mgVerify5.ini")
+x = readdlm("output_verify/mgVerify5_voltmap.asc", skipstart = 6)
+
+@test sumabs2(x - r) < 1e-6
