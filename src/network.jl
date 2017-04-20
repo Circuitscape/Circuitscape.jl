@@ -141,6 +141,9 @@ function advanced(cfg::Inifile, a::SparseMatrixCSC, g::Graph, source_map, ground
             a_local = laplacian(a[c, c])
             s_local = sources[c]
             g_local = grounds[c]
+            if sum(s_local) == 0 || sum(g_local) == 0
+                continue
+            end
             if finitegrounds != [-9999.]
                 f_local = finitegrounds[c]
             else

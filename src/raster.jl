@@ -270,39 +270,45 @@ function onetoall(cfg, gmap, polymap, points_rc)
     # Construct point map
     point_map = zeros(size(gmap))
     f(i, x) = points_rc[i][x]
-    #point_map[points_rc[1], points_rc[2]] = points_rc[3]
     for x = 1:size(points_rc[1], 1)
         point_map[f(1,x), f(2,x)] = f(3, x)
     end
 
+    points_unique = unique(points_rc[3])
+
     # Combine polymap and pointmap
     newpoly = deepcopy(polymap)
-    k = maximum(polymap)
-    for i in find(point_map)
-        if polymap[i] == 0
-            newpoly[i] = point_map[i] + k
+    if isempty(polymap)
+        newpoly = point_map    
+    else
+        k = maximum(polymap)
+        for i in find(point_map)
+            if polymap[i] == 0
+                newpoly[i] = point_map[i] + k
+            end
         end
     end
 
-
     nodemap = construct_node_map(gmap, newpoly)
-
 
     four_neighbors = get(cfg, "Connection scheme for raster habitat data",
                                 "connect_four_neighbors_only") == "True"
     average_resistances = get(cfg, "Connection scheme for raster habitat data",
                                 "connect_using_avg_resistances") == "True"
+
     a, g = construct_graph(gmap, nodemap, average_resistances, four_neighbors)
     cc = connected_components(g)
     debug("There are $(size(a, 1)) points and $(length(cc)) connected components")
+
     sources = zeros(size(point_map))
     z = deepcopy(sources)
-    res = zeros(size(points_rc[1], 1))
-    num_points_to_solve = size(points_rc[1], 1)
+    res = zeros(size(points_unique, 1))
+    num_points_to_solve = size(points_unique, 1)
     for i = 1:num_points_to_solve
         debug("Solving point $i of $num_points_to_solve")
         copy!(sources, z)
-        n = points_rc[3][i]
+        #n = points_rc[3][i]
+        n = points_unique[i]
         source_map = map(x -> x == n ? 1 : 0, point_map)
         ground_map = map(x -> x == n ? 0 : x, point_map)
         map!(x -> x > 0 ? Inf : x, ground_map)
