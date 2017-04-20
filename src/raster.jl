@@ -287,14 +287,14 @@ function onetoall(cfg, gmap, polymap, points_rc)
 
     nodemap = construct_node_map(gmap, newpoly)
 
-    cc = connected_components(g)
-    debug("There are $(size(a, 1)) points and $(length(cc)) connected components")
 
     four_neighbors = get(cfg, "Connection scheme for raster habitat data",
                                 "connect_four_neighbors_only") == "True"
     average_resistances = get(cfg, "Connection scheme for raster habitat data",
                                 "connect_using_avg_resistances") == "True"
     a, g = construct_graph(gmap, nodemap, average_resistances, four_neighbors)
+    cc = connected_components(g)
+    debug("There are $(size(a, 1)) points and $(length(cc)) connected components")
     sources = zeros(size(point_map))
     z = deepcopy(sources)
     res = zeros(size(points_rc[1], 1))
