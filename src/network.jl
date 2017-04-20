@@ -101,15 +101,16 @@ function compute_network(a::Inifile)
         ground_file = get(a, "Options for advanced mode", "ground_file")
         source_map = read_point_strengths(source_file)
         ground_map = read_point_strengths(ground_file)
-        voltages = advanced(a, A, g, source_map, ground_map)
+        cc = connected_components(g)
+        debug("There are $(size(A, 1)) points and $(length(cc)) connected components")
+        voltages = advanced(a, A, g, source_map, ground_map, cc)
         return voltages
     end
 end
 
-function advanced(cfg::Inifile, a::SparseMatrixCSC, g::Graph, source_map, ground_map; nodemap = Array{Float64,2}())
+function advanced(cfg::Inifile, a::SparseMatrixCSC, g::Graph, source_map, ground_map, cc; 
+                    nodemap = Array{Float64,2}(), policy = :keepall, check_node = -1)
 
-    cc = connected_components(g)
-    debug("There are $(size(a, 1)) points and $(length(cc)) connected components")
     mode = get(cfg, "Circuitscape mode", "data_type")
     if mode == "raster"
         (i1, j1, v1) = findnz(source_map)
@@ -128,15 +129,25 @@ function advanced(cfg::Inifile, a::SparseMatrixCSC, g::Graph, source_map, ground
                 grounds[v] += v2[i]
             end
         end
-        sources, grounds, finitegrounds = resolve_conflicts(sources, grounds)
+        sources, grounds, finitegrounds = resolve_conflicts(sources, grounds, policy)
         volt = zeros(size(nodemap))
         ind = find(nodemap)
+        f_local = Float64[]
+        solver_called = false
         for c in cc
+            if check_node != -1 && !(check_node in c)
+                continue
+            end
             a_local = laplacian(a[c, c])
             s_local = sources[c]
             g_local = grounds[c]
-            f_local = finitegrounds[c]
+            if finitegrounds != [-9999.]
+                f_local = finitegrounds[c]
+            else
+                f_local = finitegrounds
+            end
             voltages = multiple_solver(a_local, g, s_local, g_local, f_local)
+            solver_called = true
             for i in eachindex(volt)
                 if i in ind
                     val = Int(nodemap[i])
@@ -145,6 +156,16 @@ function advanced(cfg::Inifile, a::SparseMatrixCSC, g::Graph, source_map, ground
                         volt[i] = voltages[idx] 
                     end
                 end
+            end
+        end
+        scenario = get(cfg, "Circuitscape mode", "scenario")
+        if scenario == "one-to-all"
+            idx = find(source_map)
+            val = volt[idx] / source_map[idx]
+            if val[1] ≈ 0
+                return [-1]
+            else
+                return val
             end
         end
         return volt
@@ -156,7 +177,7 @@ function advanced(cfg::Inifile, a::SparseMatrixCSC, g::Graph, source_map, ground
         ind_nzeros = find(x -> x != 0, ground_map[:,2]) 
         finitegrounds = zeros(1)
         if length(ind_nzeros) == 0
-            finitegrounds = [-9999]
+            finitegrounds = [-9999.]
         end
         is_res = get(cfg, "Options for advanced mode", "ground_file_is_resistances")
         if is_res == "True"
@@ -199,31 +220,58 @@ function del_row_col(a, n::Int)
     a[ind, ind]
 end
 
-function resolve_conflicts(sources, grounds)
+function resolve_conflicts(sources, grounds, policy)
+
     finitegrounds = similar(sources)
     l = size(sources, 1)
+
+    finitegrounds = map(x -> x < Inf ? x : 0., grounds)
+    if count(x -> x != 0, finitegrounds) == 0
+        finitegrounds = [-9999.]
+    end
+
     conflicts = falses(l)
     for i = 1:l
         conflicts[i] = sources[i] != 0 && grounds[i] != 0
     end
-    finitegrounds = count(x -> x != 0, grounds)  > 0 ? 
-                        map(x -> x < Inf ? x : 0., grounds) : [-9999.]
+
+    if any(conflicts)
+        if policy == :rmvsrc
+            sources[find(conflicts)] = 0
+        elseif policy == :rmvgnd
+            grounds[find(conflicts)] = 0    
+        elseif policy == :rmvall
+            sources[find(conflicts)] = 0    
+        end
+    end
+
+    infgrounds = map(x -> x == Inf, grounds)
+    infconflicts = map((x,y) -> x > 0 && y > 0, infgrounds, sources)
+    grounds[infconflicts] = 0
+
+
     sources, grounds, finitegrounds
 end
 
 
 function multiple_solver(a, g, sources, grounds, finitegrounds)
+
+    asolve = deepcopy(a)
     if finitegrounds[1] != -9999
-        a = a + spdiagm(finitegrounds, 0, size(a, 1), size(a, 1))
+        asolve = a + spdiagm(finitegrounds, 0, size(a, 1), size(a, 1))
     end
+
     infgrounds = find(x -> x == Inf, grounds)
     deleteat!(sources, infgrounds)
-    for idx in infgrounds
-        a = del_row_col(a, idx)
-    end
-   
-    M = aspreconditioner(SmoothedAggregationSolver(a))
-    volt = cg(a, sources, M; tol = 1e-6, maxiter = 100000)
+    dst_del = Int[]
+    append!(dst_del, infgrounds)
+    r = collect(1:size(a, 1))
+    deleteat!(r, dst_del)
+    asolve = asolve[r, r]
+    
+
+    M = aspreconditioner(SmoothedAggregationSolver(asolve))
+    volt = cg(asolve, sources, M; tol = 1e-6, maxiter = 100000)
 
     # Replace the inf with 0
     voltages = zeros(length(volt[1]) + length(infgrounds))

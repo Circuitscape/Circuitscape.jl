@@ -165,3 +165,12 @@ r = compute("input/raster/advanced/2/mgVerify2.ini")
 x = readdlm("output_verify/mgVerify2_voltmap.asc", skipstart = 6)
 
 @test sumabs2(x - r) < 1e-6
+
+# Raster one to all test
+for i in [1,2,7]
+    r = compute("input/raster/one_to_all/$i/oneToAllVerify$(i).ini")
+    x = readdlm("output_verify/oneToAllVerify$(i)_resistances.out")
+    x = x[:,2]
+
+    @test sumabs2(x - r) < 1e-6
+end
