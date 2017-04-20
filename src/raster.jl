@@ -28,7 +28,11 @@ function compute_raster(cfg::Inifile)
     elseif scenario == "advanced"
         nodemap = construct_node_map(gmap, polymap)
         a,g = construct_graph(gmap, nodemap, average_resistances, four_neighbors)
-        voltages = advanced(cfg, a, g, rdata.source_map, rdata.ground_map, nodemap = nodemap)
+        cc = connected_components(g)
+        debug("There are $(size(a, 1)) points and $(length(cc)) connected components")
+        voltages = advanced(cfg, a, g, rdata.source_map, rdata.ground_map, cc, nodemap = nodemap)
+    else
+        voltages = onetoall(cfg, gmap, polymap, points_rc)
     end
     #gmap, polymap, points_rc
 end
@@ -261,3 +265,52 @@ function construct_node_map(gmap, polymap)
     nodemap 
 end
 
+function onetoall(cfg, gmap, polymap, points_rc)
+
+    # Construct point map
+    point_map = zeros(size(gmap))
+    f(i, x) = points_rc[i][x]
+    #point_map[points_rc[1], points_rc[2]] = points_rc[3]
+    for x = 1:size(points_rc[1], 1)
+        point_map[f(1,x), f(2,x)] = f(3, x)
+    end
+
+    # Combine polymap and pointmap
+    newpoly = deepcopy(polymap)
+    k = maximum(polymap)
+    for i in find(point_map)
+        if polymap[i] == 0
+            newpoly[i] = point_map[i] + k
+        end
+    end
+
+
+    nodemap = construct_node_map(gmap, newpoly)
+
+    cc = connected_components(g)
+    debug("There are $(size(a, 1)) points and $(length(cc)) connected components")
+
+    four_neighbors = get(cfg, "Connection scheme for raster habitat data",
+                                "connect_four_neighbors_only") == "True"
+    average_resistances = get(cfg, "Connection scheme for raster habitat data",
+                                "connect_using_avg_resistances") == "True"
+    a, g = construct_graph(gmap, nodemap, average_resistances, four_neighbors)
+    sources = zeros(size(point_map))
+    z = deepcopy(sources)
+    res = zeros(size(points_rc[1], 1))
+    num_points_to_solve = size(points_rc[1], 1)
+    for i = 1:num_points_to_solve
+        debug("Solving point $i of $num_points_to_solve")
+        copy!(sources, z)
+        n = points_rc[3][i]
+        source_map = map(x -> x == n ? 1 : 0, point_map)
+        ground_map = map(x -> x == n ? 0 : x, point_map)
+        map!(x -> x > 0 ? Inf : x, ground_map)
+
+        check_node = nodemap[points_rc[1][i], points_rc[2][i]]
+        v = advanced(cfg, a, g, source_map, ground_map, cc; nodemap = nodemap, policy = :rmvgnd, 
+                        check_node = check_node)
+        res[i] = v[1]
+    end
+    res
+end
