@@ -103,7 +103,7 @@ function pairwise_module(gmap, polymap, points_rc, four_neighbors, average_resis
             pt1 = pts[i]
             for j = i+1:size(pts, 1)
                 pt2 = pts[j]
-                newpoly = create_new_polymap(gmap, polymap, points_rc, pt1, pt2)
+                newpoly = create_new_polymap(gmap, polymap, points_rc, pt1 = pt1, pt2 = pt2)
 
                 nodemap = construct_node_map(gmap, newpoly)
                 a, g = construct_graph(gmap, nodemap, average_resistances, four_neighbors)
@@ -172,9 +172,56 @@ function construct_graph(gmap, nodemap, average_resistances, four_neighbors)
     a, g
 end
 
-function create_new_polymap(gmap, polymap, points_rc, pt1, pt2)
+function create_new_polymap(gmap, polymap, points_rc; pt1 = 0, pt2 = 0, point_map = Array{Float64,2}())
 
     f(x) = (points_rc[1][x], points_rc[2][x])
+    
+    if !isempty(point_map)
+
+       # Combine polymap and pointmap
+       newpoly = deepcopy(polymap)
+       #= if isempty(polymap)
+            newpoly = point_map    
+        else
+            k = maximum(polymap)
+            for i in find(point_map)
+                if polymap[i] == 0
+                    newpoly[i] = point_map[i] + k
+                end
+            end
+        end =#
+        point_file_no_polygons = length(points_rc[3]) == length(unique(points_rc[3]))
+        if isempty(polymap)
+            newpoly = point_map
+        elseif point_file_no_polygons
+            k = maximum(polymap)
+            for i in find(point_map)
+                if polymap[i] == 0
+                    newpoly[i] = point_map[i] + k
+                end
+            end
+        else
+
+            k = max(maximum(polymap), maximum(point_map))
+            for i in find(point_map)
+                v1 = point_map[i]
+                v2 = newpoly[i]
+                if v2 == 0
+                    newpoly[i] = k + v1
+                    continue
+                end
+                if v1 != v2 
+                    ind = find(x -> x == v2, newpoly)
+                    newpoly[ind] = v1
+                end
+            end
+                    
+
+        end
+
+        return newpoly
+    end
+        
 
     if isempty(polymap)
         newpoly = zeros(size(gmap)...)
@@ -276,18 +323,8 @@ function onetoall(cfg, gmap, polymap, points_rc)
 
     points_unique = unique(points_rc[3])
 
-    # Combine polymap and pointmap
-    newpoly = deepcopy(polymap)
-    if isempty(polymap)
-        newpoly = point_map    
-    else
-        k = maximum(polymap)
-        for i in find(point_map)
-            if polymap[i] == 0
-                newpoly[i] = point_map[i] + k
-            end
-        end
-    end
+    newpoly = create_new_polymap(gmap, polymap, points_rc, point_map = point_map)
+
 
     nodemap = construct_node_map(gmap, newpoly)
 
