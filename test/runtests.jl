@@ -1,5 +1,6 @@
 using CircuitScape
 using Base.Test
+using IniFile
 
 include("internal.jl")
 
@@ -168,6 +169,7 @@ x = readdlm("output_verify/mgVerify2_voltmap.asc", skipstart = 6)
 
 # Raster one to all test
 for i in [1,2,3,4,6,7,10]
+    @show i
     r = compute("input/raster/one_to_all/$i/oneToAllVerify$(i).ini")
     x = readdlm("output_verify/oneToAllVerify$(i)_resistances.out")
     x = x[:,2]
