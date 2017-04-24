@@ -295,11 +295,15 @@ function onetoall(cfg, gmap, polymap, points_rc)
                                 "connect_four_neighbors_only") == "True"
     average_resistances = get(cfg, "Connection scheme for raster habitat data",
                                 "connect_using_avg_resistances") == "True"
+    one_to_all = get(cfg, "Circuitscape mode",
+                                "scenario") == "one-to-all"
 
     a, g = construct_graph(gmap, nodemap, average_resistances, four_neighbors)
     cc = connected_components(g)
     debug("There are $(size(a, 1)) points and $(length(cc)) connected components")
 
+    source_map = Array{Float64,2}()
+    ground_map = Array{Float64,2}()
     sources = zeros(size(point_map))
     z = deepcopy(sources)
     res = zeros(size(points_unique, 1))
@@ -307,11 +311,15 @@ function onetoall(cfg, gmap, polymap, points_rc)
     for i = 1:num_points_to_solve
         debug("Solving point $i of $num_points_to_solve")
         copy!(sources, z)
-        #n = points_rc[3][i]
         n = points_unique[i]
-        source_map = map(x -> x == n ? 1 : 0, point_map)
-        ground_map = map(x -> x == n ? 0 : x, point_map)
-        map!(x -> x > 0 ? Inf : x, ground_map)
+        if one_to_all
+            source_map = map(x -> x == n ? 1 : 0, point_map)
+            ground_map = map(x -> x == n ? 0 : x, point_map)
+            map!(x -> x > 0 ? Inf : x, ground_map)
+        else
+            source_map = map(x -> x == n ? 0 : 1, point_map)
+            ground_map = map(x -> x == n ? Inf : 0, point_map)
+        end
 
         check_node = nodemap[points_rc[1][i], points_rc[2][i]]
         v = advanced(cfg, a, g, source_map, ground_map, cc; nodemap = nodemap, policy = :rmvgnd, 
