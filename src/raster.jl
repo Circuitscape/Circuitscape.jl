@@ -358,9 +358,6 @@ function onetoall(cfg, gmap, polymap, points_rc)
             map!(x -> x == n ? 0 : x, source_map)
             map!(x -> x != 0 ? 1 : x, source_map)
             ground_map = map(x -> x == n ? Inf : 0, point_map)
-            println("GROUND_MAP")
-            Base.print_matrix(STDOUT, ground_map)
-            println()
         end
 
         check_node = nodemap[points_rc[1][i], points_rc[2][i]]
