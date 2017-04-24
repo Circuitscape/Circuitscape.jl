@@ -317,13 +317,24 @@ function onetoall(cfg, gmap, polymap, points_rc)
             ground_map = map(x -> x == n ? 0 : x, point_map)
             map!(x -> x > 0 ? Inf : x, ground_map)
         else
-            source_map = map(x -> x == n ? 0 : 1, point_map)
+            source_map = map(x -> x != 0 ? x : 0, point_map)
+            map!(x -> x == n ? 0 : x, source_map)
+            map!(x -> x != 0 ? 1 : x, source_map)
             ground_map = map(x -> x == n ? Inf : 0, point_map)
+            println("GROUND_MAP")
+            Base.print_matrix(STDOUT, ground_map)
+            println()
         end
 
         check_node = nodemap[points_rc[1][i], points_rc[2][i]]
-        v = advanced(cfg, a, g, source_map, ground_map, cc; nodemap = nodemap, policy = :rmvgnd, 
-                        check_node = check_node)
+        
+        if one_to_all
+            v = advanced(cfg, a, g, source_map, ground_map, cc; nodemap = nodemap, policy = :rmvgnd, 
+                            check_node = check_node)
+        else
+            v = advanced(cfg, a, g, source_map, ground_map, cc; nodemap = nodemap, policy = :rmvsrc, 
+                            check_node = check_node)
+        end
         res[i] = v[1]
     end
     res
