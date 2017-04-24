@@ -175,3 +175,12 @@ for i in 1:11
 
     @test sumabs2(x - r) < 1e-6
 end
+
+# Raster all to one test
+for i in 1:11
+    r = compute("input/raster/all_to_one/$i/allToOneVerify$(i).ini")
+    x = readdlm("output_verify/allToOneVerify$(i)_resistances.out")
+    x = x[:,2]
+
+    @test sumabs2(x - r) < 1e-6
+end

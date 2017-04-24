@@ -162,14 +162,19 @@ function advanced(cfg::Inifile, a::SparseMatrixCSC, g::Graph, source_map, ground
             end
         end
         scenario = get(cfg, "Circuitscape mode", "scenario")
-        if scenario == "one-to-all"
+        if !solver_called
+            return [-1.]
+        end
+        if scenario == "one-to-all" 
             idx = find(source_map)
             val = volt[idx] / source_map[idx]
             if val[1] ≈ 0
-                return [-1]
+                return [-1.]
             else
                 return val
             end
+        elseif scenario == "all-to-one"
+            return [0.]
         end
         return volt
     else
