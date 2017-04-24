@@ -90,7 +90,6 @@ function _ascii_grid_read_header(habitat_file)
     xllcorner = float(split(readline(f))[2])
     yllcorner = float(split(readline(f))[2])
     cellsize = float(split(readline(f))[2])
-    #nodata = parse(Int, split(readline(f))[2])
     nodata = -Inf
     s = split(readline(f))
     if contains(s[1], "NODATA") || contains(s[1], "nodata")
@@ -110,7 +109,6 @@ function _guess_file_type(filename)
 end
 
 function read_polymap(file, habitatmeta; nodata_as = 0, resample = true)
-    #rastermeta = _ascii_grid_read_header(file)
     polymap, rastermeta = _ascii_grid_reader(file)
 
     ind = find(x -> x == rastermeta.nodata, polymap)

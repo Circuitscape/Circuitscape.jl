@@ -33,7 +33,6 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
             if pt2 == 0
                 continue
             end
-            #info("Solving for pair $p of $total")
             debug("pt1 = $pt1, pt2 = $pt2")
             p +=1
             curr = zeros(size(cond_pruned, 1))
