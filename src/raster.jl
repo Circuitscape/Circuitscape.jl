@@ -81,7 +81,7 @@ function load_maps(cfg::Inifile)
     source_map = Array{Float64,2}()
     ground_map = Array{Float64,2}()
     points_rc = (Vector{Int}(), Vector{Int}(), Vector{Float64}())
-    strenghts = Array{Float64,2}()
+    strengths = Array{Float64,2}()
     included_pairs = IncludeExcludePairs()
 
     if use_included_pairs
