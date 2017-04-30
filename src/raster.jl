@@ -1,15 +1,16 @@
 immutable RasterData
-    cellmap::Array{Float64,2}
-    polymap::Array{Float64,2}
-    source_map::Array{Float64,2}
-    ground_map::Array{Float64,2}
+    cellmap::Matrix{Float64}
+    polymap::Matrix{Float64}
+    source_map::Matrix{Float64}
+    ground_map::Matrix{Float64}
     points_rc::Tuple{Vector{Int},Vector{Int},Vector{Float64}}
+    strengths::Matrix{Float64}
+    included_pairs::IncludeExcludePairs
 end
 
 function compute_raster(cfg::Inifile)
 
     # Read inputs
-    # gmap, polymap, points_rc = load_maps(cfg)
     rdata = load_maps(cfg)
     gmap = rdata.cellmap
     polymap = rdata.polymap
@@ -32,7 +33,8 @@ function compute_raster(cfg::Inifile)
         debug("There are $(size(a, 1)) points and $(length(cc)) connected components")
         voltages = advanced(cfg, a, g, rdata.source_map, rdata.ground_map, cc, nodemap = nodemap)
     else
-        voltages = onetoall(cfg, gmap, polymap, points_rc)
+        voltages = onetoall(cfg, gmap, polymap, points_rc; included_pairs = rdata.included_pairs,
+                                                            strengths = rdata.strengths)
     end
     #gmap, polymap, points_rc
 end
@@ -54,12 +56,42 @@ function load_maps(cfg::Inifile)
     scenario = get(cfg, "Circuitscape mode", "scenario")
     point_file = get(cfg, "Options for pairwise and one-to-all and all-to-one modes",
                             "point_file")
+    mask_file = get(cfg, "Mask file", "mask_file") 
+    use_mask = get(cfg, "Mask file", "use_mask") == "True"
+    use_variable_source_strengths = get(cfg, "Options for one-to-all and all-to-one modes",
+                                                "use_variable_source_strengths") == "True"
+    variable_source_file = get(cfg, "Options for one-to-all and all-to-one modes",
+                                    "variable_source_file")
+    use_included_pairs = get(cfg, "Options for pairwise and one-to-all and all-to-one modes",
+                                                "use_included_pairs") == "True"
+    included_pairs_file = get(cfg, "Options for pairwise and one-to-all and all-to-one modes",
+                                    "included_pairs_file")
+
+
+    if use_mask
+        mask = read_polymap(mask_file, habitatmeta)
+        map!(x -> x > 0 ? 1 : 0, mask)
+        cellmap = cellmap .* mask
+        if sum(cellmap) == 0
+            throw(ErrorException("Mask file masks everything!"))
+        end
+    end
 
     # Default source and ground maps
     source_map = Array{Float64,2}()
     ground_map = Array{Float64,2}()
-
     points_rc = (Vector{Int}(), Vector{Int}(), Vector{Float64}())
+    strengths = Array{Float64,2}()
+    included_pairs = IncludeExcludePairs()
+
+    if use_included_pairs
+        included_pairs = read_included_pairs(included_pairs_file)
+    end
+
+    if use_variable_source_strengths
+        strengths = read_point_strengths(variable_source_file, false)
+    end
+
     if scenario == "advanced"
         source_file = get(cfg, "Options for advanced mode", "source_file")
         ground_file = get(cfg, "Options for advanced mode", "ground_file")
@@ -69,7 +101,7 @@ function load_maps(cfg::Inifile)
         points_rc = read_point_map(point_file, habitatmeta)
     end
 
-    RasterData(cellmap, polymap, source_map, ground_map, points_rc)
+    RasterData(cellmap, polymap, source_map, ground_map, points_rc, strengths, included_pairs)
 end
 
 function pairwise_module(gmap, polymap, points_rc, four_neighbors, average_resistances)
@@ -312,7 +344,17 @@ function construct_node_map(gmap, polymap)
     nodemap 
 end
 
-function onetoall(cfg, gmap, polymap, points_rc)
+function onetoall(cfg, gmap, polymap, points_rc; included_pairs = IncludeExcludePairs(), strengths = Matrix{Float64}())
+
+    use_variable_strengths = !isempty(strengths)
+    use_included_pairs = !isempty(included_pairs)
+    if use_included_pairs
+        points_unique = included_pairs.point_ids
+        prune_points!(points_rc, included_pairs.point_ids)
+        if use_variable_strengths
+            prune_strengths!(strengths, included_pairs.point_ids)
+        end
+    end
 
     # Construct point map
     point_map = zeros(size(gmap))
@@ -324,7 +366,6 @@ function onetoall(cfg, gmap, polymap, points_rc)
     points_unique = unique(points_rc[3])
 
     newpoly = create_new_polymap(gmap, polymap, points_rc, point_map = point_map)
-
 
     nodemap = construct_node_map(gmap, newpoly)
 
@@ -343,14 +384,31 @@ function onetoall(cfg, gmap, polymap, points_rc)
     ground_map = Array{Float64,2}()
     sources = zeros(size(point_map))
     z = deepcopy(sources)
+    
+    point_ids = included_pairs.point_ids
     res = zeros(size(points_unique, 1))
     num_points_to_solve = size(points_unique, 1)
+    original_point_map = copy(point_map)
+
     for i = 1:num_points_to_solve
+        copy!(point_map, original_point_map)
+        str = use_variable_strengths ? strengths[i,2] : 1
         debug("Solving point $i of $num_points_to_solve")
         copy!(sources, z)
         n = points_unique[i]
+        if use_included_pairs
+            for j = 1:num_points_to_solve
+                if i != j && included_pairs.include_pairs[i,j] == 0
+                    exclude = point_ids[j]
+                    map!(x -> x == exclude ? 0 : x, point_map)
+                end
+            end
+            polymap = create_new_polymap(gmap, polymap, points_rc, point_map = point_map)
+            nodemap = construct_node_map(gmap, polymap)
+            a, g = construct_graph(gmap, nodemap, average_resistances, four_neighbors)
+        end
         if one_to_all
-            source_map = map(x -> x == n ? 1 : 0, point_map)
+            source_map = map(x -> x == n ? str : 0, point_map)
             ground_map = map(x -> x == n ? 0 : x, point_map)
             map!(x -> x > 0 ? Inf : x, ground_map)
         else
@@ -372,4 +430,33 @@ function onetoall(cfg, gmap, polymap, points_rc)
         res[i] = v[1]
     end
     res
+end
+
+Base.isempty(t::IncludeExcludePairs) = t.mode == :undef
+
+function prune_points!(points_rc, point_ids)
+    rmv = Int64[]
+    for (i,p) in enumerate(points_rc[3])
+        if p in point_ids
+            continue
+        else
+            #for it in 1:3 deleteat!(points_rc[it], i) end
+            push!(rmv, i)
+        end
+    end
+    for i in 1:3 deleteat!(points_rc[i], rmv) end
+end
+
+function prune_strengths!(strengths, point_ids)
+    pts = strengths[:,1]
+    l = length(pts)
+    rmv = Int[]
+    for (i,p) in enumerate(pts)
+        if !(p in point_ids)
+           push!(rmv, i) 
+       end
+    end
+    rng = collect(1:l)
+    deleteat!(rng, rmv)
+    strengths[rng,:]
 end
