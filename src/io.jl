@@ -11,6 +11,15 @@ immutable RasterMeta
     file_type::Int64
 end
 
+immutable IncludeExcludePairs
+    mode::Symbol
+    point_ids::Vector{Int64}
+    idx::Vector{Int64}
+    include_pairs::Matrix{Int64}
+end
+function IncludeExcludePairs()
+    IncludeExcludePairs(:undef, Int64[], Int64[], Matrix{Int64}())
+end
 
 function read_graph(a::Inifile, gpath::String)
     i,j,v = load_graph(gpath)
@@ -37,9 +46,11 @@ end
 
 read_focal_points(path::String) = Int.(vec(readcsv(path)) + 1)
 
-function read_point_strengths(path::String)
+function read_point_strengths(path::String, inc = true)
     a = readdlm(path)
-    a[:,1] = a[:,1] + 1
+    if inc 
+        a[:,1] = a[:,1] + 1
+    end
     a
 end
 
@@ -203,4 +214,23 @@ function read_source_and_ground_maps(source_file, ground_file, habitatmeta, is_r
     end
 
     source_map, ground_map
+end
+
+function read_included_pairs(file)
+
+    minval = 0
+    maxval = 0
+    open(file, "r") do f
+        minval = float(split(readline(f))[2])
+        maxval = float(split(readline(f))[2])
+    end
+    included_pairs = readdlm(file, skipstart=2)
+    point_ids = Int.(included_pairs[:,1])
+    deleteat!(point_ids, 1)
+    included_pairs = included_pairs[2:end, 2:end]
+    map!(x -> x > maxval ? 0 : x, included_pairs)
+    idx = find(x -> x >= minval, included_pairs)
+    mode = :include
+    bin = map(x -> x >= minval ? 1 : 0, included_pairs)
+    IncludeExcludePairs(mode, point_ids, idx, bin)
 end

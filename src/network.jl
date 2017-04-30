@@ -275,7 +275,6 @@ function multiple_solver(a, g, sources, grounds, finitegrounds)
     r = collect(1:size(a, 1))
     deleteat!(r, dst_del)
     asolve = asolve[r, r]
-    
 
     M = aspreconditioner(SmoothedAggregationSolver(asolve))
     volt = cg(asolve, sources, M; tol = 1e-6, maxiter = 100000)
