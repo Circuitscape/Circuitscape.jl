@@ -21,7 +21,7 @@ function IncludeExcludePairs()
     IncludeExcludePairs(:undef, Int64[], Int64[], Matrix{Int64}())
 end
 
-function read_graph(a::Inifile, gpath::String)
+function read_graph(a, gpath::String)
     i,j,v = load_graph(gpath)
     idx = findfirst(x -> x < 1, i)
     idx != 0 && throw("Indices no good")

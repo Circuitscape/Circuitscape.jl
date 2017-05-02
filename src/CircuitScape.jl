@@ -1,6 +1,6 @@
 module CircuitScape
 
-using IniFile
+#using IniFile
 using PyAMG
 using Logging
 using LightGraphs
