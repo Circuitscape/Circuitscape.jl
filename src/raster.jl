@@ -8,7 +8,12 @@ immutable RasterData
     included_pairs::IncludeExcludePairs
 end
 
-function compute_raster(cfg::Inifile)
+function compute_raster(cfg)
+
+    # Get all variables
+    four_neighbors = cfg["connect_four_neighbors_only"] == "True"
+    average_resistances = cfg["connect_using_avg_resistances"] == "True"
+    scenario = cfg["scenario"]
 
     # Read inputs
     rdata = load_maps(cfg)
@@ -17,12 +22,7 @@ function compute_raster(cfg::Inifile)
     points_rc = rdata.points_rc
     c = count(x -> x > 0, gmap)
     info("Resistance/Conductance map has $c nodes")
-    four_neighbors = get(cfg, "Connection scheme for raster habitat data",
-                                "connect_four_neighbors_only") == "True"
-    average_resistances = get(cfg, "Connection scheme for raster habitat data",
-                                "connect_using_avg_resistances") == "True"
 
-    scenario = get(cfg, "Circuitscape mode", "scenario")
     if scenario == "pairwise"
         resistances = pairwise_module(gmap, polymap, points_rc, four_neighbors, 
                                         average_resistances)
@@ -36,37 +36,34 @@ function compute_raster(cfg::Inifile)
         voltages = onetoall(cfg, gmap, polymap, points_rc; included_pairs = rdata.included_pairs,
                                                             strengths = rdata.strengths)
     end
-    #gmap, polymap, points_rc
 end
 
-function load_maps(cfg::Inifile)
+function load_maps(cfg)
+
+    # Read all user variables
+    habitat_file = cfg["habitat_file"]
+    is_res = cfg["habitat_map_is_resistances"] == "True"
+    use_polygons = cfg["use_polygons"] == "True"
+    polymap_file = cfg["polygon_file"]
+    scenario = cfg["scenario"]
+    point_file = cfg["point_file"]
+    mask_file = cfg["mask_file"]
+    use_mask = cfg["use_mask"] == "True"
+    use_variable_source_strengths = cfg["use_variable_source_strengths"] == "True"
+    variable_source_file = cfg["variable_source_file"]
+    use_included_pairs = cfg["use_included_pairs"] == "True"
+    included_pairs_file = cfg["included_pairs_file"]
+    source_file = cfg["source_file"]
+    ground_file = cfg["ground_file"]
+    is_gres = cfg["ground_file_is_resistances"] == "True"
+
+    info("Reading Maps")
 
     # Read raster map
-    info("Reading Maps")
-    habitat_file = get(cfg, "Habitat raster or graph", "habitat_file")
-    is_res = get(cfg, "Habitat raster or graph", "habitat_map_is_resistances") == "True"
-
     cellmap, habitatmeta = read_cell_map(habitat_file, is_res)
 
     # Read polygon map
-    use_polygons = get(cfg, "Short circuit regions (aka polygons)", "use_polygons") == "True"
-    polymap_file = get(cfg, "Short circuit regions (aka polygons)", "polygon_file")
     polymap = use_polygons ? read_polymap(polymap_file, habitatmeta) : Array{Float64,2}()
-
-    scenario = get(cfg, "Circuitscape mode", "scenario")
-    point_file = get(cfg, "Options for pairwise and one-to-all and all-to-one modes",
-                            "point_file")
-    mask_file = get(cfg, "Mask file", "mask_file") 
-    use_mask = get(cfg, "Mask file", "use_mask") == "True"
-    use_variable_source_strengths = get(cfg, "Options for one-to-all and all-to-one modes",
-                                                "use_variable_source_strengths") == "True"
-    variable_source_file = get(cfg, "Options for one-to-all and all-to-one modes",
-                                    "variable_source_file")
-    use_included_pairs = get(cfg, "Options for pairwise and one-to-all and all-to-one modes",
-                                                "use_included_pairs") == "True"
-    included_pairs_file = get(cfg, "Options for pairwise and one-to-all and all-to-one modes",
-                                    "included_pairs_file")
-
 
     if use_mask
         mask = read_polymap(mask_file, habitatmeta)
@@ -93,10 +90,7 @@ function load_maps(cfg::Inifile)
     end
 
     if scenario == "advanced"
-        source_file = get(cfg, "Options for advanced mode", "source_file")
-        ground_file = get(cfg, "Options for advanced mode", "ground_file")
-        is_res = get(cfg, "Options for advanced mode", "ground_file_is_resistances") == "True"
-        source_map, ground_map = read_source_and_ground_maps(source_file, ground_file, habitatmeta, is_res)
+        source_map, ground_map = read_source_and_ground_maps(source_file, ground_file, habitatmeta, is_gres)
     else
         points_rc = read_point_map(point_file, habitatmeta)
     end
@@ -369,12 +363,9 @@ function onetoall(cfg, gmap, polymap, points_rc; included_pairs = IncludeExclude
 
     nodemap = construct_node_map(gmap, newpoly)
 
-    four_neighbors = get(cfg, "Connection scheme for raster habitat data",
-                                "connect_four_neighbors_only") == "True"
-    average_resistances = get(cfg, "Connection scheme for raster habitat data",
-                                "connect_using_avg_resistances") == "True"
-    one_to_all = get(cfg, "Circuitscape mode",
-                                "scenario") == "one-to-all"
+    four_neighbors = cfg["connect_four_neighbors_only"] == "True"
+    average_resistances = cfg["connect_using_avg_resistances"] == "True"
+    one_to_all = cfg["scenario"] == "one-to-all"
 
     a, g = construct_graph(gmap, nodemap, average_resistances, four_neighbors)
     cc = connected_components(g)

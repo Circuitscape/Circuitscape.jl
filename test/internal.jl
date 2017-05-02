@@ -36,8 +36,7 @@ end
 
 let 
 
-    cfg = Inifile()
-    read(cfg, "input/raster/one_to_all/11/oneToAllVerify11.ini")
+    cfg = CircuitScape.parse_config("input/raster/one_to_all/11/oneToAllVerify11.ini")
     r = CircuitScape.load_maps(cfg)
 
     cellmap = r.cellmap

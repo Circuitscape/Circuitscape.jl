@@ -84,20 +84,19 @@ function postprocess(volt, cond, i, j, resistances, pt1, pt2)
     r = resistances[i, j] = resistances[j, i] = volt[pt2] - volt[pt1]
 end
 
-function compute_network(a::Inifile)
-    network_file = get(a, "Habitat raster or graph", "habitat_file")
-    point_file = get(a, "Options for pairwise and one-to-all and all-to-one modes",
-                        "point_file")
+function compute_network(a)
+    network_file = a["habitat_file"]
+    point_file = a["point_file"]
     A = read_graph(a, network_file)
     g = Graph(A)
-    scenario = get(a, "Circuitscape mode", "scenario")
+    scenario = a["scenario"]
     if scenario == "pairwise"
         fp = read_focal_points(point_file)
         resistances = single_ground_all_pair_resistances(A, g, fp)
         return resistances
     elseif scenario == "advanced"
-        source_file = get(a, "Options for advanced mode", "source_file")
-        ground_file = get(a, "Options for advanced mode", "ground_file")
+        source_file = a["source_file"]
+        ground_file = a["ground_file"]
         source_map = read_point_strengths(source_file)
         ground_map = read_point_strengths(ground_file)
         cc = connected_components(g)
@@ -107,10 +106,10 @@ function compute_network(a::Inifile)
     end
 end
 
-function advanced(cfg::Inifile, a::SparseMatrixCSC, g::Graph, source_map, ground_map, cc; 
+function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map, cc; 
                     nodemap = Array{Float64,2}(), policy = :keepall, check_node = -1)
 
-    mode = get(cfg, "Circuitscape mode", "data_type")
+    mode = cfg["data_type"]
     if mode == "raster"
         (i1, j1, v1) = findnz(source_map)
         (i2, j2, v2) = findnz(ground_map)
@@ -160,7 +159,7 @@ function advanced(cfg::Inifile, a::SparseMatrixCSC, g::Graph, source_map, ground
                 end
             end
         end
-        scenario = get(cfg, "Circuitscape mode", "scenario")
+        scenario = cfg["scenario"]
         if !solver_called
             return [-1.]
         end
@@ -186,7 +185,7 @@ function advanced(cfg::Inifile, a::SparseMatrixCSC, g::Graph, source_map, ground
         if length(ind_nzeros) == 0
             finitegrounds = [-9999.]
         end
-        is_res = get(cfg, "Options for advanced mode", "ground_file_is_resistances")
+        is_res = cfg["ground_file_is_resistances"]
         if is_res == "True"
             ground_vals = 1 ./ ground_vals
         end
