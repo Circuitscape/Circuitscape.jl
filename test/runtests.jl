@@ -1,6 +1,5 @@
 using CircuitScape
 using Base.Test
-using IniFile
 
 include("internal.jl")
 
