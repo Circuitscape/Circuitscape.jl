@@ -27,7 +27,7 @@ function read_graph(a, gpath::String)
     idx != 0 && throw("Indices no good")
     idx = findfirst(x -> x < 1, j)
     idx != 0 && throw("Indices no good")
-    is_res = get(a, "Habitat raster or graph", "habitat_map_is_resistances")
+    is_res = a["habitat_map_is_resistances"]
     if is_res == "True"
         v = 1./v
     end

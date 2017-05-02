@@ -55,7 +55,7 @@ function load_maps(cfg)
     included_pairs_file = cfg["included_pairs_file"]
     source_file = cfg["source_file"]
     ground_file = cfg["ground_file"]
-    is_res = cfg["ground_file_is_resistances"] == "True"
+    is_gres = cfg["ground_file_is_resistances"] == "True"
 
     info("Reading Maps")
 
@@ -90,7 +90,7 @@ function load_maps(cfg)
     end
 
     if scenario == "advanced"
-        source_map, ground_map = read_source_and_ground_maps(source_file, ground_file, habitatmeta, is_res)
+        source_map, ground_map = read_source_and_ground_maps(source_file, ground_file, habitatmeta, is_gres)
     else
         points_rc = read_point_map(point_file, habitatmeta)
     end
@@ -363,12 +363,9 @@ function onetoall(cfg, gmap, polymap, points_rc; included_pairs = IncludeExclude
 
     nodemap = construct_node_map(gmap, newpoly)
 
-    four_neighbors = get(cfg, "Connection scheme for raster habitat data",
-                                "connect_four_neighbors_only") == "True"
-    average_resistances = get(cfg, "Connection scheme for raster habitat data",
-                                "connect_using_avg_resistances") == "True"
-    one_to_all = get(cfg, "Circuitscape mode",
-                                "scenario") == "one-to-all"
+    four_neighbors = cfg["connect_four_neighbors_only"] == "True"
+    average_resistances = cfg["connect_using_avg_resistances"] == "True"
+    one_to_all = cfg["scenario"] == "one-to-all"
 
     a, g = construct_graph(gmap, nodemap, average_resistances, four_neighbors)
     cc = connected_components(g)
