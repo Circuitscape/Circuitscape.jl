@@ -136,6 +136,13 @@ x = x[2:end, 2:end]
 
 @test sumabs2(x - r) < 1e-6
 
+# Raster test, custom config file
+r = compute("input/raster/pairwise/13/sgVerify13.ini")
+x = readdlm("output_verify/sgVerify13_resistances.out")
+x = x[2:end, 2:end]
+
+@test sumabs2(x - r) < 1e-6
+
 # Raster advanced test
 r = compute("input/raster/advanced/1/mgVerify1.ini")
 x = readdlm("output_verify/mgVerify1_voltmap.asc", skipstart = 6)
