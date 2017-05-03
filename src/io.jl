@@ -1,5 +1,7 @@
 const AAGRID = 2
 const TXTLIST = 3
+const PAIRS_AAGRID = 4
+const PAIRS_LIST = 5
 
 immutable RasterMeta
     ncols::Int64
@@ -14,11 +16,10 @@ end
 immutable IncludeExcludePairs
     mode::Symbol
     point_ids::Vector{Int64}
-    idx::Vector{Int64}
     include_pairs::Matrix{Int64}
 end
 function IncludeExcludePairs()
-    IncludeExcludePairs(:undef, Int64[], Int64[], Matrix{Int64}())
+    IncludeExcludePairs(:undef, Int64[], Matrix{Int64}())
 end
 
 function read_graph(a, gpath::String)
@@ -110,7 +111,15 @@ function _ascii_grid_read_header(habitat_file)
 end
 
 function _guess_file_type(filename) 
-    if endswith(filename, ".asc")
+    f = open(filename, "r")
+    s = readline(f)
+    close(f)
+
+    if startswith(s, "min")
+        return PAIRS_AAGRID
+    elseif startswith(s, "mode")
+        return PAIRS_LIST
+    elseif endswith(filename, ".asc")
         return AAGRID
     elseif endswith(filename, ".txt")
         return TXTLIST
@@ -218,19 +227,41 @@ end
 
 function read_included_pairs(file)
 
+    filetype = _guess_file_type(file)
     minval = 0
     maxval = 0
-    open(file, "r") do f
-        minval = float(split(readline(f))[2])
-        maxval = float(split(readline(f))[2])
+    mode = :undef
+
+    if filetype == PAIRS_AAGRID
+        open(file, "r") do f
+            minval = float(split(readline(f))[2])
+            maxval = float(split(readline(f))[2])
+        end
+        included_pairs = readdlm(file, skipstart=2)
+        point_ids = Int.(included_pairs[:,1])
+        deleteat!(point_ids, 1)
+        included_pairs = included_pairs[2:end, 2:end]
+        map!(x -> x > maxval ? 0 : x, included_pairs)
+        idx = find(x -> x >= minval, included_pairs)
+        mode = :include
+        bin = map(x -> x >= minval ? 1 : 0, included_pairs)
+        IncludeExcludePairs(mode, point_ids, bin)
+    else
+        open(file, "r") do f
+            mode = Symbol(split(readline(f))[2])
+        end
+        included_pairs = readdlm(file, skipstart = 1)
+        point_ids = Int.(deleteat!(sort!(unique(included_pairs)), 1))
+        mat = zeros(size(point_ids, 1), size(point_ids, 1))
+        
+        for i = 1:size(included_pairs, 1)
+            idx1 = findfirst(x -> x == included_pairs[i, 1], point_ids)
+            idx2 = findfirst(x -> x == included_pairs[i, 2], point_ids)
+            if idx1 != 0 && idx2 != 0
+                mat[idx1,idx2] = 1
+                mat[idx2,idx1] = 1
+            end
+        end
+        IncludeExcludePairs(mode, point_ids, mat)
     end
-    included_pairs = readdlm(file, skipstart=2)
-    point_ids = Int.(included_pairs[:,1])
-    deleteat!(point_ids, 1)
-    included_pairs = included_pairs[2:end, 2:end]
-    map!(x -> x > maxval ? 0 : x, included_pairs)
-    idx = find(x -> x >= minval, included_pairs)
-    mode = :include
-    bin = map(x -> x >= minval ? 1 : 0, included_pairs)
-    IncludeExcludePairs(mode, point_ids, idx, bin)
 end
