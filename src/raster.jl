@@ -20,12 +20,13 @@ function compute_raster(cfg)
     gmap = rdata.cellmap
     polymap = rdata.polymap
     points_rc = rdata.points_rc
+    included_pairs = rdata.included_pairs
     c = count(x -> x > 0, gmap)
     info("Resistance/Conductance map has $c nodes")
 
     if scenario == "pairwise"
         resistances = pairwise_module(gmap, polymap, points_rc, four_neighbors, 
-                                        average_resistances)
+                                        average_resistances, included_pairs)
     elseif scenario == "advanced"
         nodemap = construct_node_map(gmap, polymap)
         a,g = construct_graph(gmap, nodemap, average_resistances, four_neighbors)
@@ -98,20 +99,32 @@ function load_maps(cfg)
     RasterData(cellmap, polymap, source_map, ground_map, points_rc, strengths, included_pairs)
 end
 
-function pairwise_module(gmap, polymap, points_rc, four_neighbors, average_resistances)
+function pairwise_module(gmap, polymap, points_rc, four_neighbors, average_resistances, included_pairs)
 
     point_file_contains_polygons = length(points_rc[1]) != length(unique(points_rc[3]))
 
     if !point_file_contains_polygons
         nodemap = construct_node_map(gmap, polymap)
         a, g = construct_graph(gmap, nodemap, average_resistances, four_neighbors)
+        exclude_pairs_array = Tuple{Int,Int}[]
+        mat = included_pairs.include_pairs
 
+        if !isempty(included_pairs)
+            prune_points!(points_rc, included_pairs.point_ids)
+            for j = 1:size(mat, 2)
+                for i = 1:size(mat, 1)
+                    if mat[i,j] == 0
+                        push!(exclude_pairs_array, (i,j))
+                    end
+                end
+            end
+        end
         c = zeros(Int, length(points_rc[3]))
         for (i,v) in enumerate(zip(points_rc[1], points_rc[2]))
             c[i] = nodemap[v...]
         end
 
-        resistances = single_ground_all_pair_resistances(a, g, c)
+        resistances = single_ground_all_pair_resistances(a, g, c; exclude = exclude_pairs_array)
         return resistances
     else
         # get unique list of points

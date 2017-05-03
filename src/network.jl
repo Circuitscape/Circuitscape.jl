@@ -1,4 +1,4 @@
-function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::Vector{T})
+function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::Vector{T}; exclude = Tuple{Int,Int}[])
     numpoints = size(c, 1)
     cc = connected_components(g)
     debug("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
@@ -25,6 +25,9 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
             M = aspreconditioner(SmoothedAggregationSolver(cond_pruned))
         end
         for j = i+1:numpoints
+            if (i,j) in exclude
+                continue
+            end
             if c[i] == 0
                 resistances[i,j] = resistances[j,i] = -1
                 continue
