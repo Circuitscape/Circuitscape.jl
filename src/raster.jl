@@ -102,6 +102,7 @@ end
 function pairwise_module(gmap, polymap, points_rc, four_neighbors, average_resistances, included_pairs)
 
     point_file_contains_polygons = length(points_rc[1]) != length(unique(points_rc[3]))
+    mode = included_pairs.mode == :include ? 0 : 1
 
     if !point_file_contains_polygons
         nodemap = construct_node_map(gmap, polymap)
@@ -113,7 +114,7 @@ function pairwise_module(gmap, polymap, points_rc, four_neighbors, average_resis
             prune_points!(points_rc, included_pairs.point_ids)
             for j = 1:size(mat, 2)
                 for i = 1:size(mat, 1)
-                    if mat[i,j] == 0
+                    if mat[i,j] == mode
                         push!(exclude_pairs_array, (i,j))
                     end
                 end
@@ -355,6 +356,7 @@ function onetoall(cfg, gmap, polymap, points_rc; included_pairs = IncludeExclude
 
     use_variable_strengths = !isempty(strengths)
     use_included_pairs = !isempty(included_pairs)
+    mode = included_pairs.mode == :include ? 0 : 1
     if use_included_pairs
         points_unique = included_pairs.point_ids
         prune_points!(points_rc, included_pairs.point_ids)
@@ -402,7 +404,7 @@ function onetoall(cfg, gmap, polymap, points_rc; included_pairs = IncludeExclude
         n = points_unique[i]
         if use_included_pairs
             for j = 1:num_points_to_solve
-                if i != j && included_pairs.include_pairs[i,j] == 0
+                if i != j && included_pairs.include_pairs[i,j] == mode
                     exclude = point_ids[j]
                     map!(x -> x == exclude ? 0 : x, point_map)
                 end
