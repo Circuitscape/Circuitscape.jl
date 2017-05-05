@@ -12,14 +12,17 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
     d = 0
     M = 1
     pt1 = 1
-    rcc = Vector{Int64}()
+    rcc = 0
+    subsets = getindex.([cond], cc, cc)
+    z = zeros.(cc)
+    volt = zeros.(size.(cc))
     
     p = 0 
     for i = 1:numpoints
         if c[i] != 0
             rcc = rightcc(cc, c[i])
-            cond_pruned = cond[rcc, rcc]
-            pt1 = ingraph(rcc, c[i])
+            cond_pruned = subsets[rcc]
+            pt1 = ingraph(cc[rcc], c[i])
             d = cond_pruned[pt1, pt1]
             cond_pruned[pt1, pt1] = 0
             M = aspreconditioner(SmoothedAggregationSolver(cond_pruned))
@@ -32,21 +35,22 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
                 resistances[i,j] = resistances[j,i] = -1
                 continue
             end
-            pt2 = ingraph(rcc, c[j])
+            pt2 = ingraph(cc[rcc], c[j])
             if pt2 == 0
                 continue
             end
             debug("pt1 = $pt1, pt2 = $pt2")
             p +=1
-            curr = zeros(size(cond_pruned, 1))
-            z = zeros(size(cond_pruned, 1))
+            curr = z[rcc]
+            v = volt[rcc]
             if pt1 != pt2
                 curr[pt1] = -1
                 curr[pt2] = 1
-                volt = cg(cond_pruned, curr, M; tol = 1e-6, maxiter = 100000)
-                z = volt[1]
+                cg!(v, cond_pruned, curr, M; tol = 1e-6, maxiter = 100000)
+                curr[:] = 0
             end
-            postprocess(z, c, i, j, resistances, pt1, pt2)
+            postprocess(v, c, i, j, resistances, pt1, pt2)
+            v[:] = 0
         end
         cond_pruned[pt1,pt1] = d
     end
@@ -60,7 +64,7 @@ end
 @inline function rightcc{T}(cc::Vector{Vector{T}}, c::T)
     for i in eachindex(cc)
         if c in cc[i]
-            return cc[i]
+            return i
         end
     end
 end
