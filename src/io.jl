@@ -251,7 +251,11 @@ function read_included_pairs(file)
             mode = Symbol(split(readline(f))[2])
         end
         included_pairs = readdlm(file, skipstart = 1)
-        point_ids = Int.(deleteat!(sort!(unique(included_pairs)), 1))
+        point_ids = Int.(sort!(unique(included_pairs)))
+        if point_ids[1] == 0
+            deleteat!(point_ids, 1)
+        end
+
         mat = zeros(size(point_ids, 1), size(point_ids, 1))
         
         for i = 1:size(included_pairs, 1)
