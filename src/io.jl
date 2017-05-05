@@ -39,9 +39,14 @@ end
 
 function load_graph(gpath::String)
     g = readdlm(gpath)
-    i = Int.(g[:,1]) + 1
-    j = Int.(g[:,2]) + 1
-    v = Float64.(g[:,3])
+    i = zeros(Int, size(g, 1))
+    j = zeros(Int, size(g, 1))
+    v = zeros(size(g, 1))
+    for iter = 1:size(g, 1)
+        i[iter] = g[iter,1] + 1
+        j[iter] = g[iter,2] + 1
+        v[iter] = g[iter,3]
+    end
     i,j,v
 end
 
