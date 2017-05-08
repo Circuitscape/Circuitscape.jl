@@ -8,6 +8,7 @@ Logging.configure(level = DEBUG)
 
 include("config.jl")
 include("io.jl")
+include("out.jl")
 include("network.jl")
 include("raster.jl")
 
