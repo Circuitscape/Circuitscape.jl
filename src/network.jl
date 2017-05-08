@@ -92,16 +92,22 @@ function postprocess(volt, cond, i, j, resistances, pt1, pt2)
 end
 
 function compute_network(a)
+
     network_file = a["habitat_file"]
     point_file = a["point_file"]
     A = read_graph(a, network_file)
     g = Graph(A)
     scenario = a["scenario"]
+
     if scenario == "pairwise"
+
         fp = read_focal_points(point_file)
         resistances = single_ground_all_pair_resistances(A, g, fp)
+        resistances_3col = compute_3col(resistances, fp)
         return resistances
+
     elseif scenario == "advanced"
+
         source_file = a["source_file"]
         ground_file = a["ground_file"]
         source_map = read_point_strengths(source_file)
@@ -110,6 +116,7 @@ function compute_network(a)
         debug("There are $(size(A, 1)) points and $(length(cc)) connected components")
         voltages = advanced(a, A, g, source_map, ground_map, cc)
         return voltages
+
     end
 end
 
