@@ -13,13 +13,29 @@ function compute_3col{T}(resistances::Matrix{T}, fp)
     r3col
 end
 
-function write_cur_maps(cond, voltages, finitegrounds, pts, cc)
+function write_cur_maps(cond, voltages, finitegrounds, cc, name)
 
     node_currents, branch_currents = _create_current_maps(cond, voltages, finitegrounds)
-    branch_currents_array = _convert_to_3col(branch_currents, cc, pts)
+    branch_currents_array = _convert_to_3col(branch_currents, cc)
+    node_currents_array = _append_name_to_node_currents(node_currents, cc)
+   
+    write_currents(node_currents_array, branch_currents_array, name)
 end
 
-function _convert_to_3col(branch_currents, cc, fp)
+function write_currents(node_curr_arr, branch_curr_arr, name)
+   pref = split(cfg["output_file"], '.')[1]
+   writedlm("$(pref)_$(name).txt", node_curr_arr, '\t')
+end
+
+function _append_name_to_node_currents(node_currents, cc)
+    @show node_currents
+    @show cc
+
+    [cc node_currents]
+end
+   
+
+function _convert_to_3col(branch_currents, cc)
 
     l = length(branch_currents.nzval)
     graph = zeros(l, 3)
@@ -49,6 +65,7 @@ function get_node_currents(G, voltages, finitegrounds)
     node_currents_pos = _get_node_currents_posneg(G, voltages, finitegrounds, true)
     node_currents_neg = _get_node_currents_posneg(G, voltages, finitegrounds, false)
     node_currents = map((x,y) -> x > y ? x : y, node_currents_pos, node_currents_neg)
+    
 end
 
 function _get_node_currents_posneg(G, voltages, finitegrounds, pos)
@@ -59,7 +76,7 @@ function _get_node_currents_posneg(G, voltages, finitegrounds, pos)
     mask = V .> 0
     n = size(G, 1)
     branch_currents = sparse(I[mask], J[mask], V[mask], n, n)
-    sum(branch_currents, 1)
+    vec(sum(branch_currents, 1))
 end
 
 function _get_branch_currents(G, voltages, pos)

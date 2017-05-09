@@ -90,8 +90,9 @@ function postprocess(volt, cond, i, j, resistances, pt1, pt2, cond_pruned, cc)
     end=#
 
     r = resistances[i, j] = resistances[j, i] = volt[pt2] - volt[pt1]
+    name = "$(i)_$(j)"
 
-    write_cur_maps(cond_pruned, volt, [-9999.], cond, cc)
+    write_cur_maps(cond_pruned, volt, [-9999.], cc, name)
 end
 
 function compute_network(a)
