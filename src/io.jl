@@ -22,6 +22,11 @@ function IncludeExcludePairs()
     IncludeExcludePairs(:undef, Int64[], Matrix{Int64}())
 end
 
+immutable Cellsize
+    nrows::Int64
+    ncols::Int64
+end
+
 function read_graph(a, gpath::String)
     i,j,v = load_graph(gpath)
     idx = findfirst(x -> x < 1, i)
@@ -62,6 +67,8 @@ end
 
 function read_cell_map(habitat_file, is_res)
     cell_map, rastermeta = _ascii_grid_reader(habitat_file)
+
+    global const cellsize = Cellsize(rastermeta.nrows, rastermeta.ncols)
 
     gmap = similar(cell_map)
     ind = find(x -> x == -9999, cell_map)

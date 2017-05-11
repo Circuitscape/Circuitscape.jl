@@ -13,26 +13,28 @@ function compute_3col{T}(resistances::Matrix{T}, fp)
     r3col
 end
 
-function write_cur_maps(cond, voltages, finitegrounds, cc, name)
+function write_cur_maps(G, voltages, finitegrounds, cc, name; nodemap = Matrix{Float64}())
 
-    node_currents, branch_currents = _create_current_maps(cond, voltages, finitegrounds)
-    branch_currents_array = _convert_to_3col(branch_currents, cc)
-    node_currents_array = _append_name_to_node_currents(node_currents, cc)
-   
-    write_currents(node_currents_array, branch_currents_array, name)
+    node_currents, branch_currents = _create_current_maps(G, voltages, finitegrounds, nodemap = nodemap)
+
+    if cfg["data_type"] == "network"
+        branch_currents_array = _convert_to_3col(branch_currents, cc)
+        node_currents_array = _append_name_to_node_currents(node_currents, cc)
+        write_currents(node_currents_array, branch_currents_array, name)
+    else
+       current_map = node_currents
+       #map!(x -> x > 0 ? log10(x) : x, node_currents)
+       write_aagrid(current_map, name)
+   end
 end
 
 function write_currents(node_curr_arr, branch_curr_arr, name)
    pref = split(cfg["output_file"], '.')[1]
-   writedlm("$(pref)_$(name).txt", node_curr_arr, '\t')
+   writedlm("$(pref)_node_currents_$(name).txt", node_curr_arr, '\t')
+   writedlm("$(pref)_branch_currents_$(name).txt", branch_curr_arr, '\t')
 end
 
-function _append_name_to_node_currents(node_currents, cc)
-    @show node_currents
-    @show cc
-
-    [cc node_currents]
-end
+_append_name_to_node_currents(node_currents, cc) = [cc node_currents]
    
 
 function _convert_to_3col(branch_currents, cc)
@@ -51,13 +53,25 @@ function _convert_to_3col(branch_currents, cc)
     graph
 end
 
-function _create_current_maps(G, voltages, finitegrounds)
+function _create_current_maps(G, voltages, finitegrounds; nodemap = Matrix{Float64}())
 
     node_currents = get_node_currents(G, voltages, finitegrounds)
-    branch_currents = _get_branch_currents(G, voltages, true)
-    branch_currents = abs(branch_currents)
 
-    node_currents, branch_currents
+    if cfg["data_type"] == "network"
+
+        branch_currents = _get_branch_currents(G, voltages, true)
+        branch_currents = abs(branch_currents)
+        return node_currents, branch_currents
+
+    else
+
+        idx = find(nodemap)
+        current_map = zeros(cellsize.nrows, cellsize.ncols)
+        current_map[idx] = node_currents[Int.(nodemap[idx])]
+        return current_map, spzeros(0,0)
+
+    end
+
 end
 
 function get_node_currents(G, voltages, finitegrounds)
@@ -109,3 +123,19 @@ function _get_branch_currents_posneg{T}(G, v::Vector{T}, pos)
 
     branch_currents = vdiff .* V[mask]
 end
+
+function write_aagrid(curmap, name; voltage = false, cum = false, max = false)
+    pref = split(cfg["output_file"], '.')[1]
+
+    str = "curmap"
+    if cum
+        str = "cum_$(str)"
+    elseif max 
+        str = "max_$(str)"
+    elseif voltage
+        str = "voltages"
+    end
+
+    writedlm("$(pref)_$(str)_$(name).asc", round(curmap, 8), ' ')
+end
+

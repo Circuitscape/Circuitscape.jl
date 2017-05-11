@@ -106,6 +106,9 @@ function pairwise_module(gmap, polymap, points_rc, four_neighbors, average_resis
 
     if !point_file_contains_polygons
         nodemap = construct_node_map(gmap, polymap)
+        print("NODEMAP!")
+        Base.print_matrix(STDOUT, nodemap)
+        println()
         a, g = construct_graph(gmap, nodemap, average_resistances, four_neighbors)
         exclude_pairs_array = Tuple{Int,Int}[]
         mat = included_pairs.include_pairs
@@ -125,7 +128,7 @@ function pairwise_module(gmap, polymap, points_rc, four_neighbors, average_resis
             c[i] = nodemap[v...]
         end
 
-        resistances = single_ground_all_pair_resistances(a, g, c; exclude = exclude_pairs_array)
+        resistances = single_ground_all_pair_resistances(a, g, c; exclude = exclude_pairs_array, nodemap = nodemap, orig_pts = points_rc[3])
         return resistances
     else
         # get unique list of points
