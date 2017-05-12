@@ -2,8 +2,9 @@ using CircuitScape
 using Base.Test
 
 include("internal.jl")
+include("compare_output.jl")
 
-# Simple test with one connected component
+#= Simple test with one connected component
 r = compute("input/network/sgNetworkVerify2.ini")
 x = readdlm("output_verify/sgNetworkVerify2_resistances.out")
 x = x[2:end, 2:end]
@@ -21,8 +22,16 @@ x = x[2:end, 2:end]
 r = compute("input/network/sgNetworkVerify3.ini")
 x = readdlm("output_verify/sgNetworkVerify3_resistances.out")
 x = x[2:end, 2:end]
+@test sumabs2(x - r) < 1e-6=#
 
-@test sumabs2(x - r) < 1e-6
+for i = 1:3
+    r = compute("input/network/sgNetworkVerify$(i).ini")
+    x = readdlm("output_verify/sgNetworkVerify$(i)_resistances.out")
+    x = x[2:end, 2:end]
+    @test sumabs2(x - r) < 1e-6
+    compare_all_output("sgNetworkVerify$(i)")
+end
+
 
 # Simple Network test with advanced mode
 r = compute("input/network/mgNetworkVerify1.ini")

@@ -106,7 +106,7 @@ function postprocess(volt, cond, i, j, resistances, pt1, pt2, cond_pruned, cc, c
             name = "$(Int(orig_pts[i]))_$(Int(orig_pts[j]))"
         end
         local_nodemap = zeros(Int, nodemap)
-        idx = findin(cc, nodemap)
+        idx = findin(nodemap, cc)
         local_nodemap[idx] = nodemap[idx]
         if isempty(polymap)
             idx = find(local_nodemap)
