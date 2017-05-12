@@ -1,5 +1,5 @@
 function parse_config(path::String)
-    cfg = init_config()
+    cf = init_config()
     f = open(path, "r")
     for i in EachLine(f)
         if first(i) == '['
@@ -8,10 +8,10 @@ function parse_config(path::String)
         idx = search(i, '=')
         var = rstrip(i[1:idx-1])
         val = strip(i[idx+1:end])
-        cfg[var] = val
+        cf[var] = val
     end
     close(f)
-    cfg
+    cf
 end
 
 # Defaults
