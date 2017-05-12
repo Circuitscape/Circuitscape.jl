@@ -26,7 +26,7 @@ function compute_raster(cfg)
 
     if scenario == "pairwise"
         resistances = pairwise_module(gmap, polymap, points_rc, four_neighbors, 
-                                        average_resistances, included_pairs)
+                                        average_resistances, included_pairs, cfg)
     elseif scenario == "advanced"
         nodemap = construct_node_map(gmap, polymap)
         a,g = construct_graph(gmap, nodemap, average_resistances, four_neighbors)
@@ -99,16 +99,13 @@ function load_maps(cfg)
     RasterData(cellmap, polymap, source_map, ground_map, points_rc, strengths, included_pairs)
 end
 
-function pairwise_module(gmap, polymap, points_rc, four_neighbors, average_resistances, included_pairs)
+function pairwise_module(gmap, polymap, points_rc, four_neighbors, average_resistances, included_pairs, cfg)
 
     point_file_contains_polygons = length(points_rc[1]) != length(unique(points_rc[3]))
     mode = included_pairs.mode == :include ? 0 : 1
 
     if !point_file_contains_polygons
         nodemap = construct_node_map(gmap, polymap)
-        print("NODEMAP!")
-        Base.print_matrix(STDOUT, nodemap)
-        println()
         a, g = construct_graph(gmap, nodemap, average_resistances, four_neighbors)
         exclude_pairs_array = Tuple{Int,Int}[]
         mat = included_pairs.include_pairs
@@ -128,7 +125,11 @@ function pairwise_module(gmap, polymap, points_rc, four_neighbors, average_resis
             c[i] = nodemap[v...]
         end
 
-        resistances = single_ground_all_pair_resistances(a, g, c; exclude = exclude_pairs_array, nodemap = nodemap, orig_pts = points_rc[3])
+        resistances = single_ground_all_pair_resistances(a, g, c, cfg; 
+                                        exclude = exclude_pairs_array, 
+                                        nodemap = nodemap, 
+                                        orig_pts = points_rc[3],
+                                        polymap = polymap)
         return resistances
     else
         # get unique list of points
@@ -154,7 +155,7 @@ function pairwise_module(gmap, polymap, points_rc, four_neighbors, average_resis
                 x = find(x -> x == pt1, points_rc[3])[1]
                 y = find(x -> x == pt2, points_rc[3])[1]
                 c = Int[nodemap[points_rc[1][x], points_rc[2][x]], nodemap[points_rc[1][y], points_rc[2][y]]]
-                pairwise_resistance = single_ground_all_pair_resistances(a, g, c)
+                pairwise_resistance = single_ground_all_pair_resistances(a, g, c, cfg)
                 resistances[i,j] = resistances[j,i] = pairwise_resistance[1,2]
             end
         end
@@ -310,9 +311,10 @@ weird_avg(x,y) = (x + y) / (2*√2)
 weirder_avg(x, y) = 1 / (√2 * (1/x + 1/y) / 2)
 
 function construct_node_map(gmap, polymap)
+
     nodemap = zeros(size(gmap)) 
     if isempty(polymap)
-         ind = find(x -> x > 0, gmap)
+         ind::Vector{Int64} = find(x -> x > 0, gmap)
          nodemap[ind] = 1:length(ind)
     else
         d = Dict{Int, Vector{Int}}()
@@ -346,9 +348,9 @@ function construct_node_map(gmap, polymap)
     end
     for i in eachindex(polymap)
         if polymap[i] != 0 && nodemap[i] == 0
-            val = polymap[i] 
-            ind = findfirst(x -> x == val, polymap)
-            nodemap[i] = nodemap[ind]
+            val::Float64 = polymap[i] 
+            index::Int64 = findfirst(x -> x == val, polymap)
+            nodemap[i] = nodemap[index]
         end
     end
 

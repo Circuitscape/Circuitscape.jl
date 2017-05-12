@@ -1,5 +1,8 @@
-function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::Vector{T}; 
-                                                    exclude = Tuple{Int,Int}[], nodemap = Matrix{Float64}(), orig_pts = Vector{Int}())
+function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::Vector{T}, cfg; 
+                                                    exclude = Tuple{Int,Int}[], 
+                                                    nodemap = Matrix{Float64}(), 
+                                                    orig_pts = Vector{Int}(), 
+                                                    polymap = Matrix{Float64}())
     numpoints = size(c, 1)
     cc = connected_components(g)
     debug("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
@@ -50,7 +53,10 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
                 cg!(v, cond_pruned, curr, M; tol = 1e-6, maxiter = 100000)
                 curr[:] = 0
             end
-            postprocess(v, c, i, j, resistances, pt1, pt2, cond_pruned, cc[rcc]; nodemap = nodemap, orig_pts = orig_pts)
+            postprocess(v, c, i, j, resistances, pt1, pt2, cond_pruned, cc[rcc], cfg; 
+                                            nodemap = nodemap, 
+                                            orig_pts = orig_pts,
+                                            polymap = polymap)
             v[:] = 0
         end
         cond_pruned[pt1,pt1] = d
@@ -79,7 +85,10 @@ function laplacian(G::SparseMatrixCSC)
     G = -G + spdiagm(vec(sum(G, 1)))
 end
 
-function postprocess(volt, cond, i, j, resistances, pt1, pt2, cond_pruned, cc; nodemap = Matrix{Float64}(), orig_pts = Vector{Int}())
+function postprocess(volt, cond, i, j, resistances, pt1, pt2, cond_pruned, cc, cfg; 
+                                            nodemap = Matrix{Float64}(), 
+                                            orig_pts = Vector{Int}(), 
+                                            polymap = Vector{Float64}())
     #fname = "/tmp/voltages_$(p1)_$(p2).txt"
 
     #=open(fname, "a") do f
@@ -90,14 +99,25 @@ function postprocess(volt, cond, i, j, resistances, pt1, pt2, cond_pruned, cc; n
     end=#
 
     r = resistances[i, j] = resistances[j, i] = volt[pt2] - volt[pt1]
-    name = "$(i)_$(j)"
-    if cfg["data_type"] == "raster"
-        name = "$(Int(orig_pts[i]))_$(Int(orig_pts[j]))"
-    end
-    local_nodemap = map(x -> x in cc ? x : 0, nodemap)
-    local_nodemap = construct_node_map(local_nodemap, local_nodemap)
 
-    write_cur_maps(cond_pruned, volt, [-9999.], cc, name; nodemap = local_nodemap)
+    if cfg["write_cur_maps"] == "True"
+        name = "$(i)_$(j)"
+        if cfg["data_type"] == "raster"
+            name = "$(Int(orig_pts[i]))_$(Int(orig_pts[j]))"
+        end
+        local_nodemap = zeros(Int, nodemap)
+        idx = findin(cc, nodemap)
+        local_nodemap[idx] = nodemap[idx]
+        if isempty(polymap)
+            idx = find(local_nodemap)
+            local_nodemap[idx] = 1:length(idx)
+        else
+            local_polymap = zeros(local_nodemap)
+            local_polymap[idx] = polymap[idx]
+            local_nodemap = construct_node_map(local_nodemap, local_polymap)
+        end
+        write_cur_maps(cond_pruned, volt, [-9999.], cc, name, cfg; nodemap = local_nodemap)
+    end
 end
 
 function compute_network(a)
@@ -111,7 +131,7 @@ function compute_network(a)
     if scenario == "pairwise"
 
         fp = read_focal_points(point_file)
-        resistances = single_ground_all_pair_resistances(A, g, fp)
+        resistances = single_ground_all_pair_resistances(A, g, fp, a)
         resistances_3col = compute_3col(resistances, fp)
         return resistances
 

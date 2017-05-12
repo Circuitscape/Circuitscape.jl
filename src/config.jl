@@ -11,7 +11,7 @@ function parse_config(path::String)
         cf[var] = val
     end
     close(f)
-    global const cfg = cf
+    cf
 end
 
 # Defaults
