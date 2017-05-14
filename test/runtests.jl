@@ -19,7 +19,7 @@ for i = 1:3
     x = readdlm("output_verify/mgNetworkVerify$(i)_voltages.txt")
     x = x[:,2]
     @test sumabs2(x - r) < 1e-6
-    compare_all_output("sgNetworkVerify$(i)")
+    compare_all_output("mgNetworkVerify$(i)")
 end
 
 
@@ -29,6 +29,7 @@ for i in deleteat!(collect(1:15), 12)
     x = readdlm("output_verify/sgVerify$(i)_resistances.out")
     x = x[2:end, 2:end]
     @test sumabs2(x - r) < 1e-6
+    compare_all_output("sgVerify$(i)")
 end
 
 # Raster advanced tests
