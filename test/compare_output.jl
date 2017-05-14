@@ -6,12 +6,9 @@ function compare_all_output(str)
         info("Testing $f")
         if endswith(f, "asc")
             r = read_aagrid("output/$f")
-            @show size(r)
-            println("done with me")
             x = get_comp(list_to_comp, f)
-            @show size(x)
-            println("done with you")
             @test compare_aagrid(r, x)
+            info("Test $f passed")
         end
     end
             

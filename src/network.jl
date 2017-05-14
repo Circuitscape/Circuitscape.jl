@@ -2,7 +2,8 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
                                                     exclude = Tuple{Int,Int}[], 
                                                     nodemap = Matrix{Float64}(), 
                                                     orig_pts = Vector{Int}(), 
-                                                    polymap = Matrix{Float64}())
+                                                    polymap = Matrix{Float64}(),
+                                                    hbmeta = RasterMeta())
     numpoints = size(c, 1)
     cc = connected_components(g)
     debug("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
@@ -56,7 +57,8 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
             postprocess(v, c, i, j, resistances, pt1, pt2, cond_pruned, cc[rcc], cfg; 
                                             nodemap = nodemap, 
                                             orig_pts = orig_pts,
-                                            polymap = polymap)
+                                            polymap = polymap,
+                                            hbmeta = hbmeta)
             v[:] = 0
         end
         cond_pruned[pt1,pt1] = d
@@ -88,7 +90,8 @@ end
 function postprocess(volt, cond, i, j, resistances, pt1, pt2, cond_pruned, cc, cfg; 
                                             nodemap = Matrix{Float64}(), 
                                             orig_pts = Vector{Int}(), 
-                                            polymap = Vector{Float64}())
+                                            polymap = Vector{Float64}(),
+                                            hbmeta = hbmeta)
     #fname = "/tmp/voltages_$(p1)_$(p2).txt"
 
     #=open(fname, "a") do f
@@ -116,7 +119,9 @@ function postprocess(volt, cond, i, j, resistances, pt1, pt2, cond_pruned, cc, c
             local_polymap[idx] = polymap[idx]
             local_nodemap = construct_node_map(local_nodemap, local_polymap)
         end
-        write_cur_maps(cond_pruned, volt, [-9999.], cc, name, cfg; nodemap = local_nodemap)
+        write_cur_maps(cond_pruned, volt, [-9999.], cc, name, cfg; 
+                                    nodemap = local_nodemap, 
+                                    hbmeta = hbmeta)
     end
 end
 
