@@ -3,13 +3,12 @@ function compare_all_output(str)
     gen_list, list_to_comp = generate_lists(str)
 
     for f in gen_list
-        @show f
+        info("Testing $f")
         if endswith(f, "asc")
             r = read_aagrid("output/$f")
             println("done with me")
             x = get_comp(list_to_comp, f)
             println("done with you")
-            @show compare_aagrid(r, x)
             @test compare_aagrid(r, x)
         end
     end
