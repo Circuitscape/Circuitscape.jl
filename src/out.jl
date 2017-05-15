@@ -13,9 +13,10 @@ function compute_3col{T}(resistances::Matrix{T}, fp)
     r3col
 end
 
-function write_cur_maps(G, voltages, finitegrounds, cc, name, cfg; nodemap = Matrix{Float64}())
+function write_cur_maps(G, voltages, finitegrounds, cc, name, cfg; nodemap = Matrix{Float64}(),
+                                                                    hbmeta = RasterMeta())
 
-    node_currents, branch_currents = _create_current_maps(G, voltages, finitegrounds, cfg, nodemap = nodemap)
+    node_currents, branch_currents = _create_current_maps(G, voltages, finitegrounds, cfg, nodemap = nodemap, hbmeta = hbmeta)
 
     if cfg["data_type"] == "network"
         branch_currents_array = _convert_to_3col(branch_currents, cc)
@@ -23,7 +24,7 @@ function write_cur_maps(G, voltages, finitegrounds, cc, name, cfg; nodemap = Mat
         write_currents(node_currents_array, branch_currents_array, name, cfg)
     else
        current_map = node_currents
-       write_aagrid(current_map, name, cfg)
+       write_aagrid(current_map, name, cfg, hbmeta)
    end
 end
 
@@ -52,7 +53,7 @@ function _convert_to_3col(branch_currents, cc)
     graph
 end
 
-function _create_current_maps(G, voltages, finitegrounds, cfg; nodemap = Matrix{Float64}())
+function _create_current_maps(G, voltages, finitegrounds, cfg; nodemap = Matrix{Float64}(), hbmeta = RasterMeta())
 
     node_currents = get_node_currents(G, voltages, finitegrounds)
 
@@ -65,7 +66,7 @@ function _create_current_maps(G, voltages, finitegrounds, cfg; nodemap = Matrix{
     else
 
         idx = find(nodemap)
-        current_map = zeros(cellsize.nrows, cellsize.ncols)
+        current_map = zeros(hbmeta.nrows, hbmeta.ncols)
         current_map[idx] = node_currents[Int.(nodemap[idx])]
         return current_map, spzeros(0,0)
 
@@ -123,7 +124,7 @@ function _get_branch_currents_posneg{T}(G, v::Vector{T}, pos)
     branch_currents = vdiff .* V[mask]
 end
 
-function write_aagrid(curmap, name, cfg; voltage = false, cum = false, max = false)
+function write_aagrid(curmap, name, cfg, hbmeta; voltage = false, cum = false, max = false)
     pref = split(cfg["output_file"], '.')[1]
 
     str = "curmap"

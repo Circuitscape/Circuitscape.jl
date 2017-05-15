@@ -13,6 +13,10 @@ immutable RasterMeta
     file_type::Int64
 end
 
+function RasterMeta()
+    RasterMeta(0,0,0,0,0,0,0)
+end
+
 immutable IncludeExcludePairs
     mode::Symbol
     point_ids::Vector{Int64}
@@ -20,11 +24,6 @@ immutable IncludeExcludePairs
 end
 function IncludeExcludePairs()
     IncludeExcludePairs(:undef, Int64[], Matrix{Int64}())
-end
-
-immutable Cellsize
-    nrows::Int64
-    ncols::Int64
 end
 
 function read_graph(a, gpath::String)
@@ -67,8 +66,6 @@ end
 
 function read_cell_map(habitat_file, is_res)
     cell_map, rastermeta = _ascii_grid_reader(habitat_file)
-
-    global const cellsize = Cellsize(rastermeta.nrows, rastermeta.ncols)
 
     gmap = similar(cell_map)
     ind = find(x -> x == -9999, cell_map)

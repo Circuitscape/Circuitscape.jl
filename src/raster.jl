@@ -16,7 +16,7 @@ function compute_raster(cfg)
     scenario = cfg["scenario"]
 
     # Read inputs
-    rdata = load_maps(cfg)
+    rdata, hbmeta = load_maps(cfg)
     gmap = rdata.cellmap
     polymap = rdata.polymap
     points_rc = rdata.points_rc
@@ -26,7 +26,7 @@ function compute_raster(cfg)
 
     if scenario == "pairwise"
         resistances = pairwise_module(gmap, polymap, points_rc, four_neighbors, 
-                                        average_resistances, included_pairs, cfg)
+                                        average_resistances, included_pairs, cfg, hbmeta)
     elseif scenario == "advanced"
         nodemap = construct_node_map(gmap, polymap)
         a,g = construct_graph(gmap, nodemap, average_resistances, four_neighbors)
@@ -96,10 +96,10 @@ function load_maps(cfg)
         points_rc = read_point_map(point_file, habitatmeta)
     end
 
-    RasterData(cellmap, polymap, source_map, ground_map, points_rc, strengths, included_pairs)
+    RasterData(cellmap, polymap, source_map, ground_map, points_rc, strengths, included_pairs), habitatmeta
 end
 
-function pairwise_module(gmap, polymap, points_rc, four_neighbors, average_resistances, included_pairs, cfg)
+function pairwise_module(gmap, polymap, points_rc, four_neighbors, average_resistances, included_pairs, cfg, hbmeta)
 
     point_file_contains_polygons = length(points_rc[1]) != length(unique(points_rc[3]))
     mode = included_pairs.mode == :include ? 0 : 1
@@ -129,7 +129,8 @@ function pairwise_module(gmap, polymap, points_rc, four_neighbors, average_resis
                                         exclude = exclude_pairs_array, 
                                         nodemap = nodemap, 
                                         orig_pts = points_rc[3],
-                                        polymap = polymap)
+                                        polymap = polymap,
+                                        hbmeta = hbmeta)
         return resistances
     else
         # get unique list of points
