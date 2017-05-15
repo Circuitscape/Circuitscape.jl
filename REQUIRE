@@ -1,5 +1,5 @@
 julia 0.5
-IterativeSolvers 0.2.2 0.2.2
+IterativeSolvers 0.2.0 0.2.2
 Logging
 LightGraphs
 PyAMG
