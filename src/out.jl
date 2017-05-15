@@ -42,8 +42,10 @@ function _convert_to_3col(branch_currents, cc)
     l = length(branch_currents.nzval)
     graph = zeros(l, 3)
     graph[:,3] = branch_currents.nzval
-    idx = find(branch_currents)
+    #idx = find(branch_currents)
     I,J,V = findnz(branch_currents)
+    @show I, J, V
+    @show branch_currents
 
     for i = 1:size(I, 1)
         graph[i,1] = cc[I[i]]

@@ -104,7 +104,8 @@ function postprocess(volt, cond, i, j, resistances, pt1, pt2, cond_pruned, cc, c
     r = resistances[i, j] = resistances[j, i] = volt[pt2] - volt[pt1]
 
     if cfg["write_cur_maps"] == "True"
-        name = "$(i)_$(j)"
+        #name = "$(i)_$(j)"
+        name = "$(cond[i])_$(cond[j])"
         if cfg["data_type"] == "raster"
             name = "$(Int(orig_pts[i]))_$(Int(orig_pts[j]))"
         end
