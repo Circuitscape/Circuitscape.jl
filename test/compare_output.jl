@@ -19,7 +19,6 @@ function compare_all_output(str)
             if contains(f, "branch")
                 r = read_branch_currents("output/$f")
                 x = get_network_comp(list_to_comp, f)
-                @show compare_branch(r, x)
                 @test compare_branch(r, x)
                 info("Test $f passed")
 
@@ -56,9 +55,10 @@ function get_network_comp(list_to_comp, f)
     s = split(f, ['_', '.'])
     for i = 1:size(s, 1)
         if isnumber(s[i])
-            f = replace(f, "_$(s[i])", "_$(parse(Int, s[i]) - 1 |> string)")
+            f = replace(f, "_$(s[i])", "_$(parse(Int, s[i]) - 1 |> string)", 1)
         end
     end
+    @assert isfile("output_verify/$f")
     readdlm("output_verify/$f")
 end
 
