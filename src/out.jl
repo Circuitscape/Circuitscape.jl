@@ -42,12 +42,18 @@ function _convert_to_3col(branch_currents, cc)
     l = length(branch_currents.nzval)
     graph = zeros(l, 3)
     graph[:,3] = branch_currents.nzval
-    idx = find(branch_currents)
-    I,J,V = findnz(branch_currents)
 
-    for i = 1:size(I, 1)
-        graph[i,1] = cc[I[i]]
-        graph[i,2] = cc[J[i]]
+    # Inspired by show method for sparse matrices in Julia Base
+    b = branch_currents
+
+    k = 1
+    for i = 1:size(b, 1)
+        for j in nzrange(b, i)
+            row = b.rowval[j]
+            graph[k,1] = cc[row]
+            graph[k,2] = cc[i]
+            k += 1
+        end
     end
 
     graph
@@ -100,6 +106,7 @@ function _get_branch_currents(G, voltages, pos)
     n = size(G, 1)
 	mask = I .< J
 	branch_currents = sparse(I[mask], J[mask], branch_currents, n, n)
+    dropzeros!(branch_currents)
 
 	branch_currents  
 end
@@ -122,6 +129,9 @@ function _get_branch_currents_posneg{T}(G, v::Vector{T}, pos)
     map!(x -> x < 0 ? -x : 0, V)
 
     branch_currents = vdiff .* V[mask]
+    maxcur = maximum(branch_currents)
+    map!(x -> abs(x / maxcur) < 1e-8 ? 0 : x, branch_currents)
+    branch_currents
 end
 
 function write_aagrid(curmap, name, cfg, hbmeta; voltage = false, cum = false, max = false)
