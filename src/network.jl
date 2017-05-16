@@ -51,7 +51,7 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
             if pt1 != pt2
                 curr[pt1] = -1
                 curr[pt2] = 1
-                cg!(v, cond_pruned, curr, M; tol = 1e-6, maxiter = 100000)
+                solve_linear_system!(cfg, v, cond_pruned, curr, M)
                 curr[:] = 0
             end
             postprocess(v, c, i, j, resistances, pt1, pt2, cond_pruned, cc[rcc], cfg; 
@@ -69,6 +69,14 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
     end
     resistances
 end
+
+function solve_linear_system!(cfg, v, G, curr, M)
+    if cfg["solver"] == "cg+amg"
+        cg!(v, G, curr, M; tol = 1e-6, maxiter = 100000)
+    end
+    v
+end
+solve_linear_system(cfg, G, curr, M) = solve_linear_system!(cfg, zeros(curr), G, curr, M)
 
 @inline function rightcc{T}(cc::Vector{Vector{T}}, c::T)
     for i in eachindex(cc)
@@ -202,7 +210,7 @@ function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map, cc;
             else
                 f_local = finitegrounds
             end
-            voltages = multiple_solver(a_local, g, s_local, g_local, f_local)
+            voltages = multiple_solver(cfg, a_local, g, s_local, g_local, f_local)
             solver_called = true
             for i in eachindex(volt)
                 if i in ind
@@ -259,7 +267,7 @@ function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map, cc;
         curr = zeros(size(a, 1))
         curr_indices = Int.(source_map[:,1])
         curr[curr_indices] = source_map[:,2]
-        volt = cg(a, curr, M; tol = 1e-6, maxiter = 100000)
+        volt = solve_linear_system(cfg, a, curr, M)
         ground_indices = ground_map[:,1]
         k = 1
         ground_zeros = ground_indices[ind_zeros]
@@ -267,7 +275,7 @@ function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map, cc;
             if i in ground_zeros
                 continue
             else
-                v[i] = volt[1][k]
+                v[i] = volt[k]
                 k += 1
             end
         end
@@ -315,7 +323,7 @@ function resolve_conflicts(sources, grounds, policy)
 end
 
 
-function multiple_solver(a, g, sources, grounds, finitegrounds)
+function multiple_solver(cfg, a, g, sources, grounds, finitegrounds)
 
     asolve = deepcopy(a)
     if finitegrounds[1] != -9999
@@ -331,16 +339,17 @@ function multiple_solver(a, g, sources, grounds, finitegrounds)
     asolve = asolve[r, r]
 
     M = aspreconditioner(SmoothedAggregationSolver(asolve))
-    volt = cg(asolve, sources, M; tol = 1e-6, maxiter = 100000)
+    volt = solve_linear_system(cfg, asolve, sources, M)
 
     # Replace the inf with 0
-    voltages = zeros(length(volt[1]) + length(infgrounds))
+    voltages = zeros(length(volt) + length(infgrounds))
     k = 1
     for i = 1:size(voltages, 1)
         if i in infgrounds
             voltages[i] = 0
         else
-            voltages[i] = volt[1][k]
+            #voltages[i] = volt[1][k]
+            voltages[i] = volt[k]
             k += 1
         end
     end
