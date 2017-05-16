@@ -92,22 +92,29 @@ function postprocess(volt, cond, i, j, resistances, pt1, pt2, cond_pruned, cc, c
                                             orig_pts = Vector{Int}(), 
                                             polymap = Vector{Float64}(),
                                             hbmeta = hbmeta)
-    #fname = "/tmp/voltages_$(p1)_$(p2).txt"
-
-    #=open(fname, "a") do f
-        for i in eachindex(cond)
-            write(f, string(p1), '\t', string(cond[i]), '\t', string(volt[cond[i]] - volt[p1]))
-            write(f, '\n')
-        end
-    end=#
 
     r = resistances[i, j] = resistances[j, i] = volt[pt2] - volt[pt1]
+    name = "$(cond[i])_$(cond[j])"
+    if cfg["data_type"] == "raster"
+        name = "$(Int(orig_pts[i]))_$(Int(orig_pts[j]))"
+    end
+
+    if cfg["write_volt_maps"] == "True"
+        local_nodemap = zeros(Int, nodemap)
+        idx = findin(nodemap, cc)
+        local_nodemap[idx] = nodemap[idx]
+        if isempty(polymap)
+            idx = find(local_nodemap)
+            local_nodemap[idx] = 1:length(idx)
+        else
+            local_polymap = zeros(local_nodemap)
+            local_polymap[idx] = polymap[idx]
+            local_nodemap = construct_node_map(local_nodemap, local_polymap)
+        end
+        write_volt_maps(name, volt, cc, local_nodemap, cfg, hbmeta)
+    end
 
     if cfg["write_cur_maps"] == "True"
-        name = "$(cond[i])_$(cond[j])"
-        if cfg["data_type"] == "raster"
-            name = "$(Int(orig_pts[i]))_$(Int(orig_pts[j]))"
-        end
         local_nodemap = zeros(Int, nodemap)
         idx = findin(nodemap, cc)
         local_nodemap[idx] = nodemap[idx]
