@@ -156,7 +156,7 @@ function pairwise_module(gmap, polymap, points_rc, four_neighbors, average_resis
                 x = find(x -> x == pt1, points_rc[3])[1]
                 y = find(x -> x == pt2, points_rc[3])[1]
                 c = Int[nodemap[points_rc[1][x], points_rc[2][x]], nodemap[points_rc[1][y], points_rc[2][y]]]
-                pairwise_resistance = single_ground_all_pair_resistances(a, g, c, cfg)
+                pairwise_resistance = single_ground_all_pair_resistances(a, g, c, cfg; orig_pts = points_rc[3])
                 resistances[i,j] = resistances[j,i] = pairwise_resistance[1,2]
             end
         end

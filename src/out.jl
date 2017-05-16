@@ -134,7 +134,7 @@ function _get_branch_currents_posneg{T}(G, v::Vector{T}, pos)
     branch_currents
 end
 
-function write_aagrid(curmap, name, cfg, hbmeta; voltage = false, cum = false, max = false)
+function write_aagrid(map, name, cfg, hbmeta; voltage = false, cum = false, max = false)
     pref = split(cfg["output_file"], '.')[1]
 
     str = "curmap"
@@ -143,9 +143,36 @@ function write_aagrid(curmap, name, cfg, hbmeta; voltage = false, cum = false, m
     elseif max 
         str = "max_$(str)"
     elseif voltage
-        str = "voltages"
+        str = "voltmap"
     end
 
-    writedlm("$(pref)_$(str)_$(name).asc", round(curmap, 8), ' ')
+    writedlm("$(pref)_$(str)_$(name).asc", round(map, 8), ' ')
 end
 
+function write_volt_maps(name, voltages, cc, nodemap, cfg, hbmeta)
+
+    if cfg["data_type"] == "network"
+        write_voltages(cfg["output_file"], name, voltages, cc)
+    else
+        vm = _create_voltage_map(voltages, nodemap, hbmeta)
+        write_aagrid(vm, name, cfg, hbmeta, voltage = true)
+    end
+end
+
+function write_voltages{T}(output, name, voltages::Vector{T}, cc)
+
+    volt_arr = zeros(T, size(voltages, 1), 2)
+    volt_arr[:,1] = cc
+    volt_arr[:,2] = voltages
+    
+    pref = split(output, '.')[1]
+    writedlm("$(pref)_voltages_$(name).txt", volt_arr)
+
+end
+
+function _create_voltage_map{T}(voltages::Vector{T}, nodemap, hbmeta)
+    voltmap = zeros(T, hbmeta.nrows, hbmeta.ncols)
+    idx = find(nodemap)
+    voltmap[idx] = voltages[Int.(nodemap[idx])]
+    voltmap
+end
