@@ -33,7 +33,7 @@ function compute_raster(cfg)
         cc = connected_components(g)
         debug("There are $(size(a, 1)) points and $(length(cc)) connected components")
         voltages = advanced(cfg, a, g, rdata.source_map, rdata.ground_map, cc, 
-                                                                    nodemap = nodemap)
+                                                                    nodemap = nodemap, hbmeta = hbmeta)
         return voltages
     else
         voltages = onetoall(cfg, gmap, polymap, points_rc; 

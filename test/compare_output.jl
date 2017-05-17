@@ -1,7 +1,6 @@
 function compare_all_output(str)
 
     gen_list, list_to_comp = generate_lists(str)
-    @show gen_list
 
     for f in gen_list
         info("Testing $f")

@@ -106,7 +106,7 @@ function _get_node_currents_posneg(G, voltages, finitegrounds, pos)
         end
         n = size(G, 1)
         @show finiteground_currents
-        branch_currents = branch_currents + spdiag(finiteground_currents, 0, n, n)
+        branch_currents = branch_currents + spdiagm(finiteground_currents, 0, n, n)
     end
 
     vec(sum(branch_currents, 1))
