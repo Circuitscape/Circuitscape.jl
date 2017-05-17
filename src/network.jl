@@ -163,14 +163,8 @@ function compute_network(cfg)
         ground_map = read_point_strengths(ground_file)
         cc = connected_components(g)
         debug("There are $(size(A, 1)) points and $(length(cc)) connected components")
-        voltages, sources, grounds, finitegrounds = advanced(cfg, A, g, source_map, ground_map, cc)
+        voltages = advanced(cfg, A, g, source_map, ground_map, cc)
 
-        #=if cfg["write_volt_maps"] == "True"
-            write_volt_maps("", voltages, cc, cfg, hbmeta)
-        end
-        if cfg["write_cur_maps"] == "True"
-            write_cur_maps(A, voltages, finitegrounds, find(finitegrounds), "", cfg)
-        end=#
         return voltages
 
     end
@@ -244,24 +238,24 @@ function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map, cc;
     end
     if cfg["data_type"] == "network"
         v = [collect(1:size(a, 1))  voltages]
-        return v, sources, grounds, finitegrounds
+        return v
     end
     scenario = cfg["scenario"]
     if !solver_called
-        return [-1.], sources, grounds, finitegrounds
+        return [-1.]
     end
     if scenario == "one-to-all" 
         idx = find(source_map)
         val = volt[idx] / source_map[idx]
         if val[1] ≈ 0
-            return [-1.], sources, grounds, finitegrounds
+            return [-1.]
         else
-            return val, sources, grounds, finitegrounds
+            return val
         end
     elseif scenario == "all-to-one"
-        return [0.], sources, grounds, finitegrounds
+        return [0.]
     end
-    return volt, sources, grounds, finitegrounds
+    return volt
 end
 
 function del_row_col(a, n::Int)
