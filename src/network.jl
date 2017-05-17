@@ -262,66 +262,6 @@ function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map, cc;
         return [0.], sources, grounds, finitegrounds
     end
     return volt, sources, grounds, finitegrounds
-    #=else
-        println("SOURCE MAP!")
-        Base.print_matrix(STDOUT, source_map)
-        println()
-        println("GROUND MAP!")
-        Base.print_matrix(STDOUT, ground_map)
-        println()
-        sources = zeros(size(a, 1))
-        grounds = zeros(size(a, 1))
-        is_res = cfg["ground_file_is_resistances"]
-        if is_res == "True"
-            ground_map[:,2] = 1 ./ ground_map[:,2]
-        end
-        sources[Int.(source_map[:,1])] = source_map[:,2]
-        grounds[Int.(ground_map[:,1])] = ground_map[:,2]
-        sources, grounds, finitegrounds = resolve_conflicts(sources, grounds, policy)
-        @show sources
-        @show grounds
-        @show finitegrounds
-        #=a = laplacian(a)
-        v = zeros(size(a, 1))
-        ground_vals = ground_map[:,2]
-        ind_zeros = find(x -> x == 0, ground_map[:,2]) 
-        ind_nzeros = find(x -> x != 0, ground_map[:,2]) 
-        finitegrounds = zeros(1)
-        if length(ind_nzeros) == 0
-            finitegrounds = [-9999.]
-        end
-        is_res = cfg["ground_file_is_resistances"]
-        if is_res == "True"
-            ground_vals = 1 ./ ground_vals
-        end
-        for i in eachindex(ground_vals)
-            if ground_vals[i] == Inf
-                ground_vals[i] = 0
-            end
-        end
-        if finitegrounds[1] != -9999
-            a = a + spdiagm(ground_vals, 0, size(a, 1), size(a, 1))
-        end
-        for i in ind_zeros
-            a = del_row_col(a, Int(ground_map[i,1]))
-        end
-        M = aspreconditioner(SmoothedAggregationSolver(a))
-        curr = zeros(size(a, 1))
-        curr_indices = Int.(source_map[:,1])
-        curr[curr_indices] = source_map[:,2]
-        volt = solve_linear_system(cfg, a, curr, M)
-        ground_indices = ground_map[:,1]
-        k = 1
-        ground_zeros = ground_indices[ind_zeros]
-        for i = 1:size(v, 1)
-            if i in ground_zeros
-                continue
-            else
-                v[i] = volt[k]
-                k += 1
-            end
-        end=#=#
-        #return v, sources, grounds, finitegrounds
 end
 
 function del_row_col(a, n::Int)
