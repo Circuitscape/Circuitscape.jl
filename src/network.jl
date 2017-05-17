@@ -102,9 +102,9 @@ function postprocess(volt, cond, i, j, resistances, pt1, pt2, cond_pruned, cc, c
                                             hbmeta = hbmeta)
 
     r = resistances[i, j] = resistances[j, i] = volt[pt2] - volt[pt1]
-    name = "$(cond[i])_$(cond[j])"
+    name = "_$(cond[i])_$(cond[j])"
     if cfg["data_type"] == "raster"
-        name = "$(Int(orig_pts[i]))_$(Int(orig_pts[j]))"
+        name = "_$(Int(orig_pts[i]))_$(Int(orig_pts[j]))"
     end
 
     if cfg["write_volt_maps"] == "True"
@@ -119,7 +119,7 @@ function postprocess(volt, cond, i, j, resistances, pt1, pt2, cond_pruned, cc, c
             local_polymap[idx] = polymap[idx]
             local_nodemap = construct_node_map(local_nodemap, local_polymap)
         end
-        write_volt_maps(name, volt, cc, cfg, hbmeta, nodemap = local_nodemap)
+        write_volt_maps(name, volt, cc, cfg, hbmeta = hbmeta, nodemap = local_nodemap)
     end
 
     if cfg["write_cur_maps"] == "True"
@@ -171,16 +171,14 @@ function compute_network(cfg)
 end
 
 function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map, cc; 
-                    nodemap = Array{Float64,2}(), policy = :keepall, check_node = -1)
+                    nodemap = Array{Float64,2}(), policy = :keepall, check_node = -1, hbmeta = RasterMeta())
 
     mode = cfg["data_type"]
-    sources = Float64[]
-    grounds = Float64[]
+    sources = zeros(size(a, 1))
+    grounds = zeros(size(a, 1))
     if mode == "raster"
         (i1, j1, v1) = findnz(source_map)
         (i2, j2, v2) = findnz(ground_map)
-        sources = zeros(size(a, 1))
-        grounds = zeros(size(a, 1))
         for i = 1:size(i1, 1)
             v = Int(nodemap[i1[i], j1[i]])
             if v != 0
@@ -194,8 +192,6 @@ function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map, cc;
             end
         end
     else
-        sources = zeros(size(a, 1))
-        grounds = zeros(size(a, 1))
         is_res = cfg["ground_file_is_resistances"]
         if is_res == "True"
             ground_map[:,2] = 1 ./ ground_map[:,2]
@@ -236,6 +232,16 @@ function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map, cc;
             end
         end
     end
+
+    if cfg["write_volt_maps"] == "True"
+        write_volt_maps("", voltages, collect(1:size(a, 1)), cfg; hbmeta = hbmeta, nodemap = nodemap)
+    end
+    if cfg["write_cur_maps"] == "True"
+        write_cur_maps(laplacian(a), voltages, finitegrounds, collect(1:size(a, 1)), "", cfg; 
+                                                                                nodemap = nodemap, 
+                                                                                hbmeta = hbmeta)
+    end
+
     if cfg["data_type"] == "network"
         v = [collect(1:size(a, 1))  voltages]
         return v
@@ -255,6 +261,7 @@ function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map, cc;
     elseif scenario == "all-to-one"
         return [0.]
     end
+
     return volt
 end
 

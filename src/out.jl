@@ -30,8 +30,8 @@ end
 
 function write_currents(node_curr_arr, branch_curr_arr, name, cfg)
    pref = split(cfg["output_file"], '.')[1]
-   writedlm("$(pref)_node_currents_$(name).txt", node_curr_arr, '\t')
-   writedlm("$(pref)_branch_currents_$(name).txt", branch_curr_arr, '\t')
+   writedlm("$(pref)_node_currents$(name).txt", node_curr_arr, '\t')
+   writedlm("$(pref)_branch_currents$(name).txt", branch_curr_arr, '\t')
 end
 
 _append_name_to_node_currents(node_currents, cc) = [cc node_currents]
@@ -105,6 +105,7 @@ function _get_node_currents_posneg(G, voltages, finitegrounds, pos)
             map!(x -> x > 0 ? x : 0, finiteground_currents)
         end
         n = size(G, 1)
+        @show finiteground_currents
         branch_currents = branch_currents + spdiag(finiteground_currents, 0, n, n)
     end
 
@@ -124,6 +125,7 @@ function _get_branch_currents(G, voltages, pos)
 end
 
 function _get_branch_currents_posneg{T}(G, v::Vector{T}, pos)
+
     I,J,V = findnz(G)
     mask = I .< J
     vdiff = zeros(T, sum(mask))
@@ -158,10 +160,10 @@ function write_aagrid(map, name, cfg, hbmeta; voltage = false, cum = false, max 
         str = "voltmap"
     end
 
-    writedlm("$(pref)_$(str)_$(name).asc", round(map, 8), ' ')
+    writedlm("$(pref)_$(str)$(name).asc", round(map, 8), ' ')
 end
 
-function write_volt_maps(name, voltages, cc, cfg, hbmeta; nodemap = Array{Float64,2}())
+function write_volt_maps(name, voltages, cc, cfg; hbmeta = RasterMeta(), nodemap = Array{Float64,2}())
 
     if cfg["data_type"] == "network"
         write_voltages(cfg["output_file"], name, voltages, cc)
@@ -178,7 +180,7 @@ function write_voltages{T}(output, name, voltages::Vector{T}, cc)
     volt_arr[:,2] = voltages
     
     pref = split(output, '.')[1]
-    writedlm("$(pref)_voltages_$(name).txt", volt_arr)
+    writedlm("$(pref)_voltages$(name).txt", volt_arr)
 
 end
 
