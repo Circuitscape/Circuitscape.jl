@@ -44,6 +44,7 @@ for i in 1:5
     r = compute("input/raster/advanced/$i/mgVerify$(i).ini")
     x = readdlm("output_verify/mgVerify$(i)_voltmap.asc"; skipstart = 6)
     @test sumabs2(x - r) < 1e-6
+    compare_all_output("mgVerify$(i)")
     info("Test mgVerify$i passed")
 end
 
