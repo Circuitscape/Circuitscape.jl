@@ -32,10 +32,15 @@ function compute_raster(cfg)
         a,g = construct_graph(gmap, nodemap, average_resistances, four_neighbors)
         cc = connected_components(g)
         debug("There are $(size(a, 1)) points and $(length(cc)) connected components")
-        voltages = advanced(cfg, a, g, rdata.source_map, rdata.ground_map, cc, nodemap = nodemap)
+        voltages, sources, grounds, finitegrounds = advanced(cfg, a, g, rdata.source_map, 
+                                                                    rdata.ground_map, cc, 
+                                                                    nodemap = nodemap)
+        return voltages
     else
-        voltages = onetoall(cfg, gmap, polymap, points_rc; included_pairs = rdata.included_pairs,
-                                                            strengths = rdata.strengths)
+        voltages = onetoall(cfg, gmap, polymap, points_rc; 
+                                    included_pairs = rdata.included_pairs,
+                                    strengths = rdata.strengths)
+        return voltages
     end
 end
 
@@ -438,10 +443,10 @@ function onetoall(cfg, gmap, polymap, points_rc; included_pairs = IncludeExclude
         check_node = nodemap[points_rc[1][i], points_rc[2][i]]
         
         if one_to_all
-            v = advanced(cfg, a, g, source_map, ground_map, cc; nodemap = nodemap, policy = :rmvgnd, 
+            v, s, gr, fg = advanced(cfg, a, g, source_map, ground_map, cc; nodemap = nodemap, policy = :rmvgnd, 
                             check_node = check_node)
         else
-            v = advanced(cfg, a, g, source_map, ground_map, cc; nodemap = nodemap, policy = :rmvsrc, 
+            v, s, gr, fg = advanced(cfg, a, g, source_map, ground_map, cc; nodemap = nodemap, policy = :rmvsrc, 
                             check_node = check_node)
         end
         res[i] = v[1]

@@ -95,7 +95,19 @@ function _get_node_currents_posneg(G, voltages, finitegrounds, pos)
     I,J,V = findnz(branch_currents)
     mask = V .> 0
     n = size(G, 1)
-    branch_currents = sparse(I[mask], J[mask], V[mask], n, n)
+    branch_currents = sparse( I[mask], J[mask], V[mask], n, n)
+
+	if finitegrounds[1]!= -9999
+        finiteground_currents = finitegrounds .* voltages
+        if pos
+            map!(x -> x < 0 ? -x : 0, finiteground_currents)
+        else
+            map!(x -> x > 0 ? x : 0, finiteground_currents)
+        end
+        n = size(G, 1)
+        branch_currents = branch_currents + spdiag(finiteground_currents, 0, n, n)
+    end
+
     vec(sum(branch_currents, 1))
 end
 
@@ -149,7 +161,7 @@ function write_aagrid(map, name, cfg, hbmeta; voltage = false, cum = false, max 
     writedlm("$(pref)_$(str)_$(name).asc", round(map, 8), ' ')
 end
 
-function write_volt_maps(name, voltages, cc, nodemap, cfg, hbmeta)
+function write_volt_maps(name, voltages, cc, cfg, hbmeta; nodemap = Array{Float64,2}())
 
     if cfg["data_type"] == "network"
         write_voltages(cfg["output_file"], name, voltages, cc)
