@@ -119,7 +119,7 @@ function postprocess(volt, cond, i, j, resistances, pt1, pt2, cond_pruned, cc, c
             local_polymap[idx] = polymap[idx]
             local_nodemap = construct_node_map(local_nodemap, local_polymap)
         end
-        write_volt_maps(name, volt, cc, local_nodemap, cfg, hbmeta)
+        write_volt_maps(name, volt, cc, cfg, hbmeta, nodemap = local_nodemap)
     end
 
     if cfg["write_cur_maps"] == "True"
@@ -140,30 +140,31 @@ function postprocess(volt, cond, i, j, resistances, pt1, pt2, cond_pruned, cc, c
     end
 end
 
-function compute_network(a)
+function compute_network(cfg)
 
-    network_file = a["habitat_file"]
-    point_file = a["point_file"]
-    A = read_graph(a, network_file)
+    network_file = cfg["habitat_file"]
+    point_file = cfg["point_file"]
+    A = read_graph(cfg, network_file)
     g = Graph(A)
-    scenario = a["scenario"]
+    scenario = cfg["scenario"]
 
     if scenario == "pairwise"
 
         fp = read_focal_points(point_file)
-        resistances = single_ground_all_pair_resistances(A, g, fp, a)
+        resistances = single_ground_all_pair_resistances(A, g, fp, cfg)
         resistances_3col = compute_3col(resistances, fp)
         return resistances
 
     elseif scenario == "advanced"
 
-        source_file = a["source_file"]
-        ground_file = a["ground_file"]
+        source_file = cfg["source_file"]
+        ground_file = cfg["ground_file"]
         source_map = read_point_strengths(source_file)
         ground_map = read_point_strengths(ground_file)
         cc = connected_components(g)
         debug("There are $(size(A, 1)) points and $(length(cc)) connected components")
-        voltages = advanced(a, A, g, source_map, ground_map, cc)
+        voltages = advanced(cfg, A, g, source_map, ground_map, cc)
+
         return voltages
 
     end
@@ -173,6 +174,8 @@ function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map, cc;
                     nodemap = Array{Float64,2}(), policy = :keepall, check_node = -1)
 
     mode = cfg["data_type"]
+    sources = Float64[]
+    grounds = Float64[]
     if mode == "raster"
         (i1, j1, v1) = findnz(source_map)
         (i2, j2, v2) = findnz(ground_map)
@@ -190,97 +193,69 @@ function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map, cc;
                 grounds[v] += v2[i]
             end
         end
-        sources, grounds, finitegrounds = resolve_conflicts(sources, grounds, policy)
-        volt = zeros(size(nodemap))
-        ind = find(nodemap)
-        f_local = Float64[]
-        solver_called = false
-        for c in cc
-            if check_node != -1 && !(check_node in c)
-                continue
-            end
-            a_local = laplacian(a[c, c])
-            s_local = sources[c]
-            g_local = grounds[c]
-            if sum(s_local) == 0 || sum(g_local) == 0
-                continue
-            end
-            if finitegrounds != [-9999.]
-                f_local = finitegrounds[c]
-            else
-                f_local = finitegrounds
-            end
-            voltages = multiple_solver(cfg, a_local, g, s_local, g_local, f_local)
-            solver_called = true
-            for i in eachindex(volt)
-                if i in ind
-                    val = Int(nodemap[i])
-                    if val in c
-                        idx = findfirst(x -> x == val, c)
-                        volt[i] = voltages[idx] 
-                    end
+    else
+        sources = zeros(size(a, 1))
+        grounds = zeros(size(a, 1))
+        is_res = cfg["ground_file_is_resistances"]
+        if is_res == "True"
+            ground_map[:,2] = 1 ./ ground_map[:,2]
+        end
+        sources[Int.(source_map[:,1])] = source_map[:,2]
+        grounds[Int.(ground_map[:,1])] = ground_map[:,2]
+    end
+    sources, grounds, finitegrounds = resolve_conflicts(sources, grounds, policy)
+    volt = zeros(size(nodemap))
+    ind = find(nodemap)
+    f_local = Float64[]
+    solver_called = false
+    voltages = Float64[]
+    for c in cc
+        if check_node != -1 && !(check_node in c)
+            continue
+        end
+        a_local = laplacian(a[c, c])
+        s_local = sources[c]
+        g_local = grounds[c]
+        if sum(s_local) == 0 || sum(g_local) == 0
+            continue
+        end
+        if finitegrounds != [-9999.]
+            f_local = finitegrounds[c]
+        else
+            f_local = finitegrounds
+        end
+        voltages = multiple_solver(cfg, a_local, g, s_local, g_local, f_local)
+        solver_called = true
+        for i in eachindex(volt)
+            if i in ind
+                val = Int(nodemap[i])
+                if val in c
+                    idx = findfirst(x -> x == val, c)
+                    volt[i] = voltages[idx] 
                 end
             end
         end
-        scenario = cfg["scenario"]
-        if !solver_called
-            return [-1.]
-        end
-        if scenario == "one-to-all" 
-            idx = find(source_map)
-            val = volt[idx] / source_map[idx]
-            if val[1] ≈ 0
-                return [-1.]
-            else
-                return val
-            end
-        elseif scenario == "all-to-one"
-            return [0.]
-        end
-        return volt
-    else
-        a = laplacian(a)
-        v = zeros(size(a, 1))
-        ground_vals = ground_map[:,2]
-        ind_zeros = find(x -> x == 0, ground_map[:,2]) 
-        ind_nzeros = find(x -> x != 0, ground_map[:,2]) 
-        finitegrounds = zeros(1)
-        if length(ind_nzeros) == 0
-            finitegrounds = [-9999.]
-        end
-        is_res = cfg["ground_file_is_resistances"]
-        if is_res == "True"
-            ground_vals = 1 ./ ground_vals
-        end
-        for i in eachindex(ground_vals)
-            if ground_vals[i] == Inf
-                ground_vals[i] = 0
-            end
-        end
-        if finitegrounds[1] != -9999
-            a = a + spdiagm(ground_vals, 0, size(a, 1), size(a, 1))
-        end
-        for i in ind_zeros
-            a = del_row_col(a, Int(ground_map[i,1]))
-        end
-        M = aspreconditioner(SmoothedAggregationSolver(a))
-        curr = zeros(size(a, 1))
-        curr_indices = Int.(source_map[:,1])
-        curr[curr_indices] = source_map[:,2]
-        volt = solve_linear_system(cfg, a, curr, M)
-        ground_indices = ground_map[:,1]
-        k = 1
-        ground_zeros = ground_indices[ind_zeros]
-        for i = 1:size(v, 1)
-            if i in ground_zeros
-                continue
-            else
-                v[i] = volt[k]
-                k += 1
-            end
-        end
+    end
+    if cfg["data_type"] == "network"
+        v = [collect(1:size(a, 1))  voltages]
         return v
     end
+    scenario = cfg["scenario"]
+    if !solver_called
+        return [-1.]
+    end
+    if scenario == "one-to-all" 
+        idx = find(source_map)
+        val = volt[idx] / source_map[idx]
+        if val[1] ≈ 0
+            return [-1.]
+        else
+            return val
+        end
+    elseif scenario == "all-to-one"
+        return [0.]
+    end
+    return volt
 end
 
 function del_row_col(a, n::Int)

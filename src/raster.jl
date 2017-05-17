@@ -32,10 +32,14 @@ function compute_raster(cfg)
         a,g = construct_graph(gmap, nodemap, average_resistances, four_neighbors)
         cc = connected_components(g)
         debug("There are $(size(a, 1)) points and $(length(cc)) connected components")
-        voltages = advanced(cfg, a, g, rdata.source_map, rdata.ground_map, cc, nodemap = nodemap)
+        voltages = advanced(cfg, a, g, rdata.source_map, rdata.ground_map, cc, 
+                                                                    nodemap = nodemap)
+        return voltages
     else
-        voltages = onetoall(cfg, gmap, polymap, points_rc; included_pairs = rdata.included_pairs,
-                                                            strengths = rdata.strengths)
+        voltages = onetoall(cfg, gmap, polymap, points_rc; 
+                                    included_pairs = rdata.included_pairs,
+                                    strengths = rdata.strengths)
+        return voltages
     end
 end
 
