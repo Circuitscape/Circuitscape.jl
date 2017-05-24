@@ -182,6 +182,9 @@ function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map, cc;
     is_network = mode == "network"
     sources = zeros(size(a, 1))
     grounds = zeros(size(a, 1))
+    println("source map!")
+    Base.print_matrix(STDOUT, source_map)
+    println()
     if mode == "raster"
         (i1, j1, v1) = findnz(source_map)
         (i2, j2, v2) = findnz(ground_map)
@@ -206,6 +209,7 @@ function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map, cc;
         grounds[Int.(ground_map[:,1])] = ground_map[:,2]
     end
     sources, grounds, finitegrounds = resolve_conflicts(sources, grounds, policy)
+    @show sources
     volt = zeros(size(nodemap))
     ind = find(nodemap)
     f_local = Float64[]

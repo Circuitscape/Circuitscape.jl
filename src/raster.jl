@@ -410,6 +410,11 @@ function onetoall(cfg, gmap, polymap, points_rc; included_pairs = IncludeExclude
     res = zeros(size(points_unique, 1))
     num_points_to_solve = size(points_unique, 1)
     original_point_map = copy(point_map)
+    unique_point_map = zeros(gmap)
+    for i in points_unique
+        ind = findfirst(x -> x == i, points_rc[3])
+        unique_point_map[f(1,ind), f(2,ind)] = f(3,ind)
+    end
 
     for i = 1:num_points_to_solve
         copy!(point_map, original_point_map)
@@ -429,7 +434,8 @@ function onetoall(cfg, gmap, polymap, points_rc; included_pairs = IncludeExclude
             a, g = construct_graph(gmap, nodemap, average_resistances, four_neighbors)
         end
         if one_to_all
-            source_map = map(x -> x == n ? str : 0, point_map)
+            #source_map = map(x -> x == n ? str : 0, point_map)
+            source_map = map(x -> x == n ? str : 0, unique_point_map)
             ground_map = map(x -> x == n ? 0 : x, point_map)
             map!(x -> x > 0 ? Inf : x, ground_map)
         else
