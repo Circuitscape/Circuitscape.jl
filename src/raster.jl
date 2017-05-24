@@ -443,10 +443,10 @@ function onetoall(cfg, gmap, polymap, points_rc; included_pairs = IncludeExclude
         
         if one_to_all
             v = advanced(cfg, a, g, source_map, ground_map, cc; nodemap = nodemap, policy = :rmvgnd, 
-                            check_node = check_node, src = n, polymap = polymap, hbmeta = hbmeta)
+                            check_node = check_node, src = n, polymap = newpoly, hbmeta = hbmeta)
         else
             v = advanced(cfg, a, g, source_map, ground_map, cc; nodemap = nodemap, policy = :rmvsrc, 
-                            check_node = check_node, src = n, polymap = polymap, hbmeta = hbmeta)
+                            check_node = check_node, src = n, polymap = newpoly, hbmeta = hbmeta)
         end
         res[i] = v[1]
     end
