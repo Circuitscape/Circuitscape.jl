@@ -105,7 +105,6 @@ function _get_node_currents_posneg(G, voltages, finitegrounds, pos)
             map!(x -> x > 0 ? x : 0, finiteground_currents)
         end
         n = size(G, 1)
-        @show finiteground_currents
         branch_currents = branch_currents + spdiagm(finiteground_currents, 0, n, n)
     end
 
@@ -190,3 +189,22 @@ function _create_voltage_map{T}(voltages::Vector{T}, nodemap, hbmeta)
     voltmap[idx] = voltages[Int.(nodemap[idx])]
     voltmap
 end
+
+alloc_map(hbmeta) = zeros(hbmeta.nrows, hbmeta.ncols) 
+
+function accum_voltages!(base, newvolt, nodemap, hbmeta)
+    voltmap = _create_voltage_map(newvolt, nodemap, hbmeta)
+    for i in eachindex(base)
+        base[i] += voltmap[i]
+    end
+end
+
+function accum_currents!(base, newcurr, cfg, G, voltages, finitegrounds, nodemap, hbmeta)
+    node_currents, branch_currents = _create_current_maps(G, voltages, finitegrounds, cfg, 
+                                                            nodemap = nodemap, hbmeta = hbmeta)
+
+    for i in eachindex(base)
+        base[i] += node_currents[i]
+    end
+end
+    
