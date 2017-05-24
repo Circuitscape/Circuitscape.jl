@@ -229,7 +229,6 @@ function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map, cc;
             f_local = finitegrounds
         end
         voltages = multiple_solver(cfg, a_local, g, s_local, g_local, f_local)
-        @show voltages
         solver_called = true
         if cfg["write_volt_maps"] == "True" && !is_network
             local_nodemap = zeros(Int, nodemap)
