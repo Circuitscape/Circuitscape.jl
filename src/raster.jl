@@ -33,12 +33,12 @@ function compute_raster(cfg)
         cc = connected_components(g)
         debug("There are $(size(a, 1)) points and $(length(cc)) connected components")
         voltages = advanced(cfg, a, g, rdata.source_map, rdata.ground_map, cc, 
-                                                                    nodemap = nodemap)
+                                                                    nodemap = nodemap, hbmeta = hbmeta, polymap = rdata.polymap)
         return voltages
     else
         voltages = onetoall(cfg, gmap, polymap, points_rc; 
                                     included_pairs = rdata.included_pairs,
-                                    strengths = rdata.strengths)
+                                    strengths = rdata.strengths, hbmeta = hbmeta)
         return voltages
     end
 end
@@ -367,7 +367,7 @@ function construct_node_map(gmap, polymap)
     nodemap 
 end
 
-function onetoall(cfg, gmap, polymap, points_rc; included_pairs = IncludeExcludePairs(), strengths = Matrix{Float64}())
+function onetoall(cfg, gmap, polymap, points_rc; included_pairs = IncludeExcludePairs(), strengths = Matrix{Float64}(), hbmeta = RasterMeta())
 
     use_variable_strengths = !isempty(strengths)
     use_included_pairs = !isempty(included_pairs)
@@ -410,6 +410,11 @@ function onetoall(cfg, gmap, polymap, points_rc; included_pairs = IncludeExclude
     res = zeros(size(points_unique, 1))
     num_points_to_solve = size(points_unique, 1)
     original_point_map = copy(point_map)
+    unique_point_map = zeros(gmap)
+    for i in points_unique
+        ind = findfirst(x -> x == i, points_rc[3])
+        unique_point_map[f(1,ind), f(2,ind)] = f(3,ind)
+    end
 
     for i = 1:num_points_to_solve
         copy!(point_map, original_point_map)
@@ -429,7 +434,8 @@ function onetoall(cfg, gmap, polymap, points_rc; included_pairs = IncludeExclude
             a, g = construct_graph(gmap, nodemap, average_resistances, four_neighbors)
         end
         if one_to_all
-            source_map = map(x -> x == n ? str : 0, point_map)
+            #source_map = map(x -> x == n ? str : 0, point_map)
+            source_map = map(x -> x == n ? str : 0, unique_point_map)
             ground_map = map(x -> x == n ? 0 : x, point_map)
             map!(x -> x > 0 ? Inf : x, ground_map)
         else
@@ -443,10 +449,10 @@ function onetoall(cfg, gmap, polymap, points_rc; included_pairs = IncludeExclude
         
         if one_to_all
             v = advanced(cfg, a, g, source_map, ground_map, cc; nodemap = nodemap, policy = :rmvgnd, 
-                            check_node = check_node)
+                            check_node = check_node, src = n, polymap = newpoly, hbmeta = hbmeta)
         else
             v = advanced(cfg, a, g, source_map, ground_map, cc; nodemap = nodemap, policy = :rmvsrc, 
-                            check_node = check_node)
+                            check_node = check_node, src = n, polymap = newpoly, hbmeta = hbmeta)
         end
         res[i] = v[1]
     end

@@ -102,9 +102,9 @@ function postprocess(volt, cond, i, j, resistances, pt1, pt2, cond_pruned, cc, c
                                             hbmeta = hbmeta)
 
     r = resistances[i, j] = resistances[j, i] = volt[pt2] - volt[pt1]
-    name = "$(cond[i])_$(cond[j])"
+    name = "_$(cond[i])_$(cond[j])"
     if cfg["data_type"] == "raster"
-        name = "$(Int(orig_pts[i]))_$(Int(orig_pts[j]))"
+        name = "_$(Int(orig_pts[i]))_$(Int(orig_pts[j]))"
     end
 
     if cfg["write_volt_maps"] == "True"
@@ -119,7 +119,7 @@ function postprocess(volt, cond, i, j, resistances, pt1, pt2, cond_pruned, cc, c
             local_polymap[idx] = polymap[idx]
             local_nodemap = construct_node_map(local_nodemap, local_polymap)
         end
-        write_volt_maps(name, volt, cc, cfg, hbmeta, nodemap = local_nodemap)
+        write_volt_maps(name, volt, cc, cfg, hbmeta = hbmeta, nodemap = local_nodemap)
     end
 
     if cfg["write_cur_maps"] == "True"
@@ -171,16 +171,23 @@ function compute_network(cfg)
 end
 
 function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map, cc; 
-                    nodemap = Array{Float64,2}(), policy = :keepall, check_node = -1)
+                                                                    nodemap = Matrix{Float64}(), 
+                                                                    policy = :keepall, 
+                                                                    check_node = -1, 
+                                                                    hbmeta = RasterMeta(), 
+                                                                    src = 0, 
+                                                                    polymap = Matrix{Float64}())
 
     mode = cfg["data_type"]
-    sources = Float64[]
-    grounds = Float64[]
+    is_network = mode == "network"
+    sources = zeros(size(a, 1))
+    grounds = zeros(size(a, 1))
+    println("source map!")
+    Base.print_matrix(STDOUT, source_map)
+    println()
     if mode == "raster"
         (i1, j1, v1) = findnz(source_map)
         (i2, j2, v2) = findnz(ground_map)
-        sources = zeros(size(a, 1))
-        grounds = zeros(size(a, 1))
         for i = 1:size(i1, 1)
             v = Int(nodemap[i1[i], j1[i]])
             if v != 0
@@ -194,8 +201,6 @@ function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map, cc;
             end
         end
     else
-        sources = zeros(size(a, 1))
-        grounds = zeros(size(a, 1))
         is_res = cfg["ground_file_is_resistances"]
         if is_res == "True"
             ground_map[:,2] = 1 ./ ground_map[:,2]
@@ -204,11 +209,14 @@ function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map, cc;
         grounds[Int.(ground_map[:,1])] = ground_map[:,2]
     end
     sources, grounds, finitegrounds = resolve_conflicts(sources, grounds, policy)
+    @show sources
     volt = zeros(size(nodemap))
     ind = find(nodemap)
     f_local = Float64[]
     solver_called = false
     voltages = Float64[]
+    outvolt = alloc_map(hbmeta) 
+    outcurr = alloc_map(hbmeta)
     for c in cc
         if check_node != -1 && !(check_node in c)
             continue
@@ -226,6 +234,34 @@ function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map, cc;
         end
         voltages = multiple_solver(cfg, a_local, g, s_local, g_local, f_local)
         solver_called = true
+        if cfg["write_volt_maps"] == "True" && !is_network
+            local_nodemap = zeros(Int, nodemap)
+            idx = findin(nodemap, c)
+            local_nodemap[idx] = nodemap[idx]
+            if isempty(polymap)
+                idx = find(local_nodemap)
+                local_nodemap[idx] = 1:length(idx)
+            else
+                local_polymap = zeros(local_nodemap)
+                local_polymap[idx] = polymap[idx]
+                local_nodemap = construct_node_map(local_nodemap, local_polymap)
+            end
+            accum_voltages!(outvolt, voltages, local_nodemap, hbmeta)
+        end
+        if cfg["write_cur_maps"] == "True" && !is_network
+            local_nodemap = zeros(Int, nodemap)
+            idx = findin(nodemap, c)
+            local_nodemap[idx] = nodemap[idx]
+            if isempty(polymap)
+                idx = find(local_nodemap)
+                local_nodemap[idx] = 1:length(idx)
+            else
+                local_polymap = zeros(local_nodemap)
+                local_polymap[idx] = polymap[idx]
+                local_nodemap = construct_node_map(local_nodemap, local_polymap)
+            end
+            accum_currents!(outcurr, voltages, cfg, a_local, voltages, f_local, local_nodemap, hbmeta)
+        end
         for i in eachindex(volt)
             if i in ind
                 val = Int(nodemap[i])
@@ -236,6 +272,23 @@ function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map, cc;
             end
         end
     end
+
+    name = src == 0 ? "" : "_$(Int(src))"
+    if cfg["write_volt_maps"] == "True"
+        if is_network
+            write_volt_maps(name, voltages, collect(1:size(a,1)), cfg)
+        else
+            write_aagrid(outvolt, name, cfg, hbmeta, voltage = true)
+        end
+    end
+    if cfg["write_cur_maps"] == "True"
+        if is_network
+            write_cur_maps(laplacian(a), voltages, finitegrounds, collect(1:size(a,1)), name, cfg)
+        else
+            write_aagrid(outcurr, name, cfg, hbmeta)
+        end
+    end
+
     if cfg["data_type"] == "network"
         v = [collect(1:size(a, 1))  voltages]
         return v
@@ -255,6 +308,7 @@ function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map, cc;
     elseif scenario == "all-to-one"
         return [0.]
     end
+
     return volt
 end
 

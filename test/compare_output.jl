@@ -18,14 +18,14 @@ function compare_all_output(str)
             # Branch currents
             if contains(f, "branch")
                 r = read_branch_currents("output/$f")
-                x = get_network_comp(list_to_comp, f)
+                x = !startswith(f, "mg") ? get_network_comp(list_to_comp, f) : readdlm("output_verify/$f")
                 @test compare_branch(r, x)
                 info("Test $f passed")
 
             # Node currents
             else
                 r = read_node_currents("output/$f")
-                x = get_network_comp(list_to_comp, f)
+                x = !startswith(f, "mg") ? get_network_comp(list_to_comp, f) : readdlm("output_verify/$f")
                 @test compare_node(r, x)
                 info("Test $f passed")
             end

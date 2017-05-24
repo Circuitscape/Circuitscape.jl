@@ -44,6 +44,7 @@ for i in 1:5
     r = compute("input/raster/advanced/$i/mgVerify$(i).ini")
     x = readdlm("output_verify/mgVerify$(i)_voltmap.asc"; skipstart = 6)
     @test sumabs2(x - r) < 1e-6
+    compare_all_output("mgVerify$(i)")
     info("Test mgVerify$i passed")
 end
 
@@ -53,8 +54,8 @@ for i in 1:13
     r = compute("input/raster/one_to_all/$i/oneToAllVerify$(i).ini")
     x = readdlm("output_verify/oneToAllVerify$(i)_resistances.out")
     x = x[:,2]
-
     @test sumabs2(x - r) < 1e-6
+    compare_all_output("oneToAllVerify$(i)")
     info("Test oneToAllVerify$i passed")
 end
 
