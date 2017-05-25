@@ -61,20 +61,20 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
                                             orig_pts = orig_pts,
                                             polymap = polymap,
                                             hbmeta = hbmeta)
-			push!(I, i)
-			push!(J, j)
-			push!(V, val)
+            push!(I, i)
+            push!(J, j)
+            push!(V, val)
         end
-		I,J,V
+        I,J,V
     end
-	X = vcat(pmap(x -> f(x), 1:length(c))...)
+    X = vcat(pmap(x -> f(x), 1:length(c))...)
     #debug("solved $p equations")
-	for x in X
-		for i = 1:size(x[1], 1)
-			resistances[x[1][i], x[2][i]] = x[3][i]
-			resistances[x[2][i], x[1][i]] = x[3][i]
-		end
-	end
+    for x in X
+        for i = 1:size(x[1], 1)
+            resistances[x[1][i], x[2][i]] = x[3][i]
+            resistances[x[2][i], x[1][i]] = x[3][i]
+        end
+    end
     for i = 1:size(resistances,1)
         resistances[i,i] = 0
     end
@@ -111,7 +111,7 @@ function postprocess(volt, cond, i, j, resistances, pt1, pt2, cond_pruned, cc, c
                                             orig_pts = Vector{Int}(), 
                                             polymap = Vector{Float64}(),
                                             hbmeta = hbmeta)
-	v = volt[pt2] - volt[pt1]
+    v = volt[pt2] - volt[pt1]
     r = resistances[i, j] = resistances[j, i] = v
     name = "_$(cond[i])_$(cond[j])"
     if cfg["data_type"] == "raster"
