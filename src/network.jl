@@ -23,13 +23,16 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
     volt = zeros.(size.(cc))
     
     p = 0 
-    for i = 1:numpoints
+	val = 0 
+    #for i = 1:numpoints
+    function f(i)
+		I = Int64[]
+		J = Int64[]
+		V = Float64[]
         if c[i] != 0
             rcc = rightcc(cc, c[i])
-            cond_pruned = subsets[rcc]
+            cond_pruned = copy(subsets[rcc])
             pt1 = ingraph(cc[rcc], c[i])
-            d = cond_pruned[pt1, pt1]
-            cond_pruned[pt1, pt1] = 0
             M = aspreconditioner(SmoothedAggregationSolver(cond_pruned))
         end
         for j = i+1:numpoints
@@ -37,7 +40,7 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
                 continue
             end
             if c[i] == 0
-                resistances[i,j] = resistances[j,i] = -1
+                #resistances[i,j] = resistances[j,i] = -1
                 continue
             end
             pt2 = ingraph(cc[rcc], c[j])
@@ -46,24 +49,32 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
             end
             debug("pt1 = $pt1, pt2 = $pt2")
             p +=1
-            curr = z[rcc]
-            v = volt[rcc]
+			curr = zeros(z[rcc])
+			v = zeros(volt[rcc])
             if pt1 != pt2
                 curr[pt1] = -1
                 curr[pt2] = 1
                 solve_linear_system!(cfg, v, cond_pruned, curr, M)
-                curr[:] = 0
             end
-            postprocess(v, c, i, j, resistances, pt1, pt2, cond_pruned, cc[rcc], cfg; 
+            i, j, val = postprocess(v, c, i, j, resistances, pt1, pt2, cond_pruned, cc[rcc], cfg; 
                                             nodemap = nodemap, 
                                             orig_pts = orig_pts,
                                             polymap = polymap,
                                             hbmeta = hbmeta)
-            v[:] = 0
+			push!(I, i)
+			push!(J, j)
+			push!(V, val)
         end
-        cond_pruned[pt1,pt1] = d
+		I,J,V
     end
-    debug("solved $p equations")
+	X = vcat(pmap(x -> f(x), 1:length(c))...)
+    #debug("solved $p equations")
+	for x in X
+		for i = 1:size(x[1], 1)
+			resistances[x[1][i], x[2][i]] = x[3][i]
+			resistances[x[2][i], x[1][i]] = x[3][i]
+		end
+	end
     for i = 1:size(resistances,1)
         resistances[i,i] = 0
     end
@@ -100,8 +111,8 @@ function postprocess(volt, cond, i, j, resistances, pt1, pt2, cond_pruned, cc, c
                                             orig_pts = Vector{Int}(), 
                                             polymap = Vector{Float64}(),
                                             hbmeta = hbmeta)
-
-    r = resistances[i, j] = resistances[j, i] = volt[pt2] - volt[pt1]
+	v = volt[pt2] - volt[pt1]
+    r = resistances[i, j] = resistances[j, i] = v
     name = "_$(cond[i])_$(cond[j])"
     if cfg["data_type"] == "raster"
         name = "_$(Int(orig_pts[i]))_$(Int(orig_pts[j]))"
@@ -138,6 +149,7 @@ function postprocess(volt, cond, i, j, resistances, pt1, pt2, cond_pruned, cc, c
                                     nodemap = local_nodemap, 
                                     hbmeta = hbmeta)
     end
+	i, j, v
 end
 
 function compute_network(cfg)
