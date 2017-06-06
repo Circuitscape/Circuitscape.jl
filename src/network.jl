@@ -19,56 +19,48 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
     pt1 = 1
     rcc = 0
     subsets = getindex.([cond], cc, cc)
-    z = zeros.(cc)
-    volt = zeros.(size.(cc))
+    Msets = aspreconditioner.(SmoothedAggregationSolver.(subsets))
     
-    p = 0 
-    for i = 1:numpoints
-        if c[i] != 0
-            rcc = rightcc(cc, c[i])
-            cond_pruned = subsets[rcc]
-            pt1 = ingraph(cc[rcc], c[i])
-            d = cond_pruned[pt1, pt1]
-            cond_pruned[pt1, pt1] = 0
-            M = aspreconditioner(SmoothedAggregationSolver(cond_pruned))
+    for (i, comp) in enumerate(cc)
+        csub = filter(x -> x in comp, c)
+        idx = findin(c, csub)
+        matrix = subsets[i]
+        M = Msets[i]
+        X = vcat(pmap(x -> f(x, cfg, csub, idx, comp, matrix, M), 1:length(csub))...)
+        for x in X 
+            for i = 1:size(x[1], 1)
+                resistances[x[1][i], x[2][i]] = x[3][i]
+            end
         end
-        for j = i+1:numpoints
-            if (i,j) in exclude
-                continue
-            end
-            if c[i] == 0
-                resistances[i,j] = resistances[j,i] = -1
-                continue
-            end
-            pt2 = ingraph(cc[rcc], c[j])
-            if pt2 == 0
-                continue
-            end
-            debug("pt1 = $pt1, pt2 = $pt2")
-            p +=1
-            curr = z[rcc]
-            v = volt[rcc]
-            if pt1 != pt2
-                curr[pt1] = -1
-                curr[pt2] = 1
-                solve_linear_system!(cfg, v, cond_pruned, curr, M)
-                curr[:] = 0
-            end
-            postprocess(v, c, i, j, resistances, pt1, pt2, cond_pruned, cc[rcc], cfg; 
-                                            nodemap = nodemap, 
-                                            orig_pts = orig_pts,
-                                            polymap = polymap,
-                                            hbmeta = hbmeta)
-            v[:] = 0
-        end
-        cond_pruned[pt1,pt1] = d
     end
-    debug("solved $p equations")
     for i = 1:size(resistances,1)
         resistances[i,i] = 0
     end
-    resistances
+    
+    resistances    
 end
+
+function f(i, cfg, csub, idx, comp, matrix, M)
+
+    I = Int[]
+    J = Int[]
+    V = Float64[]
+    #for i = 1:size(csub, 1)
+        pt1 = csub[i]
+        for j = i+1:size(csub, 1)
+            pt2 = csub[j]
+            curr = zeros(size(matrix, 1))
+            curr[idx[i]] = -1
+            curr[idx[j]] = 1
+            volt = solve_linear_system(cfg, matrix, curr, M)
+            v = volt[idx[i]] - volt[idx[j]]
+            push!(I, idx[i])
+            push!(J, idx[j])
+            push!(V, v)
+        end
+    #end
+    I, J, V
+end 
 
 function solve_linear_system!(cfg, v, G, curr, M)
     if cfg["solver"] == "cg+amg"
