@@ -15,15 +15,14 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
     total = Int(numpoints * (numpoints-1) / 2)
     subsets = getindex.([cond], cc, cc)
     
-    for (i, comp) in enumerate(cc)
+    for (cid, comp) in enumerate(cc)
         csub = filter(x -> x in comp, c)
         idx = findin(c, csub)
-        matrix = subsets[i]
-        X = vcat(pmap(x -> f(x, cfg, csub, idx, comp, matrix), 1:length(csub))...)
-        for x in X 
-            for i = 1:size(x[1], 1)
-                resistances[x[1][i], x[2][i]] = x[3][i]
-                resistances[x[2][i], x[1][i]] = x[3][i]
+        matrix = subsets[cid]
+        for i = 1:size(csub, 1)
+            X = vcat(pmap(x -> f(x, cfg, csub, idx, comp, matrix, i), i+1:size(csub,1))...)
+            for (i,j,v) in X
+                resistances[i,j] = resistances[j,i] = v
             end
         end
     end
@@ -34,26 +33,19 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
     resistances    
 end
 
-function f(i, cfg, csub, idx, comp, matrix)
-
-    M = aspreconditioner(SmoothedAggregationSolver(matrix))
-    I = Int[]
-    J = Int[]
-    V = Float64[]
+function f(j, cfg, csub, idx, comp, matrix, i)
+        
+    X = Tuple{Int,Int,Float64}[]
     pt1 = ingraph(comp, csub[i])
-    for j = i+1:size(csub, 1)
-        pt2 = ingraph(comp, csub[j])
-        curr = zeros(size(matrix, 1))
-        curr[pt1] = -1
-        curr[pt2] = 1
-        info("Solving pt1 = $pt1, pt2 = $pt2")
-        volt = solve_linear_system(cfg, matrix, curr, M)
-        v = volt[pt2] - volt[pt1]
-        push!(I, idx[i])
-        push!(J, idx[j])
-        push!(V, v)
-    end
-    I, J, V
+    pt2 = ingraph(comp, csub[j])
+    curr = zeros(size(matrix, 1))
+    curr[pt1] = -1
+    curr[pt2] = 1
+    info("Solving pt1 = $pt1, pt2 = $pt2")
+    #volt = solve_linear_system(cfg, matrix, curr, M)
+    volt = matrix \ curr
+    v = volt[pt2] - volt[pt1]
+    push!(X, (idx[i], idx[j], v))
 end 
 
 function solve_linear_system!(cfg, v, G, curr, M)
