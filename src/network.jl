@@ -13,23 +13,18 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
 
     volt = Vector{Float64}(size(g, 1))
     total = Int(numpoints * (numpoints-1) / 2)
-    cond_pruned = sprand(1,1,0.1)
-    d = 0
-    M = 1
-    pt1 = 1
-    rcc = 0
     subsets = getindex.([cond], cc, cc)
-    Msets = aspreconditioner.(SmoothedAggregationSolver.(subsets))
     
     for (i, comp) in enumerate(cc)
         csub = filter(x -> x in comp, c)
         idx = findin(c, csub)
         matrix = subsets[i]
-        M = Msets[i]
+        M = aspreconditioner(SmoothedAggregationSolver(matrix))
         X = vcat(pmap(x -> f(x, cfg, csub, idx, comp, matrix, M), 1:length(csub))...)
         for x in X 
             for i = 1:size(x[1], 1)
                 resistances[x[1][i], x[2][i]] = x[3][i]
+                resistances[x[2][i], x[1][i]] = x[3][i]
             end
         end
     end
@@ -42,23 +37,23 @@ end
 
 function f(i, cfg, csub, idx, comp, matrix, M)
 
+    @show M.po.o
     I = Int[]
     J = Int[]
     V = Float64[]
-    #for i = 1:size(csub, 1)
-        pt1 = csub[i]
-        for j = i+1:size(csub, 1)
-            pt2 = csub[j]
-            curr = zeros(size(matrix, 1))
-            curr[idx[i]] = -1
-            curr[idx[j]] = 1
-            volt = solve_linear_system(cfg, matrix, curr, M)
-            v = volt[idx[i]] - volt[idx[j]]
-            push!(I, idx[i])
-            push!(J, idx[j])
-            push!(V, v)
-        end
-    #end
+    pt1 = ingraph(comp, csub[i])
+    for j = i+1:size(csub, 1)
+        pt2 = ingraph(comp, csub[j])
+        curr = zeros(size(matrix, 1))
+        curr[pt1] = -1
+        curr[pt2] = 1
+        info("Solving pt1 = $pt1, pt2 = $pt2")
+        volt = solve_linear_system(cfg, matrix, curr, M)
+        v = volt[pt2] - volt[pt1]
+        push!(I, idx[i])
+        push!(J, idx[j])
+        push!(V, v)
+    end
     I, J, V
 end 
 
