@@ -14,12 +14,14 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
     volt = Vector{Float64}(size(g, 1))
     total = Int(numpoints * (numpoints-1) / 2)
     subsets = getindex.([cond], cc, cc)
+
+    dat() = nodemap, polymap, hbmeta, orig_pts
     
     for (i, comp) in enumerate(cc)
         csub = filter(x -> x in comp, c)
         idx = findin(c, csub)
         matrix = subsets[i]
-        X = vcat(pmap(x -> f(x, cfg, csub, idx, comp, matrix), 1:length(csub))...)
+        X = vcat(pmap(x -> f(x, cfg, csub, idx, comp, matrix, c, dat), 1:length(csub))...)
         for x in X 
             for i = 1:size(x[1], 1)
                 resistances[x[1][i], x[2][i]] = x[3][i]
@@ -34,20 +36,25 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
     resistances    
 end
 
-function f(i, cfg, csub, idx, comp, matrix)
+function f(i, cfg, csub, idx, comp, matrix, c, dat)
 
-    M = aspreconditioner(SmoothedAggregationSolver(matrix))
     I = Int[]
     J = Int[]
     V = Float64[]
     pt1 = ingraph(comp, csub[i])
+    nodemap, polymap, hbmeta, orig_pts = dat()
     for j = i+1:size(csub, 1)
         pt2 = ingraph(comp, csub[j])
         curr = zeros(size(matrix, 1))
         curr[pt1] = -1
         curr[pt2] = 1
         info("Solving pt1 = $pt1, pt2 = $pt2")
-        volt = solve_linear_system(cfg, matrix, curr, M)
+        volt = matrix \ curr
+        postprocess(volt, c, i, j, pt1, pt2, matrix, comp, cfg; 
+                                            nodemap = nodemap,
+                                            orig_pts = orig_pts,
+                                            polymap = polymap,
+                                            hbmeta = hbmeta)
         v = volt[pt2] - volt[pt1]
         push!(I, idx[i])
         push!(J, idx[j])
@@ -81,13 +88,12 @@ function laplacian(G::SparseMatrixCSC)
     G = -G + spdiagm(vec(sum(G, 1)))
 end
 
-function postprocess(volt, cond, i, j, resistances, pt1, pt2, cond_pruned, cc, cfg; 
+function postprocess(volt, cond, i, j, pt1, pt2, cond_pruned, cc, cfg; 
                                             nodemap = Matrix{Float64}(), 
                                             orig_pts = Vector{Int}(), 
                                             polymap = Vector{Float64}(),
                                             hbmeta = hbmeta)
 
-    r = resistances[i, j] = resistances[j, i] = volt[pt2] - volt[pt1]
     name = "_$(cond[i])_$(cond[j])"
     if cfg["data_type"] == "raster"
         name = "_$(Int(orig_pts[i]))_$(Int(orig_pts[j]))"
