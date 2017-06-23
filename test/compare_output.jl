@@ -39,7 +39,7 @@ generate_lists(str) = list_of_files(str, "output/"), list_of_files(str, "output_
 read_branch_currents(str) = readdlm(str)
 read_node_currents(str) = readdlm(str)
 
-read_aagrid(file) = readdlm(file, skipstart = 0) # Will change to 6 
+read_aagrid(file) = readdlm(file, skipstart = 6) # Will change to 6 
 
 compare_aagrid{T}(r::Matrix{T}, x::Matrix{T}) = sumabs2(x - r) < 1e-6
 

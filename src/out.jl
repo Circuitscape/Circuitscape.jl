@@ -24,7 +24,8 @@ function write_cur_maps(G, voltages, finitegrounds, cc, name, cfg; nodemap = Mat
         write_currents(node_currents_array, branch_currents_array, name, cfg)
     else
        current_map = node_currents
-       write_aagrid(current_map, name, cfg, hbmeta)
+       log_transform = cfg["log_transform_maps"] == "True"
+       write_aagrid(current_map, name, cfg, hbmeta; log_transform = log_transform)
    end
 end
 
@@ -147,8 +148,15 @@ function _get_branch_currents_posneg{T}(G, v::Vector{T}, pos)
     branch_currents
 end
 
-function write_aagrid(map, name, cfg, hbmeta; voltage = false, cum = false, max = false)
+function write_aagrid(cmap, name, cfg, hbmeta; 
+                        voltage = false, cum = false, max = false, 
+                        log_transform = false)
+    
     pref = split(cfg["output_file"], '.')[1]
+
+    if log_transform
+        map!(x -> x > 0 ? log10(x) : float(hbmeta.nodata), cmap)
+    end
 
     str = "curmap"
     if cum
@@ -159,7 +167,18 @@ function write_aagrid(map, name, cfg, hbmeta; voltage = false, cum = false, max 
         str = "voltmap"
     end
 
-    writedlm("$(pref)_$(str)$(name).asc", round(map, 8), ' ')
+    filename = "$(pref)_$(str)$(name).asc"
+    f = open(filename, "w")
+
+    write(f, "ncols         $(hbmeta.ncols)\n")
+    write(f, "nrows         $(hbmeta.nrows)\n")
+    write(f, "xllcorner     $(hbmeta.xllcorner)\n")
+    write(f, "yllcorner     $(hbmeta.yllcorner)\n")
+    write(f, "cellsize      $(hbmeta.cellsize)\n")
+    write(f, "NODATA_value  $(hbmeta.nodata)\n")
+
+    writedlm(f, round(cmap, 8), ' ')
+    close(f)
 end
 
 function write_volt_maps(name, voltages, cc, cfg; hbmeta = RasterMeta(), nodemap = Array{Float64,2}())
