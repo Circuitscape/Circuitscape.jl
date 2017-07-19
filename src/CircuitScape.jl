@@ -4,6 +4,7 @@ using PyAMG
 using Logging
 using LightGraphs
 using IterativeSolvers
+using GZip
 Logging.configure(level = DEBUG)
 
 include("config.jl")
