@@ -13,7 +13,7 @@ function compute_3col{T}(resistances::Matrix{T}, fp)
     r3col
 end
 
-function write_cur_maps(G, voltages, finitegrounds, cc, name, cfg; nodemap = Matrix{Float64}(),
+function write_cur_maps(G, voltages, finitegrounds, cc, name, cfg; nodemap = Matrix{Float64}(0,0),
                                                                     hbmeta = RasterMeta())
 
     node_currents, branch_currents = _create_current_maps(G, voltages, finitegrounds, cfg, nodemap = nodemap, hbmeta = hbmeta)
@@ -181,7 +181,7 @@ function write_aagrid(cmap, name, cfg, hbmeta;
     close(f)
 end
 
-function write_volt_maps(name, voltages, cc, cfg; hbmeta = RasterMeta(), nodemap = Array{Float64,2}())
+function write_volt_maps(name, voltages, cc, cfg; hbmeta = RasterMeta(), nodemap = Matrix{Float64}(0, 0))
 
     if cfg["data_type"] == "network"
         write_voltages(cfg["output_file"], name, voltages, cc)
