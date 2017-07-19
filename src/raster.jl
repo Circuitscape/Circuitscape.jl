@@ -401,8 +401,8 @@ function onetoall(cfg, gmap, polymap, points_rc; included_pairs = IncludeExclude
     cc = connected_components(g)
     debug("There are $(size(a, 1)) points and $(length(cc)) connected components")
 
-    source_map = Array{Float64,2}()
-    ground_map = Array{Float64,2}()
+    source_map = Matrix{Float64}(0, 0)
+    ground_map = Matrix{Float64}(0, 0)
     sources = zeros(size(point_map))
     z = deepcopy(sources)
     

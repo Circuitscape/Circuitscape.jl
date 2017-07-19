@@ -10,7 +10,7 @@ for i = 1:3
     r = compute("input/network/sgNetworkVerify$(i).ini")
     x = readdlm("output_verify/sgNetworkVerify$(i)_resistances.out")
     x = x[2:end, 2:end]
-    @test sumabs2(x - r) < 1e-6
+    @test sum(abs2, x - r) < 1e-6
     compare_all_output("sgNetworkVerify$(i)")
     info("Test sgNetworkVerify$i passed")
 end
@@ -21,7 +21,7 @@ for i = 1:3
     r = compute("input/network/mgNetworkVerify$(i).ini")
     x = readdlm("output_verify/mgNetworkVerify$(i)_voltages.txt")
     x[:,1] = x[:,1] + 1
-    @test sumabs2(x - r) < 1e-6
+    @test sum(abs2, x - r) < 1e-6
     compare_all_output("mgNetworkVerify$(i)")
     info("Test mgNetworkVerify$i passed")
 end
@@ -33,7 +33,7 @@ for i in deleteat!(collect(1:16), 12)
     r = compute("input/raster/pairwise/$i/sgVerify$(i).ini")
     x = readdlm("output_verify/sgVerify$(i)_resistances.out")
     x = x[2:end, 2:end]
-    @test sumabs2(x - r) < 1e-6
+    @test sum(abs2, x - r) < 1e-6
     compare_all_output("sgVerify$(i)")
     info("Test sgVerify$i passed")
 end
@@ -43,7 +43,7 @@ for i in 1:5
     info("Testing mgVerify$i")
     r = compute("input/raster/advanced/$i/mgVerify$(i).ini")
     x = readdlm("output_verify/mgVerify$(i)_voltmap.asc"; skipstart = 6)
-    @test sumabs2(x - r) < 1e-6
+    @test sum(abs2, x - r) < 1e-6
     compare_all_output("mgVerify$(i)")
     info("Test mgVerify$i passed")
 end
@@ -54,7 +54,7 @@ for i in 1:13
     r = compute("input/raster/one_to_all/$i/oneToAllVerify$(i).ini")
     x = readdlm("output_verify/oneToAllVerify$(i)_resistances.out")
     x = x[:,2]
-    @test sumabs2(x - r) < 1e-6
+    @test sum(abs2, x - r) < 1e-6
     compare_all_output("oneToAllVerify$(i)")
     info("Test oneToAllVerify$i passed")
 end
@@ -66,6 +66,6 @@ for i in 1:12
     x = readdlm("output_verify/allToOneVerify$(i)_resistances.out")
     x = x[:,2]
 
-    @test sumabs2(x - r) < 1e-6
+    @test sum(abs2, x - r) < 1e-6
     info("Test allToOneVerify$i passed")
 end

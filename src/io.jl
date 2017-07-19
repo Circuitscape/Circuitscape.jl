@@ -200,8 +200,8 @@ end
 
 function read_source_and_ground_maps(source_file, ground_file, habitatmeta, is_res)
 
-    ground_map = Array{Float64,2}()
-    source_map = Array{Float64,2}()
+    ground_map = Matrix{Float64}(0,0)
+    source_map = Matrix{Float64}(0,0)
 
     f = endswith(ground_file, "gz") ? Gzip.open(ground_file, "r") : open(ground_file, "r")
     filetype = _guess_file_type(ground_file, f)
