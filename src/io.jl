@@ -23,7 +23,7 @@ immutable IncludeExcludePairs
     include_pairs::Matrix{Int64}
 end
 function IncludeExcludePairs()
-    IncludeExcludePairs(:undef, Int64[], Matrix{Int64}())
+    IncludeExcludePairs(:undef, Int64[], Matrix{Int64}(0, 0))
 end
 
 function read_graph(a, gpath::String)
@@ -88,7 +88,7 @@ end
 function _ascii_grid_reader(file)
     f = endswith(file, ".gz") ? GZip.open(file, "r") : open(file, "r")
     rastermeta = _ascii_grid_read_header(file, f)
-    c = Array{Float64,2}()
+    c = Matrix{Float64}(0,0)
     ss = 6
     if rastermeta.nodata == -Inf
         ss = 5
@@ -101,7 +101,7 @@ function _ascii_grid_reader(file)
         d = d[:, 1:end-1]
         c = map(Float64, d)
     end
-    map!(x -> x == rastermeta.nodata ? -9999. : x , c)
+    map!(x -> x == rastermeta.nodata ? -9999. : x , c, c)
     c, rastermeta
 end
 
@@ -174,8 +174,8 @@ function read_point_map(file, habitatmeta)
         I = points_rc[:,2]
         J = points_rc[:,3]
         v = points_rc[:,1]
-        i  = ceil(Int, habitatmeta.nrows - (J - habitatmeta.yllcorner) / habitatmeta.cellsize)
-        j = ceil(Int, (I - habitatmeta.xllcorner) / habitatmeta.cellsize)
+        i  = ceil.(Int, habitatmeta.nrows - (J - habitatmeta.yllcorner) / habitatmeta.cellsize)
+        j = ceil.(Int, (I - habitatmeta.xllcorner) / habitatmeta.cellsize)
     else
         (i,j,v) = findnz(points_rc)
     end
@@ -256,7 +256,7 @@ function read_included_pairs(file)
         point_ids = Int.(included_pairs[:,1])
         deleteat!(point_ids, 1)
         included_pairs = included_pairs[2:end, 2:end]
-        map!(x -> x > maxval ? 0 : x, included_pairs)
+        map!(x -> x > maxval ? 0 : x, included_pairs, included_pairs)
         idx = find(x -> x >= minval, included_pairs)
         mode = :include
         bin = map(x -> x >= minval ? 1 : 0, included_pairs)

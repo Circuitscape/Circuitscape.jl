@@ -68,7 +68,7 @@ function load_maps(cfg)
     cellmap, habitatmeta = read_cell_map(habitat_file, is_res)
 
     # Read polygon map
-    polymap = use_polygons ? read_polymap(polymap_file, habitatmeta) : Array{Float64,2}()
+    polymap = use_polygons ? read_polymap(polymap_file, habitatmeta) : Matrix{Float64}(0,0)
 
     if use_mask
         mask = read_polymap(mask_file, habitatmeta)
@@ -80,10 +80,10 @@ function load_maps(cfg)
     end
 
     # Default source and ground maps
-    source_map = Array{Float64,2}()
-    ground_map = Array{Float64,2}()
+    source_map = Matrix{Float64}(0, 0)
+    ground_map = Matrix{Float64}(0, 0)
     points_rc = (Vector{Int}(), Vector{Int}(), Vector{Float64}())
-    strengths = Array{Float64,2}()
+    strengths = Matrix{Float64}(0, 0)
     included_pairs = IncludeExcludePairs()
 
     if use_included_pairs
@@ -226,7 +226,7 @@ function construct_graph(gmap, nodemap, average_resistances, four_neighbors)
     a, g
 end
 
-function create_new_polymap(gmap, polymap, points_rc; pt1 = 0, pt2 = 0, point_map = Array{Float64,2}())
+function create_new_polymap(gmap, polymap, points_rc; pt1 = 0, pt2 = 0, point_map = Matrix{Float64}(0,0))
 
     f(x) = (points_rc[1][x], points_rc[2][x])
     
