@@ -72,7 +72,7 @@ function load_maps(cfg)
 
     if use_mask
         mask = read_polymap(mask_file, habitatmeta)
-        map!(x -> x > 0 ? 1 : 0, mask)
+        map!(x -> x > 0 ? 1 : 0, mask, mask)
         cellmap = cellmap .* mask
         if sum(cellmap) == 0
             throw(ErrorException("Mask file masks everything!"))
@@ -426,7 +426,7 @@ function onetoall(cfg, gmap, polymap, points_rc; included_pairs = IncludeExclude
             for j = 1:num_points_to_solve
                 if i != j && included_pairs.include_pairs[i,j] == mode
                     exclude = point_ids[j]
-                    map!(x -> x == exclude ? 0 : x, point_map)
+                    map!(x -> x == exclude ? 0 : x, point_map, point_map)
                 end
             end
             polymap = create_new_polymap(gmap, polymap, points_rc, point_map = point_map)
@@ -437,11 +437,11 @@ function onetoall(cfg, gmap, polymap, points_rc; included_pairs = IncludeExclude
             #source_map = map(x -> x == n ? str : 0, point_map)
             source_map = map(x -> x == n ? str : 0, unique_point_map)
             ground_map = map(x -> x == n ? 0 : x, point_map)
-            map!(x -> x > 0 ? Inf : x, ground_map)
+            map!(x -> x > 0 ? Inf : x, ground_map, ground_map)
         else
             source_map = map(x -> x != 0 ? x : 0, point_map)
-            map!(x -> x == n ? 0 : x, source_map)
-            map!(x -> x != 0 ? 1 : x, source_map)
+            map!(x -> x == n ? 0 : x, source_map, source_map)
+            map!(x -> x != 0 ? 1 : x, source_map, source_map)
             ground_map = map(x -> x == n ? Inf : 0, point_map)
         end
 
