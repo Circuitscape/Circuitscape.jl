@@ -54,7 +54,7 @@ end
 function get_network_comp(list_to_comp, f)
     s = split(f, ['_', '.'])
     for i = 1:size(s, 1)
-        if isnumber(s[i])
+        if all(isnumber, s[i])
             f = replace(f, "_$(s[i])", "_$(parse(Int, s[i]) - 1 |> string)", 1)
         end
     end

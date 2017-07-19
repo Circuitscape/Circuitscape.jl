@@ -76,7 +76,7 @@ function solve_linear_system!(cfg, v, G, curr, M)
     end
     v
 end
-solve_linear_system(cfg, G, curr, M) = solve_linear_system!(cfg, zeros(curr), G, curr, M)
+solve_linear_system(cfg, G, curr, M) = solve_linear_system!(cfg, zeros(size(curr)), G, curr, M)
 
 @inline function rightcc{T}(cc::Vector{Vector{T}}, c::T)
     for i in eachindex(cc)
@@ -108,14 +108,14 @@ function postprocess(volt, cond, i, j, resistances, pt1, pt2, cond_pruned, cc, c
     end
 
     if cfg["write_volt_maps"] == "True"
-        local_nodemap = zeros(Int, nodemap)
+        local_nodemap = zeros(Int, size(nodemap))
         idx = findin(nodemap, cc)
         local_nodemap[idx] = nodemap[idx]
         if isempty(polymap)
             idx = find(local_nodemap)
             local_nodemap[idx] = 1:length(idx)
         else
-            local_polymap = zeros(local_nodemap)
+            local_polymap = zeros(size(local_nodemap))
             local_polymap[idx] = polymap[idx]
             local_nodemap = construct_node_map(local_nodemap, local_polymap)
         end
@@ -123,14 +123,14 @@ function postprocess(volt, cond, i, j, resistances, pt1, pt2, cond_pruned, cc, c
     end
 
     if cfg["write_cur_maps"] == "True"
-        local_nodemap = zeros(Int, nodemap)
+        local_nodemap = zeros(Int, size(nodemap))
         idx = findin(nodemap, cc)
         local_nodemap[idx] = nodemap[idx]
         if isempty(polymap)
             idx = find(local_nodemap)
             local_nodemap[idx] = 1:length(idx)
         else
-            local_polymap = zeros(local_nodemap)
+            local_polymap = zeros(size(local_nodemap))
             local_polymap[idx] = polymap[idx]
             local_nodemap = construct_node_map(local_nodemap, local_polymap)
         end
@@ -171,12 +171,12 @@ function compute_network(cfg)
 end
 
 function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map, cc; 
-                                                                    nodemap = Matrix{Float64}(), 
+                                                                    nodemap = Matrix{Float64}(0,0), 
                                                                     policy = :keepall, 
                                                                     check_node = -1, 
                                                                     hbmeta = RasterMeta(), 
                                                                     src = 0, 
-                                                                    polymap = Matrix{Float64}())
+                                                                    polymap = Matrix{Float64}(0,0))
 
     mode = cfg["data_type"]
     is_network = mode == "network"
@@ -231,28 +231,28 @@ function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map, cc;
         voltages = multiple_solver(cfg, a_local, g, s_local, g_local, f_local)
         solver_called = true
         if cfg["write_volt_maps"] == "True" && !is_network
-            local_nodemap = zeros(Int, nodemap)
+            local_nodemap = zeros(Int, size(nodemap))
             idx = findin(nodemap, c)
             local_nodemap[idx] = nodemap[idx]
             if isempty(polymap)
                 idx = find(local_nodemap)
                 local_nodemap[idx] = 1:length(idx)
             else
-                local_polymap = zeros(local_nodemap)
+                local_polymap = zeros(size(local_nodemap))
                 local_polymap[idx] = polymap[idx]
                 local_nodemap = construct_node_map(local_nodemap, local_polymap)
             end
             accum_voltages!(outvolt, voltages, local_nodemap, hbmeta)
         end
         if cfg["write_cur_maps"] == "True" && !is_network
-            local_nodemap = zeros(Int, nodemap)
+            local_nodemap = zeros(Int, size(nodemap))
             idx = findin(nodemap, c)
             local_nodemap[idx] = nodemap[idx]
             if isempty(polymap)
                 idx = find(local_nodemap)
                 local_nodemap[idx] = 1:length(idx)
             else
-                local_polymap = zeros(local_nodemap)
+                local_polymap = zeros(size(local_nodemap))
                 local_polymap[idx] = polymap[idx]
                 local_nodemap = construct_node_map(local_nodemap, local_polymap)
             end

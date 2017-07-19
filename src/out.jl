@@ -67,7 +67,7 @@ function _create_current_maps(G, voltages, finitegrounds, cfg; nodemap = Matrix{
     if cfg["data_type"] == "network"
 
         branch_currents = _get_branch_currents(G, voltages, true)
-        branch_currents = abs(branch_currents)
+        branch_currents = abs.(branch_currents)
         return node_currents, branch_currents
 
     else
@@ -177,7 +177,7 @@ function write_aagrid(cmap, name, cfg, hbmeta;
     write(f, "cellsize      $(hbmeta.cellsize)\n")
     write(f, "NODATA_value  $(hbmeta.nodata)\n")
 
-    writedlm(f, round(cmap, 8), ' ')
+    writedlm(f, round.(cmap, 8), ' ')
     close(f)
 end
 
