@@ -1,8 +1,8 @@
 function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::Vector{T}, cfg; 
                                                     exclude = Tuple{Int,Int}[], 
-                                                    nodemap = Matrix{Float64}(), 
+                                                    nodemap = Matrix{Float64}(0, 0), 
                                                     orig_pts = Vector{Int}(), 
-                                                    polymap = Matrix{Float64}(),
+                                                    polymap = Matrix{Float64}(0, 0),
                                                     hbmeta = RasterMeta())
     numpoints = size(c, 1)
     cc = connected_components(g)
@@ -72,7 +72,7 @@ end
 
 function solve_linear_system!(cfg, v, G, curr, M)
     if cfg["solver"] == "cg+amg"
-        cg!(v, G, curr, M; tol = 1e-6, maxiter = 100000)
+        cg!(v, G, curr, Pl = M, tol = 1e-6, maxiter = 100000)
     end
     v
 end
@@ -295,7 +295,7 @@ function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map, cc;
     end
     if scenario == "one-to-all" 
         idx = find(source_map)
-        val = volt[idx] / source_map[idx]
+        val = volt[idx] ./ source_map[idx]
         if val[1] ≈ 0
             return [-1.]
         else

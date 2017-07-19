@@ -1,7 +1,7 @@
 function parse_config(path::String)
     cf = init_config()
     f = open(path, "r")
-    for i in EachLine(f)
+    for i in EachLine(f, chomp = false)
         if first(i) == '['
             continue
         end

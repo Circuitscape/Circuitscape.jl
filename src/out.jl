@@ -101,9 +101,9 @@ function _get_node_currents_posneg(G, voltages, finitegrounds, pos)
 	if finitegrounds[1]!= -9999
         finiteground_currents = finitegrounds .* voltages
         if pos
-            map!(x -> x < 0 ? -x : 0, finiteground_currents)
+            map!(x -> x < 0 ? -x : 0, finiteground_currents, finiteground_currents)
         else
-            map!(x -> x > 0 ? x : 0, finiteground_currents)
+            map!(x -> x > 0 ? x : 0, finiteground_currents, finiteground_currents)
         end
         n = size(G, 1)
         branch_currents = branch_currents + spdiagm(finiteground_currents, 0, n, n)
@@ -140,11 +140,11 @@ function _get_branch_currents_posneg{T}(G, v::Vector{T}, pos)
         #    vdiff[i] = v[J[v]] - v[I[v]]
         #end
     end
-    map!(x -> x < 0 ? -x : 0, V)
+    map!(x -> x < 0 ? -x : 0, V, V)
 
     branch_currents = vdiff .* V[mask]
     maxcur = maximum(branch_currents)
-    map!(x -> abs(x / maxcur) < 1e-8 ? 0 : x, branch_currents)
+    map!(x -> abs(x / maxcur) < 1e-8 ? 0 : x, branch_currents, branch_currents)
     branch_currents
 end
 
