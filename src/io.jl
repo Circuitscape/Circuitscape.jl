@@ -86,16 +86,21 @@ function read_cell_map(habitat_file, is_res)
 end
 
 function _ascii_grid_reader(file)
-    rastermeta = _ascii_grid_read_header(file)
+    @show file
+    f = endswith(file, ".gz") ? GZip.open(file, "r") : open(file, "r")
+    @show typeof(f)
+    rastermeta = _ascii_grid_read_header(file, f)
+    @show rastermeta
     c = Array{Float64,2}()
     ss = 6
     if rastermeta.nodata == -Inf
         ss = 5
     end
+    @show ss
     try
-        c = readdlm(file, Float64; skipstart = ss)
+        c = readdlm(f, Float64; skipstart = ss)
     catch
-        c = readdlm(file; skipstart = ss)
+        c = readdlm(f; skipstart = ss)
         c = c[:, 1:end-1]
         map!(Float64, c)
     end
@@ -103,9 +108,9 @@ function _ascii_grid_reader(file)
     c, rastermeta
 end
 
-function _ascii_grid_read_header(habitat_file)
-    file_type = _guess_file_type(habitat_file)
-    f = open(habitat_file, "r")
+function _ascii_grid_read_header(habitat_file, f)
+    file_type = _guess_file_type(habitat_file, f)
+    @show file_type
     ncols = parse(Int, split(readline(f))[2])
     nrows = parse(Int, split(readline(f))[2])
     xllcorner = float(split(readline(f))[2])
@@ -116,25 +121,30 @@ function _ascii_grid_read_header(habitat_file)
     if contains(s[1], "NODATA") || contains(s[1], "nodata")
         nodata = float(s[2])
     end 
+    seek(f, 0)
+    @show ncols
+    @show nrows
+    @show xllcorner
+    @show yllcorner
     RasterMeta(ncols, nrows, xllcorner, yllcorner, cellsize, nodata, file_type)
 end
 
-function _guess_file_type(filename) 
-    f = open(filename, "r")
+function _guess_file_type(filename, f) 
     s = readline(f)
-    close(f)
+    seek(f, 0)
 
     if startswith(s, "min")
         return PAIRS_AAGRID
     elseif startswith(s, "mode")
         return PAIRS_LIST
-    elseif endswith(filename, ".asc")
+    elseif contains(filename, ".asc")
         return AAGRID
     elseif endswith(filename, ".txt")
         return TXTLIST
     else
         throw("Check file format")
     end
+
 end
 
 function read_polymap(file, habitatmeta; nodata_as = 0, resample = true)
@@ -161,7 +171,8 @@ function read_polymap(file, habitatmeta; nodata_as = 0, resample = true)
 end
 
 function read_point_map(file, habitatmeta)
-    filetype = _guess_file_type(file)
+    f = endswith(file, ".gz") ? GZip.open(file, "r") : open(file, "r")
+    filetype = _guess_file_type(file, f)
     points_rc = filetype == TXTLIST ? readdlm(file) : read_polymap(file, habitatmeta)
 
     i = Int64[]
