@@ -60,9 +60,47 @@ end
 import Circuitscape: resolve_conflicts
 
 @test resolve_conflicts([1,0,0], [1,0,0], :rmvgnd) == ([1, 0, 0], [0, 0, 0], [1, 0, 0])
-
 @test resolve_conflicts([1,0,0], [1,0,0], :rmvsrc) == ([0, 0, 0], [1, 0, 0], [1, 0, 0])
-
 @test resolve_conflicts([1,0,0], [1,0,0], :keepall) == ([1, 0, 0], [1, 0, 0], [1, 0, 0])
-
 @test resolve_conflicts([1,0,0], [1,0,0], :rmvall) == ([0, 0, 0], [1, 0, 0], [1, 0, 0])
+
+# Construct graph
+import Circuitscape: construct_graph
+let 
+        gmap = [0 1 2
+                2 0 0
+                2 0 2]
+        nodemap = [0 3 4
+                   1 0 0
+                   2 0 5]
+        A,g = construct_graph(gmap, nodemap, false, true)
+        r = full(A) - [0 2 0 0 0 
+                       2 0 0 0 0
+                       0 0 0 1.5 0
+                       0 0 1.5 0 0
+                       0 0 0 0 0]
+        @test sum(abs2, r) < 1e-6
+        A, g = construct_graph(gmap, nodemap, true, true)
+        r = full(A) - [0 2 0 0 0 
+                       2 0 0 0 0
+                       0 0 0 1.3333 0
+                       0 0 1.33333 0 0
+                       0 0 0 0 0]
+        @test sum(abs2, r) < 1e-6
+        A,g = construct_graph(gmap, nodemap, false, false)
+        r = full(A) - [0 2 1.06066 0 0 
+                       2 0 0 0 0
+                       1.06066 0 0 1.5 0
+                       0 0 1.5 0 0
+                       0 0 0 0 0]
+        @test sum(abs2, r) < 1e-6
+        A,g = construct_graph(gmap, nodemap, true, false)
+        r = full(A) - [0 2 0.942809 0 0 
+                       2 0 0 0 0
+                       0.942809 0 0 1.3333 0
+                       0 0 1.3333 0 0
+                       0 0 0 0 0]
+        display(full(A))
+        @test sum(abs2, r) < 1e-6
+
+end 
