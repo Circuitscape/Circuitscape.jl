@@ -6,7 +6,7 @@ polymap = [1 0 1
            0 2 0
            2 0 0]
 
-r = CircuitScape.construct_node_map(gmap, polymap)
+r = Circuitscape.construct_node_map(gmap, polymap)
 
 @test r == [1 0 1
             0 2 0
@@ -25,7 +25,7 @@ let
             1.0  2.0  2.0  1.0   1.0
             1.0  2.0  2.0  0     1.0]
 
-    nodemap = CircuitScape.construct_node_map(gmap, polymap)
+    nodemap = Circuitscape.construct_node_map(gmap, polymap)
 
     @test nodemap == [ 3.0  18.0  0.0  10.0  14.0
                        0.0   0.0  0.0  11.0  15.0
@@ -36,8 +36,8 @@ end
 
 let 
 
-    cfg = CircuitScape.parse_config("input/raster/one_to_all/11/oneToAllVerify11.ini")
-    r, hbmeta = CircuitScape.load_maps(cfg)
+    cfg = Circuitscape.parse_config("input/raster/one_to_all/11/oneToAllVerify11.ini")
+    r, hbmeta = Circuitscape.load_maps(cfg)
 
     cellmap = r.cellmap
     polymap = r.polymap
@@ -48,7 +48,7 @@ let
                   4.0  0.0  0.0  0.0  0.0
                   1.0  0.0  0.0  0.0  2.0 ]
 
-    r = CircuitScape.create_new_polymap(cellmap, polymap, points_rc, point_map = point_map)
+    r = Circuitscape.create_new_polymap(cellmap, polymap, points_rc, point_map = point_map)
 
     @test r == [ 1.0  2.0  0.0  0.0  0.0
                  0.0  0.0  0.0  0.0  0.0
@@ -56,3 +56,13 @@ let
                  1.0  0.0  0.0  0.0  0.0
                  1.0  0.0  0.0  0.0  2.0 ]
 end
+
+import Circuitscape: resolve_conflicts
+
+@test resolve_conflicts([1,0,0], [1,0,0], :rmvgnd) == ([1, 0, 0], [0, 0, 0], [1, 0, 0])
+
+@test resolve_conflicts([1,0,0], [1,0,0], :rmvsrc) == ([0, 0, 0], [1, 0, 0], [1, 0, 0])
+
+@test resolve_conflicts([1,0,0], [1,0,0], :keepall) == ([1, 0, 0], [1, 0, 0], [1, 0, 0])
+
+@test resolve_conflicts([1,0,0], [1,0,0], :rmvall) == ([0, 0, 0], [1, 0, 0], [1, 0, 0])
