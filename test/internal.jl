@@ -1,16 +1,44 @@
-gmap = [1 0 1
-        0 1 0
-        1 0 1]
+import Circuitscape: construct_node_map
 
-polymap = [1 0 1
-           0 2 0
-           2 0 0]
+# Construct nodemap tests
+let
+        gmap = [0 1 2
+                2 0 0
+                2 0 2]
+        nodemap = construct_node_map(gmap, Matrix{Float64}(0,0))
+        @test nodemap == [0 3 4
+                          1 0 0
+                          2 0 5]
+end
 
-r = Circuitscape.construct_node_map(gmap, polymap)
+let
+        gmap = [0 1 2
+               2 0 0
+               2 0 2]
+        polymap = [1 0 1
+                   2 1 0
+                   0 0 2]
+        nodemap = construct_node_map(gmap, polymap)
+        @test nodemap == [4  3  4
+                          1  4  0
+                          2  0  1]
+end
 
-@test r == [1 0 1
-            0 2 0
-            2 0 3]
+let 
+        gmap = [1 0 1
+                0 1 0
+                1 0 1]
+
+        polymap = [1 0 1
+                0 2 0
+                2 0 0]
+
+        r = construct_node_map(gmap, polymap)
+
+        @test r == [1 0 1
+                    0 2 0
+                    2 0 3]
+end
 
 let 
     polymap = [ 1.0  2.0  0.0  0.0  0.0
@@ -25,7 +53,7 @@ let
             1.0  2.0  2.0  1.0   1.0
             1.0  2.0  2.0  0     1.0]
 
-    nodemap = Circuitscape.construct_node_map(gmap, polymap)
+    nodemap = construct_node_map(gmap, polymap)
 
     @test nodemap == [ 3.0  18.0  0.0  10.0  14.0
                        0.0   0.0  0.0  11.0  15.0
