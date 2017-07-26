@@ -1,4 +1,4 @@
-using CircuitScape
+using Circuitscape
 using Base.Test
 
 include("internal.jl")
