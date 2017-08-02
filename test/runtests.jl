@@ -28,7 +28,7 @@ end
 
 
 # Raster pairwise tests
-for i in deleteat!(collect(1:16), 12)
+for i = 1:15
     info("Testing sgVerify$i")
     r = compute("input/raster/pairwise/$i/sgVerify$(i).ini")
     x = readdlm("output_verify/sgVerify$(i)_resistances.out")
