@@ -8,7 +8,11 @@ Circuitscape is an open-source program that uses circuit theory to model connect
 in heterogeneous landscapes. Its most common applications include modeling movement and gene flow 
 of plants and animals, as well as identifying areas important for connectivity conservation. 
 
-This is a rewrite of the original Python version. 
+Circuitscape has now been rewritten in [Julia](https://julialang.org) for better performance and scalability. Julia is modern open-source language for scientific computing. 
+
+## Requirements
+
+You will need to [install](https://julialang.org/downloads/) Julia on your system first. 
 
 ## Installation
 
@@ -31,11 +35,13 @@ Pkg.checkout("Circuitscape")
 The current interface to Circuitscape is through the Julia terminal. 
 
 ```julia
-using Circuitscape
+using Circuitscape # loads the package into your environment
 compute("path/to/config/file.ini")
 ```
 
 ## Contributing
 
-If you have encounter any issues or would like to ask a question, please file an issue.
-Contributions in the form of pull requests are also welcome! 
+If you have encounter any issues or would like to ask a question, please file 
+a report [here](https://github.com/ranjanan/Circuitscape.jl/issues).
+Contributions in the form of 
+[pull requests](https://github.com/ranjanan/Circuitscape.jl/pulls) are also welcome! 
