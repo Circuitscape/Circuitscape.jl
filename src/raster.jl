@@ -328,9 +328,21 @@ function construct_node_map(gmap, polymap)
          nodemap[ind] = 1:length(ind)
     else
         d = Dict{Int, Vector{Int}}()
-        for i in unique(polymap)
+        #=for i in unique(polymap)
             d[i] = find(x -> x == i, polymap)
-        end
+        end=#
+        m, n = size(polymap)
+        I, J, V = findnz(polymap)
+        for (i,v) in enumerate(V)
+            if v != -9999
+                if haskey(d, v)
+                    push!(d[v], sub2ind((m, n), I[i], J[i]))
+                else
+                    d[v] = [sub2ind((m, n), I[i], J[i])]
+                end
+            end
+        end 
+        d[0] = find(x -> x == 0, polymap)
         k = 1
         for i in find(gmap)
             if i in d[0]
@@ -343,12 +355,13 @@ function construct_node_map(gmap, polymap)
                             nodemap[i] = k
                             k += 1
                         else
-                            if polymap[first(d[key])] != 0 && nodemap[first(d[key])] == 0
+                            f = first(d[key])
+                            if polymap[f] != 0 && nodemap[f] == 0
                                 nodemap[i] = k
-                                nodemap[first(d[key])] = k
+                                nodemap[f] = k
                                 k += 1
                             else
-                                nodemap[i] = nodemap[first(d[key])]
+                                nodemap[i] = nodemap[f]
                             end
                         end
                     end
@@ -486,4 +499,46 @@ function prune_strengths!(strengths, point_ids)
     rng = collect(1:l)
     deleteat!(rng, rmv)
     strengths[rng,:]
+end
+
+function update_voltmatrix!(voltmatrix, local_nodemap, voltages, hbmeta, c, r, j, cc)
+    
+    for i = 2:size(c, 1)
+        ind = findfirst(cc, c[i])
+        if ind != 0
+            voltageAtPoint = voltages[ind]
+            voltageAtPoint = 1 - (voltageAtPoint/r)
+            voltmatrix[i,j] = voltageAtPoint
+        end
+    end
+end
+
+function update_shortcut_resistances!(anchor, shortcut, resistances, voltmatrix, c, cc)
+    check = map(x -> x in cc, c)
+    l = size(resistances, 1)
+    for pointx = 1:l
+        if check[pointx]
+            R1x = resistances[anchor, pointx]
+            if R1x != -1
+                shortcut[pointx, anchor] = shortcut[anchor, pointx] = R1x
+                for point2 = pointx:l
+                    if check[point2]
+                        R12 = resistances[anchor, point2]
+                        if R12 != -1
+                            if R1x != -777
+                                shortcut[anchor, point2] = shortcut[point2, anchor] = R12
+                                Vx = voltmatrix[pointx, point2]
+                                R2x = 2*R12*Vx + R1x - R12
+                                if shortcut[point2, pointx] != -777
+                                    shortcut[point2, pointx] = shortcut[pointx, point2] = R2x
+                                end
+                            else
+                                shortcut[pointx, :] = shortcut[:, pointx] = -777
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
 end

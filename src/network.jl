@@ -8,6 +8,7 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
     cc = connected_components(g)
     debug("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
     resistances = -1 * ones(numpoints, numpoints) 
+    voltmatrix = zeros(size(resistances))
 
     cond = laplacian(a)
 
@@ -21,11 +22,30 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
     subsets = getindex.([cond], cc, cc)
     z = zeros.(cc)
     volt = zeros.(size.(cc))
+
+    is_raster = cfg["data_type"] == "raster"
+    write_volt_maps = cfg["write_volt_maps"] == "True"
+    write_cur_maps = cfg["write_cur_maps"] == "True"
+
+    get_shortcut_resistances = false
+    if is_raster && !write_volt_maps && !write_cur_maps
+        get_shortcut_resistances = true
+        shortcut = -1 * ones(size(resistances))
+        covered = Dict{Int, Bool}()
+        for i = 1:size(cc, 1)
+            covered[i] = false
+        end
+    end
     
     p = 0 
     for i = 1:numpoints
         if c[i] != 0
             rcc = rightcc(cc, c[i])
+            if get_shortcut_resistances
+                if covered[rcc]
+                    continue
+                end
+            end
             cond_pruned = subsets[rcc]
             pt1 = ingraph(cc[rcc], c[i])
             d = cond_pruned[pt1, pt1]
@@ -54,7 +74,8 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
                 solve_linear_system!(cfg, v, cond_pruned, curr, M)
                 curr[:] = 0
             end
-            postprocess(v, c, i, j, resistances, pt1, pt2, cond_pruned, cc[rcc], cfg; 
+            postprocess(v, c, i, j, resistances, pt1, pt2, cond_pruned, cc[rcc], cfg, voltmatrix,
+                                            get_shortcut_resistances; 
                                             nodemap = nodemap, 
                                             orig_pts = orig_pts,
                                             polymap = polymap,
@@ -62,6 +83,13 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
             v[:] = 0
         end
         cond_pruned[pt1,pt1] = d
+        if get_shortcut_resistances
+            update_shortcut_resistances!(i, shortcut, resistances, voltmatrix, c, cc[rcc])
+            covered[rcc] = true
+        end
+    end
+    if get_shortcut_resistances
+        resistances = shortcut
     end
     debug("solved $p equations")
     for i = 1:size(resistances,1)
@@ -95,14 +123,24 @@ function laplacian(G::SparseMatrixCSC)
     G = -G + spdiagm(vec(sum(G, 1)))
 end
 
-function postprocess(volt, cond, i, j, resistances, pt1, pt2, cond_pruned, cc, cfg; 
+function postprocess(volt, cond, i, j, resistances, pt1, pt2, cond_pruned, cc, cfg, voltmatrix,
+                                            get_shortcut_resistances; 
                                             nodemap = Matrix{Float64}(), 
                                             orig_pts = Vector{Int}(), 
                                             polymap = Vector{Float64}(),
                                             hbmeta = hbmeta)
 
     r = resistances[i, j] = resistances[j, i] = volt[pt2] - volt[pt1]
+    if get_shortcut_resistances
+        local_nodemap = zeros(Int, size(nodemap))
+        idx = findin(nodemap, cc)
+        local_nodemap[idx] = nodemap[idx]
+        update_voltmatrix!(voltmatrix, local_nodemap, volt, hbmeta, cond, r, j, cc)
+        return nothing
+    end
+
     name = "_$(cond[i])_$(cond[j])"
+
     if cfg["data_type"] == "raster"
         name = "_$(Int(orig_pts[i]))_$(Int(orig_pts[j]))"
     end
@@ -138,6 +176,7 @@ function postprocess(volt, cond, i, j, resistances, pt1, pt2, cond_pruned, cc, c
                                     nodemap = local_nodemap, 
                                     hbmeta = hbmeta)
     end
+    nothing 
 end
 
 function compute_network(cfg)
