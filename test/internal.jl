@@ -128,7 +128,6 @@ let
                        0.942809 0 0 1.3333 0
                        0 0 1.3333 0 0
                        0 0 0 0 0]
-        display(full(A))
         @test sum(abs2, r) < 1e-6
 
 end 
