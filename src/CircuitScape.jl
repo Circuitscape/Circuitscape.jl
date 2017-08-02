@@ -1,4 +1,4 @@
-module CircuitScape
+module Circuitscape
 
 using PyAMG
 using Logging
