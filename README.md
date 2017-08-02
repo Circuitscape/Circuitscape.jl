@@ -1,8 +1,8 @@
 # Circuitscape
 
-Linux: [![Build Status](https://travis-ci.org/ranjanan/CircuitScape.jl.svg?branch=master)](https://travis-ci.org/ranjanan/CircuitScape.jl)
-[![Coverage Status](https://coveralls.io/repos/ranjanan/CircuitScape.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/ranjanan/CircuitScape.jl?branch=master)
-[![codecov.io](http://codecov.io/github/ranjanan/CircuitScape.jl/coverage.svg?branch=master)](http://codecov.io/github/ranjanan/CircuitScape.jl?branch=master)
+Linux: [![Build Status](https://travis-ci.org/ranjanan/Circuitscape.jl.svg?branch=master)](https://travis-ci.org/ranjanan/CircuitScape.jl)
+[![Coverage Status](https://coveralls.io/repos/ranjanan/Circuitscape.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/ranjanan/CircuitScape.jl?branch=master)
+[![codecov.io](http://codecov.io/github/ranjanan/Circuitscape.jl/coverage.svg?branch=master)](http://codecov.io/github/ranjanan/CircuitScape.jl?branch=master)
 
 Circuitscape is an open-source program that uses circuit theory to model connectivity 
 in heterogeneous landscapes. Its most common applications include modeling movement and gene flow 
