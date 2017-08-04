@@ -24,13 +24,19 @@ You will need to [install](https://julialang.org/downloads/) Julia on your syste
 2. Once you start Julia, install Circuitscape by: 
 
 ```julia
-Pkg.add("Circuitscape")
+julia> Pkg.add("Circuitscape")
 ```
 
 If you want the latest development version, you can additionally do: 
 
 ```julia
-Pkg.checkout("Circuitscape")
+julia> Pkg.checkout("Circuitscape")
+```
+
+Check if all the tests are passing by doing the following:
+
+```julia
+julia> Pkg.test("Circuitscape")
 ```
 
 ## Usage
@@ -38,8 +44,8 @@ Pkg.checkout("Circuitscape")
 The current interface to Circuitscape is through the Julia terminal. 
 
 ```julia
-using Circuitscape # loads the package into your environment
-compute("path/to/config/file.ini")
+julia> using Circuitscape # loads the package into your environment
+julia> compute("path/to/config/file.ini")
 ```
 
 ## Contributing
