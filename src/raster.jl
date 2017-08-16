@@ -8,7 +8,7 @@ immutable RasterData
     included_pairs::IncludeExcludePairs
 end
 
-function compute_raster(cfg)
+function compute(::Raster, cfg)
 
     # Get all variables
     four_neighbors = cfg["connect_four_neighbors_only"] == "True"
@@ -25,18 +25,18 @@ function compute_raster(cfg)
     info("Resistance/Conductance map has $c nodes")
 
     if scenario == "pairwise"
-        resistances = pairwise_module(gmap, polymap, points_rc, four_neighbors, 
+        resistances = pairwise_module(gmap, polymap, points_rc, four_neighbors,
                                         average_resistances, included_pairs, cfg, hbmeta)
     elseif scenario == "advanced"
         nodemap = construct_node_map(gmap, polymap)
         a,g = construct_graph(gmap, nodemap, average_resistances, four_neighbors)
         cc = connected_components(g)
         debug("There are $(size(a, 1)) points and $(length(cc)) connected components")
-        voltages = advanced(cfg, a, g, rdata.source_map, rdata.ground_map, cc, 
+        voltages = advanced(cfg, a, g, rdata.source_map, rdata.ground_map, cc,
                                                                     nodemap = nodemap, hbmeta = hbmeta, polymap = rdata.polymap)
         return voltages
     else
-        voltages = onetoall(cfg, gmap, polymap, points_rc; 
+        voltages = onetoall(cfg, gmap, polymap, points_rc;
                                     included_pairs = rdata.included_pairs,
                                     strengths = rdata.strengths, hbmeta = hbmeta)
         return voltages
@@ -129,9 +129,9 @@ function pairwise_module(gmap, polymap, points_rc, four_neighbors, average_resis
             c[i] = nodemap[v...]
         end
 
-        resistances = single_ground_all_pair_resistances(a, g, c, cfg; 
-                                        exclude = exclude_pairs_array, 
-                                        nodemap = nodemap, 
+        resistances = single_ground_all_pair_resistances(a, g, c, cfg;
+                                        exclude = exclude_pairs_array,
+                                        nodemap = nodemap,
                                         orig_pts = points_rc[3],
                                         polymap = polymap,
                                         hbmeta = hbmeta)
@@ -209,7 +209,7 @@ function construct_graph(gmap, nodemap, average_resistances, four_neighbors)
                         push!(J, nodemap[i+1,j+1])
                         push!(V, f2(gmap[i,j], gmap[i+1,j+1]))
                     end
-                    
+
                     if i != 1 && j != size(gmap, 2) && nodemap[i-1, j+1] != 0
                         push!(I, nodemap[i,j])
                         push!(J, nodemap[i-1,j+1])
@@ -229,13 +229,13 @@ end
 function create_new_polymap(gmap, polymap, points_rc; pt1 = 0, pt2 = 0, point_map = Matrix{Float64}(0,0))
 
     f(x) = (points_rc[1][x], points_rc[2][x])
-    
+
     if !isempty(point_map)
 
        # Combine polymap and pointmap
        newpoly = deepcopy(polymap)
        #= if isempty(polymap)
-            newpoly = point_map    
+            newpoly = point_map
         else
             k = maximum(polymap)
             for i in find(point_map)
@@ -264,18 +264,18 @@ function create_new_polymap(gmap, polymap, points_rc; pt1 = 0, pt2 = 0, point_ma
                     newpoly[i] = k + v1
                     continue
                 end
-                if v1 != v2 
+                if v1 != v2
                     ind = find(x -> x == v2, newpoly)
                     newpoly[ind] = v1
                 end
             end
-                    
+
 
         end
 
         return newpoly
     end
-        
+
 
     if isempty(polymap)
         newpoly = zeros(size(gmap)...)
@@ -295,7 +295,7 @@ function create_new_polymap(gmap, polymap, points_rc; pt1 = 0, pt2 = 0, point_ma
                 continue
             end
             allzero = mapreduce(x -> polymap[f(x)...] == 0, &, idx)
-            if allzero 
+            if allzero
                 map(x -> newpoly[f(x)...] = k + 1, idx)
                 k += 1
             else
@@ -322,7 +322,7 @@ weirder_avg(x, y) = 1 / (√2 * (1/x + 1/y) / 2)
 
 function construct_node_map(gmap, polymap)
 
-    nodemap = zeros(size(gmap)) 
+    nodemap = zeros(size(gmap))
     if isempty(polymap)
          ind::Vector{Int64} = find(x -> x > 0, gmap)
          nodemap[ind] = 1:length(ind)
@@ -341,7 +341,7 @@ function construct_node_map(gmap, polymap)
                     d[v] = [sub2ind((m, n), I[i], J[i])]
                 end
             end
-        end 
+        end
         d[0] = find(x -> x == 0, polymap)
         k = 1
         for i in find(gmap)
@@ -371,13 +371,13 @@ function construct_node_map(gmap, polymap)
     end
     for i in eachindex(polymap)
         if polymap[i] != 0 && nodemap[i] == 0
-            val::Float64 = polymap[i] 
+            val::Float64 = polymap[i]
             index::Int64 = findfirst(x -> x == val, polymap)
             nodemap[i] = nodemap[index]
         end
     end
 
-    nodemap 
+    nodemap
 end
 
 function onetoall(cfg, gmap, polymap, points_rc; included_pairs = IncludeExcludePairs(), strengths = Matrix{Float64}(), hbmeta = RasterMeta())
@@ -418,7 +418,7 @@ function onetoall(cfg, gmap, polymap, points_rc; included_pairs = IncludeExclude
     ground_map = Matrix{Float64}(0, 0)
     sources = zeros(size(point_map))
     z = deepcopy(sources)
-    
+
     point_ids = included_pairs.point_ids
     res = zeros(size(points_unique, 1))
     num_points_to_solve = size(points_unique, 1)
@@ -459,12 +459,12 @@ function onetoall(cfg, gmap, polymap, points_rc; included_pairs = IncludeExclude
         end
 
         check_node = nodemap[points_rc[1][i], points_rc[2][i]]
-        
+
         if one_to_all
-            v = advanced(cfg, a, g, source_map, ground_map, cc; nodemap = nodemap, policy = :rmvgnd, 
+            v = advanced(cfg, a, g, source_map, ground_map, cc; nodemap = nodemap, policy = :rmvgnd,
                             check_node = check_node, src = n, polymap = newpoly, hbmeta = hbmeta)
         else
-            v = advanced(cfg, a, g, source_map, ground_map, cc; nodemap = nodemap, policy = :rmvsrc, 
+            v = advanced(cfg, a, g, source_map, ground_map, cc; nodemap = nodemap, policy = :rmvsrc,
                             check_node = check_node, src = n, polymap = newpoly, hbmeta = hbmeta)
         end
         res[i] = v[1]
@@ -493,7 +493,7 @@ function prune_strengths!(strengths, point_ids)
     rmv = Int[]
     for (i,p) in enumerate(pts)
         if !(p in point_ids)
-           push!(rmv, i) 
+           push!(rmv, i)
        end
     end
     rng = collect(1:l)
@@ -502,7 +502,7 @@ function prune_strengths!(strengths, point_ids)
 end
 
 function update_voltmatrix!(voltmatrix, local_nodemap, voltages, hbmeta, c, r, j, cc)
-    
+
     for i = 2:size(c, 1)
         ind = findfirst(cc, c[i])
         if ind != 0

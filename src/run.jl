@@ -1,7 +1,7 @@
 """
     `compute(path::String)`
 
-Call the `compute` function on the configuration file. 
+Call the `compute` function on the configuration file.
 
 Inputs:
 ======
@@ -11,12 +11,6 @@ Inputs:
 """
 function compute(path::String)
     cfg = parse_config(path)
-    data_type = cfg["data_type"]
-    if data_type == "network"
-        result = compute_network(cfg)
-        return result
-    else
-        result = compute_raster(cfg)
-        return result
-    end
+    data_type = cfg["data_type"] == "network" ? Network() : Raster()
+    compute(data_type, cfg)
 end

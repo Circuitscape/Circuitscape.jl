@@ -19,17 +19,17 @@ function init_config()
     a = Dict{String, String}()
 
     a["version"] = "unknown"
-    a["connect_four_neighbors_only"] =  "False" 
+    a["connect_four_neighbors_only"] =  "False"
     a["connect_using_avg_resistances"] = "False"
     a["use_polygons"] =  "False"
     a["polygon_file"] = "(Browse for a short-circuit region file)"
     a["source_file"] = "(Browse for a current source file)"
     a["ground_file"]  = "(Browse for a ground point file)"
     a["ground_file_is_resistances"] = "True"
-    a["use_unit_currents"] = "False" 
+    a["use_unit_currents"] = "False"
     a["use_direct_grounds"] = "False"
     a["remove_src_or_gnd"]  = "keepall"
-    a["mask_file"] =  "None" 
+    a["mask_file"] =  "None"
     a["use_mask"] = "False"
     a["preemptive_memory_release"] = "False"
     a["low_memory_mode"] = "False"
@@ -43,12 +43,12 @@ function init_config()
     a["set_null_currents_to_nodata"] = "False"
     a["output_file"] = "(Choose a base name for output files)"
     a["write_cum_cur_map_only"] =  "False"
-    a["log_transform_maps"] = "False" 
-    a["write_max_cur_maps"] = "False" 
-    a["compress_grids"] = "False" 
-    a["set_null_voltages_to_nodata"] = "False" 
-    a["set_focal_node_currents_to_zero"] = "False" 
-    a["write_volt_maps"] = "False" 
+    a["log_transform_maps"] = "False"
+    a["write_max_cur_maps"] = "False"
+    a["compress_grids"] = "False"
+    a["set_null_voltages_to_nodata"] = "False"
+    a["set_focal_node_currents_to_zero"] = "False"
+    a["write_volt_maps"] = "False"
     a["write_cur_maps"] = "False"
     a["habitat_map_is_resistances"] = "True"
     a["habitat_file"] = "(Browse for a resistance file)"
@@ -66,3 +66,5 @@ function init_config()
 
     a
 end
+struct Raster end
+struct Network end
