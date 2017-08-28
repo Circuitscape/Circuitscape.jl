@@ -180,47 +180,23 @@ function postprocess(volt, cond, i, j, resistances, pt1, pt2, cond_pruned, cc, c
 end
 
 function compute{S<:Scenario}(obj::Network{S}, cfg)
-
-    network_file = cfg["habitat_file"]
-    point_file = cfg["point_file"]
-    scenario = cfg["scenario"]
-
-    if scenario == "pairwise"
-
-        flags = inputflags(obj, cfg)
-        data = grab_input(obj, flags)
-        A = data.A
-        g = Graph(A)
-        fp = data.fp
-        resistances = single_ground_all_pair_resistances(A, g, fp, cfg)
-        resistances_3col = compute_3col(resistances, fp)
-        return resistances
-
-    elseif scenario == "advanced"
-
-        A = read_graph(cfg, network_file)
-        g = Graph(A)
-        source_file = cfg["source_file"]
-        ground_file = cfg["ground_file"]
-        source_map = read_point_strengths(source_file)
-        ground_map = read_point_strengths(ground_file)
-        cc = connected_components(g)
-        debug("There are $(size(A, 1)) points and $(length(cc)) connected components")
-        voltages = advanced(cfg, A, g, source_map, ground_map, cc)
-
-        return voltages
-
-    end
+    flags = inputflags(obj, cfg)
+    data = grab_input(obj, flags)
+    compute(S(), data, cfg)
 end
+compute(::Pairwise, data, cfg) = single_ground_all_pair_resistances(data.A, Graph(data.A),
+                        data.fp, cfg)
+compute(::Advanced, data, cfg) = advanced(cfg, data.A, Graph(data.A), data.source_map, data.ground_map)
 
-function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map, cc;
+function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map;
                                                                     nodemap = Matrix{Float64}(0,0),
                                                                     policy = :keepall,
                                                                     check_node = -1,
                                                                     hbmeta = RasterMeta(),
                                                                     src = 0,
                                                                     polymap = Matrix{Float64}(0,0))
-
+    cc = connected_components(g)
+    debug("There are $(size(a, 1)) points and $(length(cc)) connected components")
     mode = cfg["data_type"]
     is_network = mode == "network"
     sources = zeros(size(a, 1))

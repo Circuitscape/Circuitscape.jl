@@ -2,6 +2,7 @@ const AAGRID = 2
 const TXTLIST = 3
 const PAIRS_AAGRID = 4
 const PAIRS_LIST = 5
+const truelist = ["True", "true"]
 
 immutable RasterMeta
     ncols::Int64
@@ -305,13 +306,23 @@ struct NetPairFlags <: InputFlags
     hab_file::String
     fp_file::String
 end
+struct NetAdvFlags <: InputFlags
+    hab_is_res::Bool
+    hab_file::String
+    source_file::String
+    ground_file::String
+end
 
 abstract type Data end
 struct NetPairData{Ti,Tv} <: Data
     A::SparseMatrixCSC{Ti,Tv}
     fp::Vector{Tv}
 end
-const truelist = ["True", "true"]
+struct NetAdvData{Ti,Tv} <: Data
+    A::SparseMatrixCSC{Ti,Tv}
+    source_map::Matrix{Ti}
+    ground_map::Matrix{Ti}
+end
 function inputflags(::Network{Pairwise}, cfg)
     hab_is_res = cfg["habitat_map_is_resistances"] in truelist
     hab_file = cfg["habitat_file"]
@@ -322,4 +333,17 @@ function grab_input(::Network{Pairwise}, flags)
     A = read_graph(flags.hab_is_res, flags.hab_file)
     fp = read_focal_points(flags.fp_file)
     NetPairData(A, fp)
+end
+function inputflags(::Network{Advanced}, cfg)
+    hab_is_res = cfg["habitat_map_is_resistances"] in truelist
+    hab_file = cfg["habitat_file"]
+    source_file = cfg["source_file"]
+    ground_file = cfg["ground_file"]
+    NetAdvFlags(hab_is_res, hab_file, source_file, ground_file)
+end
+function grab_input(::Network{Advanced}, flags)
+    A = read_graph(flags.hab_is_res, flags.hab_file)
+    source_map = read_point_strengths(flags.source_file)
+    ground_map = read_point_strengths(flags.ground_file)
+    NetAdvData(A, source_map, ground_map)
 end

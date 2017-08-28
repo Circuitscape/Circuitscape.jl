@@ -30,9 +30,7 @@ function compute(::Raster, cfg)
     elseif scenario == "advanced"
         nodemap = construct_node_map(gmap, polymap)
         a,g = construct_graph(gmap, nodemap, average_resistances, four_neighbors)
-        cc = connected_components(g)
-        debug("There are $(size(a, 1)) points and $(length(cc)) connected components")
-        voltages = advanced(cfg, a, g, rdata.source_map, rdata.ground_map, cc,
+        voltages = advanced(cfg, a, g, rdata.source_map, rdata.ground_map,
                                                                     nodemap = nodemap, hbmeta = hbmeta, polymap = rdata.polymap)
         return voltages
     else
@@ -461,10 +459,10 @@ function onetoall(cfg, gmap, polymap, points_rc; included_pairs = IncludeExclude
         check_node = nodemap[points_rc[1][i], points_rc[2][i]]
 
         if one_to_all
-            v = advanced(cfg, a, g, source_map, ground_map, cc; nodemap = nodemap, policy = :rmvgnd,
+            v = advanced(cfg, a, g, source_map, ground_map; nodemap = nodemap, policy = :rmvgnd,
                             check_node = check_node, src = n, polymap = newpoly, hbmeta = hbmeta)
         else
-            v = advanced(cfg, a, g, source_map, ground_map, cc; nodemap = nodemap, policy = :rmvsrc,
+            v = advanced(cfg, a, g, source_map, ground_map; nodemap = nodemap, policy = :rmvsrc,
                             check_node = check_node, src = n, polymap = newpoly, hbmeta = hbmeta)
         end
         res[i] = v[1]
