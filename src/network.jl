@@ -179,23 +179,27 @@ function postprocess(volt, cond, i, j, resistances, pt1, pt2, cond_pruned, cc, c
     nothing
 end
 
-function compute(::Network, cfg)
+function compute{S<:Scenario}(obj::Network{S}, cfg)
 
     network_file = cfg["habitat_file"]
     point_file = cfg["point_file"]
-    A = read_graph(cfg, network_file)
-    g = Graph(A)
     scenario = cfg["scenario"]
 
     if scenario == "pairwise"
 
-        fp = read_focal_points(point_file)
+        flags = inputflags(obj, cfg)
+        data = grab_input(obj, flags)
+        A = data.A
+        g = Graph(A)
+        fp = data.fp
         resistances = single_ground_all_pair_resistances(A, g, fp, cfg)
         resistances_3col = compute_3col(resistances, fp)
         return resistances
 
     elseif scenario == "advanced"
 
+        A = read_graph(cfg, network_file)
+        g = Graph(A)
         source_file = cfg["source_file"]
         ground_file = cfg["ground_file"]
         source_map = read_point_strengths(source_file)

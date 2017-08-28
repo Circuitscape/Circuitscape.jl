@@ -66,5 +66,9 @@ function init_config()
 
     a
 end
-struct Raster end
-struct Network end
+abstract type Scenario end
+abstract type Datatype{S<:Scenario} end
+struct Pairwise <: Scenario end
+struct Advanced <: Scenario end
+struct Raster{S} <: Datatype{S} end
+struct Network{S} <: Datatype{S} end

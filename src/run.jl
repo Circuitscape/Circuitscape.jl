@@ -11,6 +11,11 @@ Inputs:
 """
 function compute(path::String)
     cfg = parse_config(path)
-    data_type = cfg["data_type"] == "network" ? Network() : Raster()
-    compute(data_type, cfg)
+    T = parse_mode(cfg["data_type"], cfg["scenario"])
+    compute(T, cfg)
+end
+function parse_mode(dt, scen)
+    d = dt == "network" ? :Network : :Raster
+    s = scen == "pairwise" ? :Pairwise : :Advanced
+    eval(Expr(:call, Expr(:curly, d, s)))
 end

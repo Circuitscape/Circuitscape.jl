@@ -40,6 +40,19 @@ function read_graph(a, gpath::String)
     A = sparse(i,j,v,m,m)
     A + A'
 end
+function read_graph(is_res::Bool, gpath::String)
+    i,j,v = load_graph(gpath)
+    idx = findfirst(x -> x < 1, i)
+    idx != 0 && throw("Indices no good")
+    idx = findfirst(x -> x < 1, j)
+    idx != 0 && throw("Indices no good")
+    if is_res
+        v = 1./v
+    end
+    m = max(i[end], j[end])
+    A = sparse(i,j,v,m,m)
+    A + A'
+end
 
 function load_graph(gpath::String)
     g = readdlm(gpath)
@@ -58,7 +71,7 @@ read_focal_points(path::String) = Int.(vec(readcsv(path)) + 1)
 
 function read_point_strengths(path::String, inc = true)
     a = readdlm(path)
-    if inc 
+    if inc
         a[:,1] = a[:,1] + 1
     end
     a
@@ -76,7 +89,7 @@ function read_cell_map(habitat_file, is_res)
             for i in eachindex(cell_map)
                 gmap[i] = 1./cell_map[i]
             end
-            gmap[ind] = 0 
+            gmap[ind] = 0
         end
     else
         copy!(gmap, cell_map)
@@ -116,12 +129,12 @@ function _ascii_grid_read_header(habitat_file, f)
     s = split(readline(f))
     if contains(s[1], "NODATA") || contains(s[1], "nodata")
         nodata = float(s[2])
-    end 
+    end
     seek(f, 0)
     RasterMeta(ncols, nrows, xllcorner, yllcorner, cellsize, nodata, file_type)
 end
 
-function _guess_file_type(filename, f) 
+function _guess_file_type(filename, f)
     s = readline(f)
     seek(f, 0)
 
@@ -146,7 +159,7 @@ function read_polymap(file, habitatmeta; nodata_as = 0, resample = true)
     if nodata_as != -1
         polymap[ind] = nodata_as
     end
-            
+
     if rastermeta.cellsize != habitatmeta.cellsize
         warn("cellsize is not the same")
     elseif rastermeta.ncols != habitatmeta.ncols
@@ -189,12 +202,12 @@ function read_point_map(file, habitatmeta)
         deleteat!(v, index)
     end
 
-    # Sort them 
+    # Sort them
     idx = sortperm(v)
     i = i[idx]
     j = j[idx]
     v = v[idx]
-    
+
     i, j, v
 end
 
@@ -272,7 +285,7 @@ function read_included_pairs(file)
         end
 
         mat = zeros(size(point_ids, 1), size(point_ids, 1))
-        
+
         for i = 1:size(included_pairs, 1)
             idx1 = findfirst(x -> x == included_pairs[i, 1], point_ids)
             idx2 = findfirst(x -> x == included_pairs[i, 2], point_ids)
@@ -283,4 +296,30 @@ function read_included_pairs(file)
         end
         IncludeExcludePairs(mode, point_ids, mat)
     end
+end
+
+abstract type Flags end
+abstract type InputFlags <: Flags end
+struct NetPairFlags <: InputFlags
+    hab_is_res::Bool
+    hab_file::String
+    fp_file::String
+end
+
+abstract type Data end
+struct NetPairData{Ti,Tv} <: Data
+    A::SparseMatrixCSC{Ti,Tv}
+    fp::Vector{Tv}
+end
+const truelist = ["True", "true"]
+function inputflags(::Network{Pairwise}, cfg)
+    hab_is_res = cfg["habitat_map_is_resistances"] in truelist
+    hab_file = cfg["habitat_file"]
+    fp_file = cfg["point_file"]
+    NetPairFlags(hab_is_res, hab_file, fp_file)
+end
+function grab_input(::Network{Pairwise}, flags)
+    A = read_graph(flags.hab_is_res, flags.hab_file)
+    fp = read_focal_points(flags.fp_file)
+    NetPairData(A, fp)
 end
