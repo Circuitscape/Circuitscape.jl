@@ -28,7 +28,7 @@ function IncludeExcludePairs()
 end
 
 function read_graph(a, gpath::String)
-    i,j,v = load_graph(gpath)
+    i,j,v = load_graph(gpath, T)
     idx = findfirst(x -> x < 1, i)
     idx != 0 && throw("Indices no good")
     idx = findfirst(x -> x < 1, j)
@@ -41,8 +41,8 @@ function read_graph(a, gpath::String)
     A = sparse(i,j,v,m,m)
     A + A'
 end
-function read_graph(is_res::Bool, gpath::String)
-    i,j,v = load_graph(gpath)
+function read_graph{T}(is_res::Bool, gpath::String, ::Type{T})
+    i,j,v = load_graph(gpath, T)
     idx = findfirst(x -> x < 1, i)
     idx != 0 && throw("Indices no good")
     idx = findfirst(x -> x < 1, j)
@@ -55,11 +55,11 @@ function read_graph(is_res::Bool, gpath::String)
     A + A'
 end
 
-function load_graph(gpath::String)
-    g = readdlm(gpath)
+function load_graph{T}(gpath::String, ::Type{T})
+    g = readdlm(gpath, T)
     i = zeros(Int, size(g, 1))
     j = zeros(Int, size(g, 1))
-    v = zeros(size(g, 1))
+    v = zeros(T, size(g, 1))
     for iter = 1:size(g, 1)
         i[iter] = g[iter,1] + 1
         j[iter] = g[iter,2] + 1
@@ -301,12 +301,14 @@ end
 
 abstract type Flags end
 abstract type InputFlags <: Flags end
-struct NetPairFlags <: InputFlags
+struct NetPairFlags{T} <: InputFlags
+    precision::T
     hab_is_res::Bool
     hab_file::String
     fp_file::String
 end
-struct NetAdvFlags <: InputFlags
+struct NetAdvFlags{T} <: InputFlags
+    precision::T
     hab_is_res::Bool
     hab_file::String
     source_file::String
@@ -324,25 +326,27 @@ struct NetAdvData{Ti,Tv} <: Data
     ground_map::Matrix{Ti}
 end
 function inputflags(::Network{Pairwise}, cfg)
+    p = cfg["precision"] == "Single" ? Float32 : Float64
     hab_is_res = cfg["habitat_map_is_resistances"] in truelist
     hab_file = cfg["habitat_file"]
     fp_file = cfg["point_file"]
-    NetPairFlags(hab_is_res, hab_file, fp_file)
+    NetPairFlags(p, hab_is_res, hab_file, fp_file)
 end
 function grab_input(::Network{Pairwise}, flags)
-    A = read_graph(flags.hab_is_res, flags.hab_file)
+    A = read_graph(flags.hab_is_res, flags.hab_file, flags.precision)
     fp = read_focal_points(flags.fp_file)
     NetPairData(A, fp)
 end
 function inputflags(::Network{Advanced}, cfg)
+    p = cfg["precision"] == "Single" ? Float32 : Float64
     hab_is_res = cfg["habitat_map_is_resistances"] in truelist
     hab_file = cfg["habitat_file"]
     source_file = cfg["source_file"]
     ground_file = cfg["ground_file"]
-    NetAdvFlags(hab_is_res, hab_file, source_file, ground_file)
+    NetAdvFlags(p, hab_is_res, hab_file, source_file, ground_file)
 end
 function grab_input(::Network{Advanced}, flags)
-    A = read_graph(flags.hab_is_res, flags.hab_file)
+    A = read_graph(flags.hab_is_res, flags.hab_file, flags.precision)
     source_map = read_point_strengths(flags.source_file)
     ground_map = read_point_strengths(flags.ground_file)
     NetAdvData(A, source_map, ground_map)

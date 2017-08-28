@@ -63,6 +63,7 @@ function init_config()
     a["log_file"] = "None"
     a["log_level"] = "INFO"
     a["screenprint_log"] = "False"
+    a["precision"] = "Double"
 
     a
 end

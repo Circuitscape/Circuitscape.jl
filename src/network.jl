@@ -7,21 +7,19 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
     numpoints = size(c, 1)
     cc = connected_components(g)
     debug("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
-    resistances = -1 * ones(numpoints, numpoints)
-    voltmatrix = zeros(size(resistances))
+    resistances = -1 * ones(eltype(a), numpoints, numpoints)
+    voltmatrix = zeros(eltype(a), size(resistances))
 
-    cond = laplacian(a)
-
-    volt = Vector{Float64}(size(g, 1))
-    total = Int(numpoints * (numpoints-1) / 2)
-    cond_pruned = sprand(1,1,0.1)
+    cond_pruned = sprand(1, 1, 0.1)
     d = 0
     M = 1
     pt1 = 1
     rcc = 0
+    cond = laplacian(a)
+
     subsets = getindex.([cond], cc, cc)
-    z = zeros.(cc)
-    volt = zeros.(size.(cc))
+    z = zeros.(eltype(a), size.(cc))
+    volt = zeros.(eltype(a), size.(cc))
 
     is_raster = cfg["data_type"] == "raster"
     write_volt_maps = cfg["write_volt_maps"] == "True"
