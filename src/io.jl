@@ -325,28 +325,30 @@ struct NetAdvData{Ti,Tv} <: Data
     source_map::Matrix{Ti}
     ground_map::Matrix{Ti}
 end
-function inputflags(::Network{Pairwise}, cfg)
+function inputflags{S}(obj::Network{S}, cfg)
     p = cfg["precision"] == "Single" ? Float32 : Float64
     hab_is_res = cfg["habitat_map_is_resistances"] in truelist
     hab_file = cfg["habitat_file"]
+    _ipflags(obj, p, hab_is_res, hab_file, cfg)
+end
+function _ipflags(::Network{Pairwise}, p, hab_is_res, hab_file, cfg)
     fp_file = cfg["point_file"]
     NetPairFlags(p, hab_is_res, hab_file, fp_file)
 end
-function grab_input(::Network{Pairwise}, flags)
-    A = read_graph(flags.hab_is_res, flags.hab_file, flags.precision)
-    fp = read_focal_points(flags.fp_file)
-    NetPairData(A, fp)
-end
-function inputflags(::Network{Advanced}, cfg)
-    p = cfg["precision"] == "Single" ? Float32 : Float64
-    hab_is_res = cfg["habitat_map_is_resistances"] in truelist
-    hab_file = cfg["habitat_file"]
+function _ipflags(::Network{Advanced}, p, hab_is_res, hab_file, cfg)
     source_file = cfg["source_file"]
     ground_file = cfg["ground_file"]
     NetAdvFlags(p, hab_is_res, hab_file, source_file, ground_file)
 end
-function grab_input(::Network{Advanced}, flags)
+function grab_input{S}(obj::Network{S}, flags)
     A = read_graph(flags.hab_is_res, flags.hab_file, flags.precision)
+    _grab_input(obj, A, flags)
+end
+function _grab_input(::Network{Pairwise}, A, flags)
+    fp = read_focal_points(flags.fp_file)
+    NetPairData(A, fp)
+end
+function _grab_input(::Network{Advanced}, A, flags)
     source_map = read_point_strengths(flags.source_file)
     ground_map = read_point_strengths(flags.ground_file)
     NetAdvData(A, source_map, ground_map)

@@ -180,11 +180,11 @@ end
 function compute{S<:Scenario}(obj::Network{S}, cfg)
     flags = inputflags(obj, cfg)
     data = grab_input(obj, flags)
-    compute(S(), data, cfg)
+    compute(obj, data, cfg)
 end
-compute(::Pairwise, data, cfg) = single_ground_all_pair_resistances(data.A, Graph(data.A),
+compute(::Network{Pairwise}, data, cfg) = single_ground_all_pair_resistances(data.A, Graph(data.A),
                         data.fp, cfg)
-compute(::Advanced, data, cfg) = advanced(cfg, data.A, Graph(data.A), data.source_map, data.ground_map)
+compute(::Network{Advanced}, data, cfg) = advanced(cfg, data.A, Graph(data.A), data.source_map, data.ground_map)
 
 function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map;
                                                                     nodemap = Matrix{Float64}(0,0),
