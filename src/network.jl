@@ -144,32 +144,12 @@ function postprocess(volt, cond, i, j, resistances, pt1, pt2, cond_pruned, cc, c
     end
 
     if cfg["write_volt_maps"] == "True"
-        local_nodemap = zeros(Int, size(nodemap))
-        idx = findin(nodemap, cc)
-        local_nodemap[idx] = nodemap[idx]
-        if isempty(polymap)
-            idx = find(local_nodemap)
-            local_nodemap[idx] = 1:length(idx)
-        else
-            local_polymap = zeros(size(local_nodemap))
-            local_polymap[idx] = polymap[idx]
-            local_nodemap = construct_node_map(local_nodemap, local_polymap)
-        end
+        local_nodemap = construct_local_node_map(nodemap, cc, polymap)
         write_volt_maps(name, volt, cc, cfg, hbmeta = hbmeta, nodemap = local_nodemap)
     end
 
     if cfg["write_cur_maps"] == "True"
-        local_nodemap = zeros(Int, size(nodemap))
-        idx = findin(nodemap, cc)
-        local_nodemap[idx] = nodemap[idx]
-        if isempty(polymap)
-            idx = find(local_nodemap)
-            local_nodemap[idx] = 1:length(idx)
-        else
-            local_polymap = zeros(size(local_nodemap))
-            local_polymap[idx] = polymap[idx]
-            local_nodemap = construct_node_map(local_nodemap, local_polymap)
-        end
+        local_nodemap = construct_local_node_map(nodemap, cc, polymap)
         write_cur_maps(cond_pruned, volt, [-9999.], cc, name, cfg;
                                     nodemap = local_nodemap,
                                     hbmeta = hbmeta)
@@ -248,31 +228,11 @@ function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map;
         voltages = multiple_solver(cfg, a_local, g, s_local, g_local, f_local)
         solver_called = true
         if cfg["write_volt_maps"] == "True" && !is_network
-            local_nodemap = zeros(Int, size(nodemap))
-            idx = findin(nodemap, c)
-            local_nodemap[idx] = nodemap[idx]
-            if isempty(polymap)
-                idx = find(local_nodemap)
-                local_nodemap[idx] = 1:length(idx)
-            else
-                local_polymap = zeros(size(local_nodemap))
-                local_polymap[idx] = polymap[idx]
-                local_nodemap = construct_node_map(local_nodemap, local_polymap)
-            end
+            local_nodemap = construct_local_node_map(nodemap, c, polymap)
             accum_voltages!(outvolt, voltages, local_nodemap, hbmeta)
         end
         if cfg["write_cur_maps"] == "True" && !is_network
-            local_nodemap = zeros(Int, size(nodemap))
-            idx = findin(nodemap, c)
-            local_nodemap[idx] = nodemap[idx]
-            if isempty(polymap)
-                idx = find(local_nodemap)
-                local_nodemap[idx] = 1:length(idx)
-            else
-                local_polymap = zeros(size(local_nodemap))
-                local_polymap[idx] = polymap[idx]
-                local_nodemap = construct_node_map(local_nodemap, local_polymap)
-            end
+            local_nodemap = construct_local_node_map(nodemap, c, polymap)
             accum_currents!(outcurr, voltages, cfg, a_local, voltages, f_local, local_nodemap, hbmeta)
         end
         for i in eachindex(volt)
@@ -323,6 +283,20 @@ function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map;
     end
 
     return volt
+end
+function construct_local_node_map(nodemap, c, polymap)
+    local_nodemap = zeros(Int, size(nodemap))
+    idx = findin(nodemap, c)
+    local_nodemap[idx] = nodemap[idx]
+    if isempty(polymap)
+        idx = find(local_nodemap)
+        local_nodemap[idx] = 1:length(idx)
+    else
+        local_polymap = zeros(size(local_nodemap))
+        local_polymap[idx] = polymap[idx]
+        local_nodemap = construct_node_map(local_nodemap, local_polymap)
+    end
+    return local_nodemap
 end
 
 function del_row_col(a, n::Int)
