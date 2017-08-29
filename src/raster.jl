@@ -8,7 +8,11 @@ immutable RasterData
     included_pairs::IncludeExcludePairs
 end
 
-function compute(::Raster, cfg)
+function compute{S}(obj::Raster{S}, cfg)
+
+    flags = inputflags(obj, cfg)
+    rdata, hbmeta = grab_input(obj, flags)
+    #compute(obj, data, cfg)
 
     # Get all variables
     four_neighbors = cfg["connect_four_neighbors_only"] == "True"
@@ -16,7 +20,7 @@ function compute(::Raster, cfg)
     scenario = cfg["scenario"]
 
     # Read inputs
-    rdata, hbmeta = load_maps(cfg)
+    # rdata, hbmeta = load_maps(cfg)
     gmap = rdata.cellmap
     polymap = rdata.polymap
     points_rc = rdata.points_rc
@@ -39,66 +43,6 @@ function compute(::Raster, cfg)
                                     strengths = rdata.strengths, hbmeta = hbmeta)
         return voltages
     end
-end
-
-function load_maps(cfg)
-
-    # Read all user variables
-    habitat_file = cfg["habitat_file"]
-    is_res = cfg["habitat_map_is_resistances"] == "True"
-    use_polygons = cfg["use_polygons"] == "True"
-    polymap_file = cfg["polygon_file"]
-    scenario = cfg["scenario"]
-    point_file = cfg["point_file"]
-    mask_file = cfg["mask_file"]
-    use_mask = cfg["use_mask"] == "True"
-    use_variable_source_strengths = cfg["use_variable_source_strengths"] == "True"
-    variable_source_file = cfg["variable_source_file"]
-    use_included_pairs = cfg["use_included_pairs"] == "True"
-    included_pairs_file = cfg["included_pairs_file"]
-    source_file = cfg["source_file"]
-    ground_file = cfg["ground_file"]
-    is_gres = cfg["ground_file_is_resistances"] == "True"
-
-    info("Reading Maps")
-
-    # Read raster map
-    cellmap, habitatmeta = read_cell_map(habitat_file, is_res)
-
-    # Read polygon map
-    polymap = use_polygons ? read_polymap(polymap_file, habitatmeta) : Matrix{Float64}(0,0)
-
-    if use_mask
-        mask = read_polymap(mask_file, habitatmeta)
-        map!(x -> x > 0 ? 1 : 0, mask, mask)
-        cellmap = cellmap .* mask
-        if sum(cellmap) == 0
-            throw(ErrorException("Mask file masks everything!"))
-        end
-    end
-
-    # Default source and ground maps
-    source_map = Matrix{Float64}(0, 0)
-    ground_map = Matrix{Float64}(0, 0)
-    points_rc = (Vector{Int}(), Vector{Int}(), Vector{Float64}())
-    strengths = Matrix{Float64}(0, 0)
-    included_pairs = IncludeExcludePairs()
-
-    if use_included_pairs
-        included_pairs = read_included_pairs(included_pairs_file)
-    end
-
-    if use_variable_source_strengths
-        strengths = read_point_strengths(variable_source_file, false)
-    end
-
-    if scenario == "advanced"
-        source_map, ground_map = read_source_and_ground_maps(source_file, ground_file, habitatmeta, is_gres)
-    else
-        points_rc = read_point_map(point_file, habitatmeta)
-    end
-
-    RasterData(cellmap, polymap, source_map, ground_map, points_rc, strengths, included_pairs), habitatmeta
 end
 
 function pairwise_module(gmap, polymap, points_rc, four_neighbors, average_resistances, included_pairs, cfg, hbmeta)

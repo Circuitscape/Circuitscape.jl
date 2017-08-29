@@ -16,6 +16,15 @@ function compute(path::String)
 end
 function parse_mode(dt, scen)
     d = dt == "network" ? :Network : :Raster
-    s = scen == "pairwise" ? :Pairwise : :Advanced
+    s = :none
+    if scen == "pairwise"
+        s = :Pairwise
+    elseif scen == "advanced"
+        s = :Advanced
+    elseif scen == "one-to-all"
+        s = :OneToAll
+    else
+        s = :AllToOne
+    end
     eval(Expr(:call, Expr(:curly, d, s)))
 end

@@ -71,5 +71,7 @@ abstract type Scenario end
 abstract type Datatype{S<:Scenario} end
 struct Pairwise <: Scenario end
 struct Advanced <: Scenario end
+struct OneToAll <: Scenario end
+struct AllToOne <: Scenario end
 struct Raster{S} <: Datatype{S} end
 struct Network{S} <: Datatype{S} end
