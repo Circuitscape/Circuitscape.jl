@@ -4,7 +4,100 @@ const PAIRS_AAGRID = 4
 const PAIRS_LIST = 5
 const truelist = ["True", "true"]
 
-immutable RasterMeta
+abstract type Data end
+abstract type Flags end
+abstract type Polygon end
+abstract type VarSource end
+abstract type IncludedPairs end
+abstract type Mask end
+abstract type InputFlags <: Flags end
+abstract type ComputeFlags <: Flags end
+
+struct UsePoly <: Polygon
+    file::String
+end
+struct NoPoly <: Polygon
+end
+struct UseVarSrc <: VarSource
+    file::String
+end
+struct NoVarSrc <: VarSource
+end
+struct UseIncPairs <: IncludedPairs
+    file::String
+end
+struct NoIncPairs <: IncludedPairs
+end
+struct UseMask <: Mask
+    file::String
+end
+struct NoMask <: Mask
+end
+
+struct IncludeExcludePairs
+    mode::Symbol
+    point_ids::Vector{Int64}
+    include_pairs::Matrix{Int64}
+end
+function IncludeExcludePairs()
+    IncludeExcludePairs(:undef, Int64[], Matrix{Int64}(0, 0))
+end
+
+struct NetPairFlags{T} <: InputFlags
+    precision::T
+    hab_is_res::Bool
+    hab_file::String
+    fp_file::String
+end
+struct NetAdvFlags{T} <: InputFlags
+    precision::T
+    hab_is_res::Bool
+    hab_file::String
+    source_file::String
+    ground_file::String
+end
+
+struct RasInputFlags{T,P,M,V,I} <: InputFlags
+    precision::T
+    hab_is_res::Bool
+    hab_file::String
+    poly::P
+    mask::M
+    point_file::String
+    var_source::V
+    included_pairs::I
+    source_file::String
+    ground_file::String
+    ground_is_res::Bool
+end
+
+struct RasCompFlags <: ComputeFlags
+    four_neighbors::Bool
+    avg_res::Bool
+end
+
+struct NetPairData{Ti,Tv} <: Data
+    A::SparseMatrixCSC{Ti,Tv}
+    fp::Vector{Tv}
+end
+
+struct NetAdvData{Ti,Tv} <: Data
+    A::SparseMatrixCSC{Ti,Tv}
+    source_map::Matrix{Ti}
+    ground_map::Matrix{Ti}
+end
+
+struct RasData{T,V} <: Data
+    cellmap::Matrix{T}
+    polymap::Matrix{V}
+    source_map::Matrix{V}
+    ground_map::Matrix{V}
+    points_rc::Tuple{Vector{V},Vector{V},Vector{V}}
+    strengths::Matrix{T}
+    included_pairs::IncludeExcludePairs
+end
+
+struct RasterMeta
     ncols::Int64
     nrows::Int64
     xllcorner::Float64
@@ -13,18 +106,8 @@ immutable RasterMeta
     nodata::Float64
     file_type::Int64
 end
-
 function RasterMeta()
     RasterMeta(0,0,0,0,0,0,0)
-end
-
-immutable IncludeExcludePairs
-    mode::Symbol
-    point_ids::Vector{Int64}
-    include_pairs::Matrix{Int64}
-end
-function IncludeExcludePairs()
-    IncludeExcludePairs(:undef, Int64[], Matrix{Int64}(0, 0))
 end
 
 function read_graph(a, gpath::String)
@@ -41,6 +124,7 @@ function read_graph(a, gpath::String)
     A = sparse(i,j,v,m,m)
     A + A'
 end
+
 function read_graph{T}(is_res::Bool, gpath::String, ::Type{T})
     i,j,v = load_graph(gpath, T)
     idx = findfirst(x -> x < 1, i)
@@ -154,7 +238,8 @@ function _guess_file_type(filename, f)
 
 end
 
-function read_polymap{T}(file::String, habitatmeta, ::Type{T}; nodata_as = 0, resample = true)
+function read_polymap{T}(file::String, habitatmeta, ::Type{T};
+                            nodata_as = 0, resample = true)
     polymap, rastermeta = _ascii_grid_reader(file, T)
 
     ind = find(x -> x == rastermeta.nodata, polymap)
@@ -180,7 +265,8 @@ end
 function read_point_map(::Raster{Pairwise}, file, habitatmeta)
     f = endswith(file, ".gz") ? GZip.open(file, "r") : open(file, "r")
     filetype = _guess_file_type(file, f)
-    _points_rc = filetype == TXTLIST ? readdlm(file, Int64) : read_polymap(file, habitatmeta, Int64)
+    _points_rc = filetype == TXTLIST ? readdlm(file, Int64) :
+                        read_polymap(file, habitatmeta, Int64)
 
     i = Int64[]
     j = Int64[]
@@ -213,7 +299,8 @@ function read_point_map(::Raster{Pairwise}, file, habitatmeta)
     i, j, v
 end
 
-function read_source_and_ground_maps{T}(source_file, ground_file, habitatmeta, is_res, ::Type{T})
+function read_source_and_ground_maps{T}(source_file, ground_file, habitatmeta,
+                                        is_res, ::Type{T})
 
     ground_map = Matrix{T}(0,0)
     source_map = Matrix{T}(0,0)
@@ -300,59 +387,6 @@ function read_included_pairs(file)
     end
 end
 
-abstract type Flags end
-abstract type InputFlags <: Flags end
-struct NetPairFlags{T} <: InputFlags
-    precision::T
-    hab_is_res::Bool
-    hab_file::String
-    fp_file::String
-end
-struct NetAdvFlags{T} <: InputFlags
-    precision::T
-    hab_is_res::Bool
-    hab_file::String
-    source_file::String
-    ground_file::String
-end
-
-abstract type Polygon end
-struct UsePoly <: Polygon
-    file::String
-end
-struct NoPoly <: Polygon
-end
-abstract type VarSource end
-struct UseVarSrc <: VarSource
-    file::String
-end
-struct NoVarSrc <: VarSource
-end
-abstract type IncludedPairs end
-struct UseIncPairs <: IncludedPairs
-    file::String
-end
-struct NoIncPairs <: IncludedPairs
-end
-abstract type Mask end
-struct UseMask <: Mask
-    file::String
-end
-struct NoMask <: Mask
-end
-struct RasFlags{T,P,M,V,I} <: InputFlags
-    precision::T
-    hab_is_res::Bool
-    hab_file::String
-    poly::P
-    mask::M
-    point_file::String
-    var_source::V
-    included_pairs::I
-    source_file::String
-    ground_file::String
-    ground_is_res::Bool
-end
 function inputflags{S}(obj::Raster{S}, cfg)
 
     # Precision for computation
@@ -383,29 +417,10 @@ function inputflags{S}(obj::Raster{S}, cfg)
     ground_file = cfg["ground_file"]
     ground_is_res = cfg["ground_file_is_resistances"] in truelist
 
-    RasFlags(p, hab_is_res, hab_file, poly, mask, point_file, var_source,
+    RasInputFlags(p, hab_is_res, hab_file, poly, mask, point_file, var_source,
                 included_pairs, source_file, ground_file, ground_is_res)
 end
 
-abstract type Data end
-struct NetPairData{Ti,Tv} <: Data
-    A::SparseMatrixCSC{Ti,Tv}
-    fp::Vector{Tv}
-end
-struct NetAdvData{Ti,Tv} <: Data
-    A::SparseMatrixCSC{Ti,Tv}
-    source_map::Matrix{Ti}
-    ground_map::Matrix{Ti}
-end
-struct RasData{T,V} <: Data
-    cellmap::Matrix{T}
-    polymap::Matrix{V}
-    source_map::Matrix{V}
-    ground_map::Matrix{V}
-    points_rc::Tuple{Vector{V},Vector{V},Vector{V}}
-    strengths::Matrix{T}
-    included_pairs::IncludeExcludePairs
-end
 function inputflags{S}(obj::Network{S}, cfg)
     p = cfg["precision"] == "Single" ? Float32 : Float64
     hab_is_res = cfg["habitat_map_is_resistances"] in truelist
@@ -495,3 +510,9 @@ read_point_strengths{T<:Union{Pairwise,Advanced}}(::Raster{T}, flags) =
     read_point_strengths(NoVarSrc(), flags.precision)
 read_point_strengths{T}(::NoVarSrc, ::Type{T}) = Matrix{T}(0,0)
 read_point_strengths{T}(v::UseVarSrc, ::Type{T}) = read_point_strengths(v.file, T, false)
+
+function computeflags{S}(::Raster{S}, cfg)
+    four_neighbors = cfg["connect_four_neighbors_only"] == "True"
+    avg_res = cfg["connect_using_avg_resistances"] == "True"
+    RasCompFlags(four_neighbors, avg_res)
+end

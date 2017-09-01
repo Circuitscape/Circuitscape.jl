@@ -11,16 +11,38 @@ end
 function compute{S}(obj::Raster{S}, cfg)
 
     flags = inputflags(obj, cfg)
-    rdata, hbmeta = grab_input(obj, flags)
-    #compute(obj, data, cfg)
+    data, hbmeta = grab_input(obj, flags)
+    compflags = computeflags(obj, cfg)
+    compute(obj, data, compflags, hbmeta, cfg)
+end
+compute(::Raster{Pairwise}, data, compflags, hbmeta, cfg) = pairwise_module(data,
+                                                    compflags, hbmeta, cfg)
+function compute(::Raster{Advanced}, rdata, compflags, hbmeta, cfg)
 
-    # Get all variables
-    four_neighbors = cfg["connect_four_neighbors_only"] == "True"
-    average_resistances = cfg["connect_using_avg_resistances"] == "True"
-    scenario = cfg["scenario"]
+    gmap = rdata.cellmap
+    polymap = rdata.polymap
+    points_rc = rdata.points_rc
+    included_pairs = rdata.included_pairs
+    avg_res = compflags.avg_res
+    four_neighbors = compflags.four_neighbors
+    nodemap = construct_node_map(gmap, polymap)
+    a,g = construct_graph(gmap, nodemap, avg_res, four_neighbors)
+    voltages = advanced(cfg, a, g, rdata.source_map, rdata.ground_map,
+                        nodemap = nodemap, hbmeta = hbmeta, polymap = rdata.polymap)
+    return voltages
+end
+function compute{S<:Union{OneToAll,AllToOne}}(::Raster{S}, rdata, compflags, hbmeta, cfg)
+    gmap = rdata.cellmap
+    polymap = rdata.polymap
+    points_rc = rdata.points_rc
+    included_pairs = rdata.included_pairs
+    onetoall(cfg, gmap, polymap, points_rc;
+                            included_pairs = rdata.included_pairs,
+                            strengths = rdata.strengths, hbmeta = hbmeta)
+end
 
-    # Read inputs
-    # rdata, hbmeta = load_maps(cfg)
+function pairwise_module(rdata, compflags, hbmeta, cfg)
+
     gmap = rdata.cellmap
     polymap = rdata.polymap
     points_rc = rdata.points_rc
@@ -28,31 +50,15 @@ function compute{S}(obj::Raster{S}, cfg)
     c = count(x -> x > 0, gmap)
     info("Resistance/Conductance map has $c nodes")
 
-    if scenario == "pairwise"
-        resistances = pairwise_module(gmap, polymap, points_rc, four_neighbors,
-                                        average_resistances, included_pairs, cfg, hbmeta)
-    elseif scenario == "advanced"
-        nodemap = construct_node_map(gmap, polymap)
-        a,g = construct_graph(gmap, nodemap, average_resistances, four_neighbors)
-        voltages = advanced(cfg, a, g, rdata.source_map, rdata.ground_map,
-                                                                    nodemap = nodemap, hbmeta = hbmeta, polymap = rdata.polymap)
-        return voltages
-    else
-        voltages = onetoall(cfg, gmap, polymap, points_rc;
-                                    included_pairs = rdata.included_pairs,
-                                    strengths = rdata.strengths, hbmeta = hbmeta)
-        return voltages
-    end
-end
-
-function pairwise_module(gmap, polymap, points_rc, four_neighbors, average_resistances, included_pairs, cfg, hbmeta)
+    four_neighbors = compflags.four_neighbors
+    avg_res = compflags.avg_res
 
     point_file_contains_polygons = length(points_rc[1]) != length(unique(points_rc[3]))
     mode = included_pairs.mode == :include ? 0 : 1
 
     if !point_file_contains_polygons
         nodemap = construct_node_map(gmap, polymap)
-        a, g = construct_graph(gmap, nodemap, average_resistances, four_neighbors)
+        a, g = construct_graph(gmap, nodemap, avg_res, four_neighbors)
         exclude_pairs_array = Tuple{Int,Int}[]
         mat = included_pairs.include_pairs
 
@@ -97,7 +103,7 @@ function pairwise_module(gmap, polymap, points_rc, four_neighbors, average_resis
                 newpoly = create_new_polymap(gmap, polymap, points_rc, pt1 = pt1, pt2 = pt2)
 
                 nodemap = construct_node_map(gmap, newpoly)
-                a, g = construct_graph(gmap, nodemap, average_resistances, four_neighbors)
+                a, g = construct_graph(gmap, nodemap, avg_res, four_neighbors)
                 x,y = 0,0
                 x = find(x -> x == pt1, points_rc[3])[1]
                 y = find(x -> x == pt2, points_rc[3])[1]
@@ -119,9 +125,9 @@ function pairwise_module(gmap, polymap, points_rc, four_neighbors, average_resis
     return nothing
 end
 
-function construct_graph(gmap, nodemap, average_resistances, four_neighbors)
-    f1 = average_resistances ? res_avg : cond_avg
-    f2 = average_resistances ? weirder_avg : weird_avg
+function construct_graph(gmap, nodemap, avg_res, four_neighbors)
+    f1 = avg_res ? res_avg : cond_avg
+    f2 = avg_res ? weirder_avg : weird_avg
     I = Int64[]
     J = Int64[]
     V = Float64[]
@@ -349,10 +355,10 @@ function onetoall(cfg, gmap, polymap, points_rc; included_pairs = IncludeExclude
     nodemap = construct_node_map(gmap, newpoly)
 
     four_neighbors = cfg["connect_four_neighbors_only"] == "True"
-    average_resistances = cfg["connect_using_avg_resistances"] == "True"
+    avg_res = cfg["connect_using_avg_resistances"] == "True"
     one_to_all = cfg["scenario"] == "one-to-all"
 
-    a, g = construct_graph(gmap, nodemap, average_resistances, four_neighbors)
+    a, g = construct_graph(gmap, nodemap, avg_res, four_neighbors)
     cc = connected_components(g)
     debug("There are $(size(a, 1)) points and $(length(cc)) connected components")
 
@@ -386,7 +392,7 @@ function onetoall(cfg, gmap, polymap, points_rc; included_pairs = IncludeExclude
             end
             polymap = create_new_polymap(gmap, polymap, points_rc, point_map = point_map)
             nodemap = construct_node_map(gmap, polymap)
-            a, g = construct_graph(gmap, nodemap, average_resistances, four_neighbors)
+            a, g = construct_graph(gmap, nodemap, avg_res, four_neighbors)
         end
         if one_to_all
             #source_map = map(x -> x == n ? str : 0, point_map)
