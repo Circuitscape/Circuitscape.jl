@@ -12,6 +12,12 @@ abstract type IncludedPairs end
 abstract type Mask end
 abstract type InputFlags <: Flags end
 abstract type ComputeFlags <: Flags end
+abstract type PointFilePolygons end
+
+struct PointFileContainsPolygons <: PointFilePolygons
+end
+struct PointFileNoPolygons <: PointFilePolygons
+end
 
 struct UsePoly <: Polygon
     file::String
@@ -71,9 +77,10 @@ struct RasInputFlags{T,P,M,V,I} <: InputFlags
     ground_is_res::Bool
 end
 
-struct RasCompFlags <: ComputeFlags
+struct RasCompFlags{P} <: ComputeFlags
     four_neighbors::Bool
     avg_res::Bool
+    ptpoly::P
 end
 
 struct NetPairData{Ti,Tv} <: Data
@@ -458,6 +465,8 @@ function grab_input{S}(obj::Raster{S}, flags)
 
     # Read cell map
     cellmap, hbmeta = read_cellmap(flags.hab_file, flags.hab_is_res, p)
+    c = count(x -> x > 0, cellmap)
+    info("Resistance/Conductance map has $c nodes")
 
     # Read polymap
     polymap = read_polymap(flags.poly, hbmeta, p)
@@ -511,8 +520,10 @@ read_point_strengths{T<:Union{Pairwise,Advanced}}(::Raster{T}, flags) =
 read_point_strengths{T}(::NoVarSrc, ::Type{T}) = Matrix{T}(0,0)
 read_point_strengths{T}(v::UseVarSrc, ::Type{T}) = read_point_strengths(v.file, T, false)
 
-function computeflags{S}(::Raster{S}, cfg)
+function computeflags{S}(::Raster{S}, cfg, points_rc)
     four_neighbors = cfg["connect_four_neighbors_only"] == "True"
     avg_res = cfg["connect_using_avg_resistances"] == "True"
-    RasCompFlags(four_neighbors, avg_res)
+    ptpoly = length(points_rc[1]) != length(unique(points_rc[3])) ?
+                PointFileContainsPolygons() : PointFileNoPolygons()
+    RasCompFlags(four_neighbors, avg_res, ptpoly)
 end

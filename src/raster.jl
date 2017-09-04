@@ -12,7 +12,7 @@ function compute{S}(obj::Raster{S}, cfg)
 
     flags = inputflags(obj, cfg)
     data, hbmeta = grab_input(obj, flags)
-    compflags = computeflags(obj, cfg)
+    compflags = computeflags(obj, cfg, data.points_rc)
     compute(obj, data, compflags, hbmeta, cfg)
 end
 compute(::Raster{Pairwise}, data, compflags, hbmeta, cfg) = pairwise_module(data,
@@ -42,87 +42,93 @@ function compute{S<:Union{OneToAll,AllToOne}}(::Raster{S}, rdata, compflags, hbm
 end
 
 function pairwise_module(rdata, compflags, hbmeta, cfg)
+    ptpoly = compflags.ptpoly
+    _pairwise(ptpoly, rdata, compflags, hbmeta, cfg)
+end
 
+    #point_file_contains_polygons = length(points_rc[1]) != length(unique(points_rc[3]))
+function _pairwise(::PointFileContainsPolygons, rdata, compflags, hbmeta, cfg)
+
+    @show "no here"
     gmap = rdata.cellmap
     polymap = rdata.polymap
     points_rc = rdata.points_rc
-    included_pairs = rdata.included_pairs
-    c = count(x -> x > 0, gmap)
-    info("Resistance/Conductance map has $c nodes")
-
-    four_neighbors = compflags.four_neighbors
     avg_res = compflags.avg_res
+    included_pairs = rdata.included_pairs
+    four_neighbors = compflags.four_neighbors
 
-    point_file_contains_polygons = length(points_rc[1]) != length(unique(points_rc[3]))
     mode = included_pairs.mode == :include ? 0 : 1
+    nodemap = construct_node_map(gmap, polymap)
+    a, g = construct_graph(gmap, nodemap, avg_res, four_neighbors)
+    exclude_pairs_array = Tuple{Int,Int}[]
+    mat = included_pairs.include_pairs
 
-    if !point_file_contains_polygons
-        nodemap = construct_node_map(gmap, polymap)
-        a, g = construct_graph(gmap, nodemap, avg_res, four_neighbors)
-        exclude_pairs_array = Tuple{Int,Int}[]
-        mat = included_pairs.include_pairs
-
-        if !isempty(included_pairs)
-            prune_points!(points_rc, included_pairs.point_ids)
-            for j = 1:size(mat, 2)
-                for i = 1:size(mat, 1)
-                    if mat[i,j] == mode
-                        push!(exclude_pairs_array, (i,j))
-                    end
+    if !isempty(included_pairs)
+        prune_points!(points_rc, included_pairs.point_ids)
+        for j = 1:size(mat, 2)
+            for i = 1:size(mat, 1)
+                if mat[i,j] == mode
+                    push!(exclude_pairs_array, (i,j))
                 end
             end
         end
-        c = zeros(Int, length(points_rc[3]))
-        for (i,v) in enumerate(zip(points_rc[1], points_rc[2]))
-            c[i] = nodemap[v...]
-        end
-
-        resistances = single_ground_all_pair_resistances(a, g, c, cfg;
-                                        exclude = exclude_pairs_array,
-                                        nodemap = nodemap,
-                                        orig_pts = points_rc[3],
-                                        polymap = polymap,
-                                        hbmeta = hbmeta)
-        return resistances
-    else
-        # get unique list of points
-        # for every point pair do
-            # construct new polymap
-            # construct new nodemap
-            # construct new graph
-            # solve for two points
-        # end
-
-        pts = unique(points_rc[3])
-        resistances = -1 * ones(length(pts), length(pts))
-
-        for i = 1:size(pts, 1)
-            pt1 = pts[i]
-            for j = i+1:size(pts, 1)
-                pt2 = pts[j]
-                newpoly = create_new_polymap(gmap, polymap, points_rc, pt1 = pt1, pt2 = pt2)
-
-                nodemap = construct_node_map(gmap, newpoly)
-                a, g = construct_graph(gmap, nodemap, avg_res, four_neighbors)
-                x,y = 0,0
-                x = find(x -> x == pt1, points_rc[3])[1]
-                y = find(x -> x == pt2, points_rc[3])[1]
-                c1 = nodemap[points_rc[1][x], points_rc[2][x]]
-                c2 = nodemap[points_rc[1][y], points_rc[2][y]]
-                c = Int[c1, c2]
-                pairwise_resistance = single_ground_all_pair_resistances(a, g, c, cfg; orig_pts =[points_rc[3][x], points_rc[3][y]],
-                                                                                        nodemap = nodemap,
-                                                                                        polymap = newpoly,
-                                                                                        hbmeta = hbmeta)
-                resistances[i,j] = resistances[j,i] = pairwise_resistance[1,2]
-            end
-        end
-        for i = 1:size(pts, 1)
-            resistances[i,i] = 0
-        end
-        return resistances
     end
-    return nothing
+    c = zeros(Int, length(points_rc[3]))
+    for (i,v) in enumerate(zip(points_rc[1], points_rc[2]))
+        c[i] = nodemap[v...]
+    end
+
+    resistances = single_ground_all_pair_resistances(a, g, c, cfg;
+                                    exclude = exclude_pairs_array,
+                                    nodemap = nodemap,
+                                    orig_pts = points_rc[3],
+                                    polymap = polymap,
+                                    hbmeta = hbmeta)
+end
+function _pairwise(::PointFileNoPolygons, rdata, compflags, hbmeta, cfg)
+
+    # get unique list of points
+    # for every point pair do
+        # construct new polymap
+        # construct new nodemap
+        # construct new graph
+        # solve for two points
+    # end
+    @show "here"
+    gmap = rdata.cellmap
+    polymap = rdata.polymap
+    points_rc = rdata.points_rc
+    avg_res = compflags.avg_res
+    four_neighbors = compflags.four_neighbors
+
+    pts = unique(points_rc[3])
+    resistances = -1 * ones(length(pts), length(pts))
+
+    for i = 1:size(pts, 1)
+        pt1 = pts[i]
+        for j = i+1:size(pts, 1)
+            pt2 = pts[j]
+            newpoly = create_new_polymap(gmap, polymap, points_rc, pt1 = pt1, pt2 = pt2)
+
+            nodemap = construct_node_map(gmap, newpoly)
+            a, g = construct_graph(gmap, nodemap, avg_res, four_neighbors)
+            x,y = 0,0
+            x = find(x -> x == pt1, points_rc[3])[1]
+            y = find(x -> x == pt2, points_rc[3])[1]
+            c1 = nodemap[points_rc[1][x], points_rc[2][x]]
+            c2 = nodemap[points_rc[1][y], points_rc[2][y]]
+            c = Int[c1, c2]
+            pairwise_resistance = single_ground_all_pair_resistances(a, g, c, cfg; orig_pts =[points_rc[3][x], points_rc[3][y]],
+                                                                                    nodemap = nodemap,
+                                                                                    polymap = newpoly,
+                                                                                    hbmeta = hbmeta)
+            resistances[i,j] = resistances[j,i] = pairwise_resistance[1,2]
+        end
+    end
+    for i = 1:size(pts, 1)
+        resistances[i,i] = 0
+    end
+    resistances
 end
 
 function construct_graph(gmap, nodemap, avg_res, four_neighbors)
