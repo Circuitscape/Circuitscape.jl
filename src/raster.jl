@@ -46,10 +46,8 @@ function pairwise_module(rdata, compflags, hbmeta, cfg)
     _pairwise(ptpoly, rdata, compflags, hbmeta, cfg)
 end
 
-    #point_file_contains_polygons = length(points_rc[1]) != length(unique(points_rc[3]))
-function _pairwise(::PointFileContainsPolygons, rdata, compflags, hbmeta, cfg)
+function _pairwise(::PointFileNoPolygons, rdata, compflags, hbmeta, cfg)
 
-    @show "no here"
     gmap = rdata.cellmap
     polymap = rdata.polymap
     points_rc = rdata.points_rc
@@ -85,7 +83,7 @@ function _pairwise(::PointFileContainsPolygons, rdata, compflags, hbmeta, cfg)
                                     polymap = polymap,
                                     hbmeta = hbmeta)
 end
-function _pairwise(::PointFileNoPolygons, rdata, compflags, hbmeta, cfg)
+function _pairwise(::PointFileContainsPolygons, rdata, compflags, hbmeta, cfg)
 
     # get unique list of points
     # for every point pair do
@@ -94,7 +92,6 @@ function _pairwise(::PointFileNoPolygons, rdata, compflags, hbmeta, cfg)
         # construct new graph
         # solve for two points
     # end
-    @show "here"
     gmap = rdata.cellmap
     polymap = rdata.polymap
     points_rc = rdata.points_rc
