@@ -1,11 +1,12 @@
 import Circuitscape: construct_node_map, Raster, OneToAll
+import Circuitscape: NoPoly, Polymap
 
 # Construct nodemap tests
 let
         gmap = [0 1 2
                 2 0 0
                 2 0 2]
-        nodemap = construct_node_map(gmap, Matrix{Float64}(0,0))
+        nodemap = construct_node_map(gmap, NoPoly())
         @test nodemap == [0 3 4
                           1 0 0
                           2 0 5]
@@ -69,7 +70,7 @@ let
     r, hbmeta = Circuitscape.grab_input(Raster{OneToAll}(), flags)
 
     cellmap = r.cellmap
-    polymap = r.polymap
+    polymap = r.polymap.polymap
     points_rc = r.points_rc
     point_map = [ 1.0  2.0  0.0  0.0  0.0
                   0.0  0.0  0.0  0.0  0.0
@@ -77,7 +78,7 @@ let
                   4.0  0.0  0.0  0.0  0.0
                   1.0  0.0  0.0  0.0  2.0 ]
 
-    r = Circuitscape.create_new_polymap(cellmap, polymap, points_rc, point_map = point_map)
+    r = Circuitscape.create_new_polymap(cellmap, Polymap(polymap), points_rc, point_map = point_map)
 
     @test r == [ 1.0  2.0  0.0  0.0  0.0
                  0.0  0.0  0.0  0.0  0.0

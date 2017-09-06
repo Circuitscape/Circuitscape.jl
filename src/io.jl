@@ -24,6 +24,10 @@ struct UsePoly <: Polygon
 end
 struct NoPoly <: Polygon
 end
+struct Polymap{T} <: Polygon
+    polymap::Matrix{T}
+end
+
 struct UseVarSrc <: VarSource
     file::String
 end
@@ -94,12 +98,12 @@ struct NetAdvData{Ti,Tv} <: Data
     ground_map::Matrix{Ti}
 end
 
-struct RasData{T,V} <: Data
+struct RasData{T,V,P,S} <: Data
     cellmap::Matrix{T}
-    polymap::Matrix{V}
+    polymap::P
     source_map::Matrix{V}
     ground_map::Matrix{V}
-    points_rc::Tuple{Vector{V},Vector{V},Vector{V}}
+    points_rc::Tuple{Vector{S},Vector{S},Vector{S}}
     strengths::Matrix{T}
     included_pairs::IncludeExcludePairs
 end
@@ -487,11 +491,11 @@ function grab_input{S}(obj::Raster{S}, flags)
     # Variable source strengths
     strengths = read_point_strengths(obj, flags)
 
-    RasterData(cellmap, polymap, source_map, ground_map, points_rc, strengths,
+    RasData(cellmap, polymap, source_map, ground_map, points_rc, strengths,
                     included_pairs), hbmeta
 end
-read_polymap{T}(::NoPoly, hbmeta, ::Type{T}) = Matrix{T}(0,0)
-read_polymap{T}(p::UsePoly, hbmeta, ::Type{T}) = read_polymap(p.file, hbmeta, T)
+read_polymap{T}(p::NoPoly, hbmeta, ::Type{T}) = p
+read_polymap{T}(p::UsePoly, hbmeta, ::Type{T}) = Polymap(read_polymap(p.file, hbmeta, T))
 update!(cellmap, ::NoMask, hbmeta) = cellmap
 function update!{T}(cellmap::Matrix{T}, m::Mask, hbmeta)
     mask = read_polymap(m.file, hbmeta, T)

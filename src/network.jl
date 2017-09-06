@@ -2,7 +2,7 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
                                                     exclude = Tuple{Int,Int}[],
                                                     nodemap = Matrix{Float64}(0, 0),
                                                     orig_pts = Vector{Int}(),
-                                                    polymap = Matrix{Float64}(0, 0),
+                                                    polymap = NoPoly(),
                                                     hbmeta = RasterMeta())
     numpoints = size(c, 1)
     cc = connected_components(g)
@@ -125,7 +125,7 @@ function postprocess(volt, cond, i, j, resistances, pt1, pt2, cond_pruned, cc, c
                                             get_shortcut_resistances;
                                             nodemap = Matrix{Float64}(),
                                             orig_pts = Vector{Int}(),
-                                            polymap = Vector{Float64}(),
+                                            polymap = NoPoly(),
                                             hbmeta = hbmeta)
 
     r = resistances[i, j] = resistances[j, i] = volt[pt2] - volt[pt1]
@@ -172,7 +172,7 @@ function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map;
                                                                     check_node = -1,
                                                                     hbmeta = RasterMeta(),
                                                                     src = 0,
-                                                                    polymap = Matrix{Float64}(0,0))
+                                                                    polymap = NoPoly())
     cc = connected_components(g)
     debug("There are $(size(a, 1)) points and $(length(cc)) connected components")
     mode = cfg["data_type"]
@@ -288,15 +288,18 @@ function construct_local_node_map(nodemap, c, polymap)
     local_nodemap = zeros(Int, size(nodemap))
     idx = findin(nodemap, c)
     local_nodemap[idx] = nodemap[idx]
-    if isempty(polymap)
-        idx = find(local_nodemap)
-        local_nodemap[idx] = 1:length(idx)
-    else
-        local_polymap = zeros(size(local_nodemap))
-        local_polymap[idx] = polymap[idx]
-        local_nodemap = construct_node_map(local_nodemap, local_polymap)
-    end
-    return local_nodemap
+    get_local_nodemap(local_nodemap, polymap, idx)
+end
+function get_local_nodemap(local_nodemap, ::NoPoly, i)
+    idx = find(local_nodemap)
+    local_nodemap[idx] = 1:length(idx)
+    local_nodemap
+end
+function get_local_nodemap(local_nodemap, p::Polymap, idx)
+    polymap = p.polymap
+    local_polymap = zeros(size(local_nodemap))
+    local_polymap[idx] = polymap[idx]
+    construct_node_map(local_nodemap, local_polymap)
 end
 
 function del_row_col(a, n::Int)

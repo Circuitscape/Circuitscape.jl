@@ -1,4 +1,4 @@
-immutable RasterData
+#=immutable RasterData
     cellmap::Matrix{Float64}
     polymap::Matrix{Float64}
     source_map::Matrix{Float64}
@@ -6,7 +6,7 @@ immutable RasterData
     points_rc::Tuple{Vector{Int},Vector{Int},Vector{Float64}}
     strengths::Matrix{Float64}
     included_pairs::IncludeExcludePairs
-end
+end=#
 
 function compute{S}(obj::Raster{S}, cfg)
 
@@ -106,7 +106,6 @@ function _pairwise(::PointFileContainsPolygons, rdata, compflags, hbmeta, cfg)
         for j = i+1:size(pts, 1)
             pt2 = pts[j]
             newpoly = create_new_polymap(gmap, polymap, points_rc, pt1 = pt1, pt2 = pt2)
-
             nodemap = construct_node_map(gmap, newpoly)
             a, g = construct_graph(gmap, nodemap, avg_res, four_neighbors)
             x,y = 0,0
@@ -117,7 +116,7 @@ function _pairwise(::PointFileContainsPolygons, rdata, compflags, hbmeta, cfg)
             c = Int[c1, c2]
             pairwise_resistance = single_ground_all_pair_resistances(a, g, c, cfg; orig_pts =[points_rc[3][x], points_rc[3][y]],
                                                                                     nodemap = nodemap,
-                                                                                    polymap = newpoly,
+                                                                                    polymap = Polymap(newpoly),
                                                                                     hbmeta = hbmeta)
             resistances[i,j] = resistances[j,i] = pairwise_resistance[1,2]
         end
@@ -177,10 +176,10 @@ function construct_graph(gmap, nodemap, avg_res, four_neighbors)
     a, g
 end
 
-function create_new_polymap(gmap, polymap, points_rc; pt1 = 0, pt2 = 0, point_map = Matrix{Float64}(0,0))
+function create_new_polymap(gmap, p, points_rc; pt1 = 0, pt2 = 0, point_map = Matrix{Float64}(0,0))
 
     f(x) = (points_rc[1][x], points_rc[2][x])
-
+    polymap = typeof(p) == NoPoly ? Matrix{Float64}(0,0) : p.polymap
     if !isempty(point_map)
 
        # Combine polymap and pointmap
@@ -265,55 +264,59 @@ function create_new_polymap(gmap, polymap, points_rc; pt1 = 0, pt2 = 0, point_ma
         return newpoly
     end
 end
+Base.isempty(p::Polymap) = isempty(p.polymap)
 
 res_avg(x, y) = 1 / ((1/x + 1/y) / 2)
 cond_avg(x, y) = (x + y) / 2
 weird_avg(x,y) = (x + y) / (2*√2)
 weirder_avg(x, y) = 1 / (√2 * (1/x + 1/y) / 2)
 
-function construct_node_map(gmap, polymap)
+function construct_node_map(gmap, ::NoPoly)
+    nodemap = zeros(Int, size(gmap))
+    ind::Vector{Int64} = find(x -> x > 0, gmap)
+    nodemap[ind] = 1:length(ind)
+    nodemap
+end
+
+construct_node_map(gmap, p::Polymap) = construct_node_map(gmap, p.polymap)
+function construct_node_map{T}(gmap, polymap::Matrix{T})
 
     nodemap = zeros(size(gmap))
-    if isempty(polymap)
-         ind::Vector{Int64} = find(x -> x > 0, gmap)
-         nodemap[ind] = 1:length(ind)
-    else
-        d = Dict{Int, Vector{Int}}()
-        #=for i in unique(polymap)
-            d[i] = find(x -> x == i, polymap)
-        end=#
-        m, n = size(polymap)
-        I, J, V = findnz(polymap)
-        for (i,v) in enumerate(V)
-            if v != -9999
-                if haskey(d, v)
-                    push!(d[v], sub2ind((m, n), I[i], J[i]))
-                else
-                    d[v] = [sub2ind((m, n), I[i], J[i])]
-                end
+    d = Dict{Int, Vector{Int}}()
+    #=for i in unique(polymap)
+        d[i] = find(x -> x == i, polymap)
+    end=#
+    m, n = size(polymap)
+    I, J, V = findnz(polymap)
+    for (i,v) in enumerate(V)
+        if v != -9999
+            if haskey(d, v)
+                push!(d[v], sub2ind((m, n), I[i], J[i]))
+            else
+                d[v] = [sub2ind((m, n), I[i], J[i])]
             end
         end
-        d[0] = find(x -> x == 0, polymap)
-        k = 1
-        for i in find(gmap)
-            if i in d[0]
-                nodemap[i] = k
-                k += 1
-            else
-                for key in keys(d)
-                    if i in d[key]
-                        if i == first(d[key])
+    end
+    d[0] = find(x -> x == 0, polymap)
+    k = 1
+    for i in find(gmap)
+        if i in d[0]
+            nodemap[i] = k
+            k += 1
+        else
+            for key in keys(d)
+                if i in d[key]
+                    if i == first(d[key])
+                        nodemap[i] = k
+                        k += 1
+                    else
+                        f = first(d[key])
+                        if polymap[f] != 0 && nodemap[f] == 0
                             nodemap[i] = k
+                            nodemap[f] = k
                             k += 1
                         else
-                            f = first(d[key])
-                            if polymap[f] != 0 && nodemap[f] == 0
-                                nodemap[i] = k
-                                nodemap[f] = k
-                                k += 1
-                            else
-                                nodemap[i] = nodemap[f]
-                            end
+                            nodemap[i] = nodemap[f]
                         end
                     end
                 end
@@ -393,7 +396,7 @@ function onetoall(cfg, gmap, polymap, points_rc; included_pairs = IncludeExclude
                     map!(x -> x == exclude ? 0 : x, point_map, point_map)
                 end
             end
-            polymap = create_new_polymap(gmap, polymap, points_rc, point_map = point_map)
+            polymap = create_new_polymap(gmap, Polymap(polymap), points_rc, point_map = point_map)
             nodemap = construct_node_map(gmap, polymap)
             a, g = construct_graph(gmap, nodemap, avg_res, four_neighbors)
         end
@@ -413,10 +416,10 @@ function onetoall(cfg, gmap, polymap, points_rc; included_pairs = IncludeExclude
 
         if one_to_all
             v = advanced(cfg, a, g, source_map, ground_map; nodemap = nodemap, policy = :rmvgnd,
-                            check_node = check_node, src = n, polymap = newpoly, hbmeta = hbmeta)
+                            check_node = check_node, src = n, polymap = Polymap(newpoly), hbmeta = hbmeta)
         else
             v = advanced(cfg, a, g, source_map, ground_map; nodemap = nodemap, policy = :rmvsrc,
-                            check_node = check_node, src = n, polymap = newpoly, hbmeta = hbmeta)
+                            check_node = check_node, src = n, polymap = Polymap(newpoly), hbmeta = hbmeta)
         end
         res[i] = v[1]
     end
