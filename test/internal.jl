@@ -103,28 +103,28 @@ let
         nodemap = [0 3 4
                    1 0 0
                    2 0 5]
-        A,g = construct_graph(gmap, nodemap, false, true)
+        A = construct_graph(gmap, nodemap, false, true)
         r = full(A) - [0 2 0 0 0
                        2 0 0 0 0
                        0 0 0 1.5 0
                        0 0 1.5 0 0
                        0 0 0 0 0]
         @test sum(abs2, r) < 1e-6
-        A, g = construct_graph(gmap, nodemap, true, true)
+        A = construct_graph(gmap, nodemap, true, true)
         r = full(A) - [0 2 0 0 0
                        2 0 0 0 0
                        0 0 0 1.3333 0
                        0 0 1.33333 0 0
                        0 0 0 0 0]
         @test sum(abs2, r) < 1e-6
-        A,g = construct_graph(gmap, nodemap, false, false)
+        A = construct_graph(gmap, nodemap, false, false)
         r = full(A) - [0 2 1.06066 0 0
                        2 0 0 0 0
                        1.06066 0 0 1.5 0
                        0 0 1.5 0 0
                        0 0 0 0 0]
         @test sum(abs2, r) < 1e-6
-        A,g = construct_graph(gmap, nodemap, true, false)
+        A = construct_graph(gmap, nodemap, true, false)
         r = full(A) - [0 2 0.942809 0 0
                        2 0 0 0 0
                        0.942809 0 0 1.3333 0

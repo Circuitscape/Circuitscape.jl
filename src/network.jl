@@ -1,11 +1,11 @@
-function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::Vector{T}, cfg;
+function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, c::Vector{T}, cfg;
                                                     exclude = Tuple{Int,Int}[],
                                                     nodemap = Matrix{Float64}(0, 0),
                                                     orig_pts = Vector{Int}(),
                                                     polymap = NoPoly(),
                                                     hbmeta = RasterMeta())
     numpoints = size(c, 1)
-    cc = connected_components(g)
+    cc = connected_components(SimpleWeightedGraph(a))
     debug("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
     resistances = -1 * ones(eltype(a), numpoints, numpoints)
     voltmatrix = zeros(eltype(a), size(resistances))
@@ -162,18 +162,18 @@ function compute{S<:Scenario}(obj::Network{S}, cfg)
     data = grab_input(obj, flags)
     compute(obj, data, cfg)
 end
-compute(::Network{Pairwise}, data, cfg) = single_ground_all_pair_resistances(data.A, Graph(data.A),
-                        data.fp, cfg)
-compute(::Network{Advanced}, data, cfg) = advanced(cfg, data.A, Graph(data.A), data.source_map, data.ground_map)
+compute(::Network{Pairwise}, data, cfg) =
+    single_ground_all_pair_resistances(data.A, data.fp, cfg)
+compute(::Network{Advanced}, data, cfg) = advanced(cfg, data.A, data.source_map, data.ground_map)
 
-function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map;
+function advanced(cfg, a::SparseMatrixCSC, source_map, ground_map;
                                                                     nodemap = Matrix{Float64}(0,0),
                                                                     policy = :keepall,
                                                                     check_node = -1,
                                                                     hbmeta = RasterMeta(),
                                                                     src = 0,
                                                                     polymap = NoPoly())
-    cc = connected_components(g)
+    cc = connected_components(SimpleWeightedGraph(a))
     debug("There are $(size(a, 1)) points and $(length(cc)) connected components")
     mode = cfg["data_type"]
     is_network = mode == "network"
@@ -225,7 +225,7 @@ function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map;
         else
             f_local = finitegrounds
         end
-        voltages = multiple_solver(cfg, a_local, g, s_local, g_local, f_local)
+        voltages = multiple_solver(cfg, a_local, s_local, g_local, f_local)
         solver_called = true
         if cfg["write_volt_maps"] == "True" && !is_network
             local_nodemap = construct_local_node_map(nodemap, c, polymap)
@@ -342,7 +342,7 @@ function resolve_conflicts(sources, grounds, policy)
 end
 
 
-function multiple_solver(cfg, a, g, sources, grounds, finitegrounds)
+function multiple_solver(cfg, a, sources, grounds, finitegrounds)
 
     asolve = deepcopy(a)
     if finitegrounds[1] != -9999

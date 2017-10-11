@@ -26,8 +26,8 @@ function compute(::Raster{Advanced}, rdata, compflags, hbmeta, cfg)
     avg_res = compflags.avg_res
     four_neighbors = compflags.four_neighbors
     nodemap = construct_node_map(gmap, polymap)
-    a,g = construct_graph(gmap, nodemap, avg_res, four_neighbors)
-    voltages = advanced(cfg, a, g, rdata.source_map, rdata.ground_map,
+    a = construct_graph(gmap, nodemap, avg_res, four_neighbors)
+    voltages = advanced(cfg, a,rdata.source_map, rdata.ground_map,
                         nodemap = nodemap, hbmeta = hbmeta, polymap = rdata.polymap)
     return voltages
 end
@@ -57,7 +57,7 @@ function _pairwise(::PointFileNoPolygons, rdata, compflags, hbmeta, cfg)
 
     mode = included_pairs.mode == :include ? 0 : 1
     nodemap = construct_node_map(gmap, polymap)
-    a, g = construct_graph(gmap, nodemap, avg_res, four_neighbors)
+    a = construct_graph(gmap, nodemap, avg_res, four_neighbors)
     exclude_pairs_array = Tuple{Int,Int}[]
     mat = included_pairs.include_pairs
 
@@ -76,7 +76,7 @@ function _pairwise(::PointFileNoPolygons, rdata, compflags, hbmeta, cfg)
         c[i] = nodemap[v...]
     end
 
-    resistances = single_ground_all_pair_resistances(a, g, c, cfg;
+    resistances = single_ground_all_pair_resistances(a, c, cfg;
                                     exclude = exclude_pairs_array,
                                     nodemap = nodemap,
                                     orig_pts = points_rc[3],
@@ -107,14 +107,14 @@ function _pairwise(::PointFileContainsPolygons, rdata, compflags, hbmeta, cfg)
             pt2 = pts[j]
             newpoly = create_new_polymap(gmap, polymap, points_rc, pt1 = pt1, pt2 = pt2)
             nodemap = construct_node_map(gmap, newpoly)
-            a, g = construct_graph(gmap, nodemap, avg_res, four_neighbors)
+            a = construct_graph(gmap, nodemap, avg_res, four_neighbors)
             x,y = 0,0
             x = find(x -> x == pt1, points_rc[3])[1]
             y = find(x -> x == pt2, points_rc[3])[1]
             c1 = nodemap[points_rc[1][x], points_rc[2][x]]
             c2 = nodemap[points_rc[1][y], points_rc[2][y]]
             c = Int[c1, c2]
-            pairwise_resistance = single_ground_all_pair_resistances(a, g, c, cfg; orig_pts =[points_rc[3][x], points_rc[3][y]],
+            pairwise_resistance = single_ground_all_pair_resistances(a, c, cfg; orig_pts =[points_rc[3][x], points_rc[3][y]],
                                                                                     nodemap = nodemap,
                                                                                     polymap = Polymap(newpoly),
                                                                                     hbmeta = hbmeta)
@@ -172,8 +172,7 @@ function construct_graph(gmap, nodemap, avg_res, four_neighbors)
     m = maximum(nodemap)
     a = sparse(I,J,V, m, m)
     a = a + a'
-    g = Graph(a)
-    a, g
+    a
 end
 
 function create_new_polymap(gmap, p, points_rc; pt1 = 0, pt2 = 0, point_map = Matrix{Float64}(0,0))
@@ -364,8 +363,8 @@ function onetoall(cfg, gmap, polymap, points_rc; included_pairs = IncludeExclude
     avg_res = cfg["connect_using_avg_resistances"] == "True"
     one_to_all = cfg["scenario"] == "one-to-all"
 
-    a, g = construct_graph(gmap, nodemap, avg_res, four_neighbors)
-    cc = connected_components(g)
+    a = construct_graph(gmap, nodemap, avg_res, four_neighbors)
+    cc = connected_components(SimpleWeightedGraph(a))
     debug("There are $(size(a, 1)) points and $(length(cc)) connected components")
 
     source_map = Matrix{Float64}(0, 0)
@@ -398,7 +397,7 @@ function onetoall(cfg, gmap, polymap, points_rc; included_pairs = IncludeExclude
             end
             polymap = create_new_polymap(gmap, Polymap(polymap), points_rc, point_map = point_map)
             nodemap = construct_node_map(gmap, polymap)
-            a, g = construct_graph(gmap, nodemap, avg_res, four_neighbors)
+            a = construct_graph(gmap, nodemap, avg_res, four_neighbors)
         end
         if one_to_all
             #source_map = map(x -> x == n ? str : 0, point_map)
@@ -415,10 +414,10 @@ function onetoall(cfg, gmap, polymap, points_rc; included_pairs = IncludeExclude
         check_node = nodemap[points_rc[1][i], points_rc[2][i]]
 
         if one_to_all
-            v = advanced(cfg, a, g, source_map, ground_map; nodemap = nodemap, policy = :rmvgnd,
+            v = advanced(cfg, a, source_map, ground_map; nodemap = nodemap, policy = :rmvgnd,
                             check_node = check_node, src = n, polymap = Polymap(newpoly), hbmeta = hbmeta)
         else
-            v = advanced(cfg, a, g, source_map, ground_map; nodemap = nodemap, policy = :rmvsrc,
+            v = advanced(cfg, a, source_map, ground_map; nodemap = nodemap, policy = :rmvsrc,
                             check_node = check_node, src = n, polymap = Polymap(newpoly), hbmeta = hbmeta)
         end
         res[i] = v[1]
