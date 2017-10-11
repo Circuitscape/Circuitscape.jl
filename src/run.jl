@@ -1,7 +1,7 @@
 """
     `compute(path::String)`
 
-Call the `compute` function on the configuration file. 
+Call the `compute` function on the configuration file.
 
 Inputs:
 ======
@@ -11,12 +11,20 @@ Inputs:
 """
 function compute(path::String)
     cfg = parse_config(path)
-    data_type = cfg["data_type"]
-    if data_type == "network"
-        result = compute_network(cfg)
-        return result
+    T = parse_mode(cfg["data_type"], cfg["scenario"])
+    compute(T, cfg)
+end
+function parse_mode(dt, scen)
+    d = dt == "network" ? :Network : :Raster
+    s = :none
+    if scen == "pairwise"
+        s = :Pairwise
+    elseif scen == "advanced"
+        s = :Advanced
+    elseif scen == "one-to-all"
+        s = :OneToAll
     else
-        result = compute_raster(cfg)
-        return result
+        s = :AllToOne
     end
+    eval(Expr(:call, Expr(:curly, d, s)))
 end

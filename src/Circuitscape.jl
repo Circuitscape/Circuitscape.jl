@@ -2,6 +2,7 @@ module Circuitscape
 
 using PyAMG
 using Logging
+using SimpleWeightedGraphs
 using LightGraphs
 using IterativeSolvers
 using GZip

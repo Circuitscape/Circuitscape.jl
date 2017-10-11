@@ -1,11 +1,12 @@
-import Circuitscape: construct_node_map
+import Circuitscape: construct_node_map, Raster, OneToAll
+import Circuitscape: NoPoly, Polymap
 
 # Construct nodemap tests
 let
         gmap = [0 1 2
                 2 0 0
                 2 0 2]
-        nodemap = construct_node_map(gmap, Matrix{Float64}(0,0))
+        nodemap = construct_node_map(gmap, NoPoly())
         @test nodemap == [0 3 4
                           1 0 0
                           2 0 5]
@@ -24,7 +25,7 @@ let
                           2  0  1]
 end
 
-let 
+let
         gmap = [1 0 1
                 0 1 0
                 1 0 1]
@@ -40,7 +41,7 @@ let
                     2 0 3]
 end
 
-let 
+let
     polymap = [ 1.0  2.0  0.0  0.0  0.0
                 0.0  0.0  0.0  0.0  0.0
                 0.0  0.0  0.0  0.0  0.0
@@ -62,13 +63,14 @@ let
                        3.0   6.0  9.0   0.0  18.0]
 end
 
-let 
+let
 
     cfg = Circuitscape.parse_config("input/raster/one_to_all/11/oneToAllVerify11.ini")
-    r, hbmeta = Circuitscape.load_maps(cfg)
+    flags = Circuitscape.inputflags(Raster{OneToAll}(), cfg)
+    r, hbmeta = Circuitscape.grab_input(Raster{OneToAll}(), flags)
 
     cellmap = r.cellmap
-    polymap = r.polymap
+    polymap = r.polymap.polymap
     points_rc = r.points_rc
     point_map = [ 1.0  2.0  0.0  0.0  0.0
                   0.0  0.0  0.0  0.0  0.0
@@ -76,7 +78,7 @@ let
                   4.0  0.0  0.0  0.0  0.0
                   1.0  0.0  0.0  0.0  2.0 ]
 
-    r = Circuitscape.create_new_polymap(cellmap, polymap, points_rc, point_map = point_map)
+    r = Circuitscape.create_new_polymap(cellmap, Polymap(polymap), points_rc, point_map = point_map)
 
     @test r == [ 1.0  2.0  0.0  0.0  0.0
                  0.0  0.0  0.0  0.0  0.0
@@ -94,40 +96,40 @@ import Circuitscape: resolve_conflicts
 
 # Construct graph
 import Circuitscape: construct_graph
-let 
+let
         gmap = [0 1 2
                 2 0 0
                 2 0 2]
         nodemap = [0 3 4
                    1 0 0
                    2 0 5]
-        A,g = construct_graph(gmap, nodemap, false, true)
-        r = full(A) - [0 2 0 0 0 
+        A = construct_graph(gmap, nodemap, false, true)
+        r = full(A) - [0 2 0 0 0
                        2 0 0 0 0
                        0 0 0 1.5 0
                        0 0 1.5 0 0
                        0 0 0 0 0]
         @test sum(abs2, r) < 1e-6
-        A, g = construct_graph(gmap, nodemap, true, true)
-        r = full(A) - [0 2 0 0 0 
+        A = construct_graph(gmap, nodemap, true, true)
+        r = full(A) - [0 2 0 0 0
                        2 0 0 0 0
                        0 0 0 1.3333 0
                        0 0 1.33333 0 0
                        0 0 0 0 0]
         @test sum(abs2, r) < 1e-6
-        A,g = construct_graph(gmap, nodemap, false, false)
-        r = full(A) - [0 2 1.06066 0 0 
+        A = construct_graph(gmap, nodemap, false, false)
+        r = full(A) - [0 2 1.06066 0 0
                        2 0 0 0 0
                        1.06066 0 0 1.5 0
                        0 0 1.5 0 0
                        0 0 0 0 0]
         @test sum(abs2, r) < 1e-6
-        A,g = construct_graph(gmap, nodemap, true, false)
-        r = full(A) - [0 2 0.942809 0 0 
+        A = construct_graph(gmap, nodemap, true, false)
+        r = full(A) - [0 2 0.942809 0 0
                        2 0 0 0 0
                        0.942809 0 0 1.3333 0
                        0 0 1.3333 0 0
                        0 0 0 0 0]
         @test sum(abs2, r) < 1e-6
 
-end 
+end

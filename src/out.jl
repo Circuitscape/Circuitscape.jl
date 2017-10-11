@@ -36,7 +36,7 @@ function write_currents(node_curr_arr, branch_curr_arr, name, cfg)
 end
 
 _append_name_to_node_currents(node_currents, cc) = [cc node_currents]
-   
+
 
 function _convert_to_3col(branch_currents, cc)
 
@@ -86,7 +86,7 @@ function get_node_currents(G, voltages, finitegrounds)
     node_currents_pos = _get_node_currents_posneg(G, voltages, finitegrounds, true)
     node_currents_neg = _get_node_currents_posneg(G, voltages, finitegrounds, false)
     node_currents = map((x,y) -> x > y ? x : y, node_currents_pos, node_currents_neg)
-    
+
 end
 
 function _get_node_currents_posneg(G, voltages, finitegrounds, pos)
@@ -121,7 +121,7 @@ function _get_branch_currents(G, voltages, pos)
 	branch_currents = sparse(I[mask], J[mask], branch_currents, n, n)
     dropzeros!(branch_currents)
 
-	branch_currents  
+	branch_currents
 end
 
 function _get_branch_currents_posneg{T}(G, v::Vector{T}, pos)
@@ -148,20 +148,20 @@ function _get_branch_currents_posneg{T}(G, v::Vector{T}, pos)
     branch_currents
 end
 
-function write_aagrid(cmap, name, cfg, hbmeta; 
-                        voltage = false, cum = false, max = false, 
+function write_aagrid(cmap, name, cfg, hbmeta;
+                        voltage = false, cum = false, max = false,
                         log_transform = false)
-    
+
     pref = split(cfg["output_file"], '.')[1]
 
     if log_transform
-        map!(x -> x > 0 ? log10(x) : float(hbmeta.nodata), cmap)
+        map!(x -> x > 0 ? log10(x) : float(hbmeta.nodata), cmap, cmap)
     end
 
     str = "curmap"
     if cum
         str = "cum_$(str)"
-    elseif max 
+    elseif max
         str = "max_$(str)"
     elseif voltage
         str = "voltmap"
@@ -196,7 +196,7 @@ function write_voltages{T}(output, name, voltages::Vector{T}, cc)
     volt_arr = zeros(T, size(voltages, 1), 2)
     volt_arr[:,1] = cc
     volt_arr[:,2] = voltages
-    
+
     pref = split(output, '.')[1]
     writedlm("$(pref)_voltages$(name).txt", volt_arr)
 
@@ -209,7 +209,7 @@ function _create_voltage_map{T}(voltages::Vector{T}, nodemap, hbmeta)
     voltmap
 end
 
-alloc_map(hbmeta) = zeros(hbmeta.nrows, hbmeta.ncols) 
+alloc_map(hbmeta) = zeros(hbmeta.nrows, hbmeta.ncols)
 
 function accum_voltages!(base, newvolt, nodemap, hbmeta)
     voltmap = _create_voltage_map(newvolt, nodemap, hbmeta)
@@ -219,11 +219,10 @@ function accum_voltages!(base, newvolt, nodemap, hbmeta)
 end
 
 function accum_currents!(base, newcurr, cfg, G, voltages, finitegrounds, nodemap, hbmeta)
-    node_currents, branch_currents = _create_current_maps(G, voltages, finitegrounds, cfg, 
+    node_currents, branch_currents = _create_current_maps(G, voltages, finitegrounds, cfg,
                                                             nodemap = nodemap, hbmeta = hbmeta)
 
     for i in eachindex(base)
         base[i] += node_currents[i]
     end
 end
-    

@@ -1,27 +1,25 @@
-function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::Vector{T}, cfg; 
-                                                    exclude = Tuple{Int,Int}[], 
-                                                    nodemap = Matrix{Float64}(0, 0), 
-                                                    orig_pts = Vector{Int}(), 
-                                                    polymap = Matrix{Float64}(0, 0),
+function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, c::Vector{T}, cfg;
+                                                    exclude = Tuple{Int,Int}[],
+                                                    nodemap = Matrix{Float64}(0, 0),
+                                                    orig_pts = Vector{Int}(),
+                                                    polymap = NoPoly(),
                                                     hbmeta = RasterMeta())
     numpoints = size(c, 1)
-    cc = connected_components(g)
+    cc = connected_components(SimpleWeightedGraph(a))
     debug("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
-    resistances = -1 * ones(numpoints, numpoints) 
-    voltmatrix = zeros(size(resistances))
+    resistances = -1 * ones(eltype(a), numpoints, numpoints)
+    voltmatrix = zeros(eltype(a), size(resistances))
 
-    cond = laplacian(a)
-
-    volt = Vector{Float64}(size(g, 1))
-    total = Int(numpoints * (numpoints-1) / 2)
-    cond_pruned = sprand(1,1,0.1)
+    cond_pruned = sprand(1, 1, 0.1)
     d = 0
     M = 1
     pt1 = 1
     rcc = 0
+    cond = laplacian(a)
+
     subsets = getindex.([cond], cc, cc)
-    z = zeros.(cc)
-    volt = zeros.(size.(cc))
+    z = zeros.(eltype(a), size.(cc))
+    volt = zeros.(eltype(a), size.(cc))
 
     is_raster = cfg["data_type"] == "raster"
     write_volt_maps = cfg["write_volt_maps"] == "True"
@@ -36,8 +34,8 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
             covered[i] = false
         end
     end
-    
-    p = 0 
+
+    p = 0
     for i = 1:numpoints
         if c[i] != 0
             rcc = rightcc(cc, c[i])
@@ -75,8 +73,8 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, g::Graph, c::
                 curr[:] = 0
             end
             postprocess(v, c, i, j, resistances, pt1, pt2, cond_pruned, cc[rcc], cfg, voltmatrix,
-                                            get_shortcut_resistances; 
-                                            nodemap = nodemap, 
+                                            get_shortcut_resistances;
+                                            nodemap = nodemap,
                                             orig_pts = orig_pts,
                                             polymap = polymap,
                                             hbmeta = hbmeta)
@@ -124,10 +122,10 @@ function laplacian(G::SparseMatrixCSC)
 end
 
 function postprocess(volt, cond, i, j, resistances, pt1, pt2, cond_pruned, cc, cfg, voltmatrix,
-                                            get_shortcut_resistances; 
-                                            nodemap = Matrix{Float64}(), 
-                                            orig_pts = Vector{Int}(), 
-                                            polymap = Vector{Float64}(),
+                                            get_shortcut_resistances;
+                                            nodemap = Matrix{Float64}(),
+                                            orig_pts = Vector{Int}(),
+                                            polymap = NoPoly(),
                                             hbmeta = hbmeta)
 
     r = resistances[i, j] = resistances[j, i] = volt[pt2] - volt[pt1]
@@ -146,77 +144,37 @@ function postprocess(volt, cond, i, j, resistances, pt1, pt2, cond_pruned, cc, c
     end
 
     if cfg["write_volt_maps"] == "True"
-        local_nodemap = zeros(Int, size(nodemap))
-        idx = findin(nodemap, cc)
-        local_nodemap[idx] = nodemap[idx]
-        if isempty(polymap)
-            idx = find(local_nodemap)
-            local_nodemap[idx] = 1:length(idx)
-        else
-            local_polymap = zeros(size(local_nodemap))
-            local_polymap[idx] = polymap[idx]
-            local_nodemap = construct_node_map(local_nodemap, local_polymap)
-        end
+        local_nodemap = construct_local_node_map(nodemap, cc, polymap)
         write_volt_maps(name, volt, cc, cfg, hbmeta = hbmeta, nodemap = local_nodemap)
     end
 
     if cfg["write_cur_maps"] == "True"
-        local_nodemap = zeros(Int, size(nodemap))
-        idx = findin(nodemap, cc)
-        local_nodemap[idx] = nodemap[idx]
-        if isempty(polymap)
-            idx = find(local_nodemap)
-            local_nodemap[idx] = 1:length(idx)
-        else
-            local_polymap = zeros(size(local_nodemap))
-            local_polymap[idx] = polymap[idx]
-            local_nodemap = construct_node_map(local_nodemap, local_polymap)
-        end
-        write_cur_maps(cond_pruned, volt, [-9999.], cc, name, cfg; 
-                                    nodemap = local_nodemap, 
+        local_nodemap = construct_local_node_map(nodemap, cc, polymap)
+        write_cur_maps(cond_pruned, volt, [-9999.], cc, name, cfg;
+                                    nodemap = local_nodemap,
                                     hbmeta = hbmeta)
     end
-    nothing 
+    nothing
 end
 
-function compute_network(cfg)
-
-    network_file = cfg["habitat_file"]
-    point_file = cfg["point_file"]
-    A = read_graph(cfg, network_file)
-    g = Graph(A)
-    scenario = cfg["scenario"]
-
-    if scenario == "pairwise"
-
-        fp = read_focal_points(point_file)
-        resistances = single_ground_all_pair_resistances(A, g, fp, cfg)
-        resistances_3col = compute_3col(resistances, fp)
-        return resistances
-
-    elseif scenario == "advanced"
-
-        source_file = cfg["source_file"]
-        ground_file = cfg["ground_file"]
-        source_map = read_point_strengths(source_file)
-        ground_map = read_point_strengths(ground_file)
-        cc = connected_components(g)
-        debug("There are $(size(A, 1)) points and $(length(cc)) connected components")
-        voltages = advanced(cfg, A, g, source_map, ground_map, cc)
-
-        return voltages
-
-    end
+function compute{S<:Scenario}(obj::Network{S}, cfg)
+    flags = inputflags(obj, cfg)
+    data = grab_input(obj, flags)
+    compute(obj, data, cfg)
 end
+compute(::Network{Pairwise}, data, cfg) =
+    single_ground_all_pair_resistances(data.A, data.fp, cfg)
+compute(::Network{Advanced}, data, cfg) = advanced(cfg, data.A, data.source_map, data.ground_map)
 
-function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map, cc; 
-                                                                    nodemap = Matrix{Float64}(0,0), 
-                                                                    policy = :keepall, 
-                                                                    check_node = -1, 
-                                                                    hbmeta = RasterMeta(), 
-                                                                    src = 0, 
-                                                                    polymap = Matrix{Float64}(0,0))
-
+function advanced(cfg, a::SparseMatrixCSC, source_map, ground_map;
+                                                                    nodemap = Matrix{Float64}(0,0),
+                                                                    policy = :keepall,
+                                                                    check_node = -1,
+                                                                    hbmeta = RasterMeta(),
+                                                                    src = 0,
+                                                                    polymap = NoPoly())
+    cc = connected_components(SimpleWeightedGraph(a))
+    debug("There are $(size(a, 1)) points and $(length(cc)) connected components")
     mode = cfg["data_type"]
     is_network = mode == "network"
     sources = zeros(size(a, 1))
@@ -250,7 +208,7 @@ function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map, cc;
     f_local = Float64[]
     solver_called = false
     voltages = Float64[]
-    outvolt = alloc_map(hbmeta) 
+    outvolt = alloc_map(hbmeta)
     outcurr = alloc_map(hbmeta)
     for c in cc
         if check_node != -1 && !(check_node in c)
@@ -267,34 +225,14 @@ function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map, cc;
         else
             f_local = finitegrounds
         end
-        voltages = multiple_solver(cfg, a_local, g, s_local, g_local, f_local)
+        voltages = multiple_solver(cfg, a_local, s_local, g_local, f_local)
         solver_called = true
         if cfg["write_volt_maps"] == "True" && !is_network
-            local_nodemap = zeros(Int, size(nodemap))
-            idx = findin(nodemap, c)
-            local_nodemap[idx] = nodemap[idx]
-            if isempty(polymap)
-                idx = find(local_nodemap)
-                local_nodemap[idx] = 1:length(idx)
-            else
-                local_polymap = zeros(size(local_nodemap))
-                local_polymap[idx] = polymap[idx]
-                local_nodemap = construct_node_map(local_nodemap, local_polymap)
-            end
+            local_nodemap = construct_local_node_map(nodemap, c, polymap)
             accum_voltages!(outvolt, voltages, local_nodemap, hbmeta)
         end
         if cfg["write_cur_maps"] == "True" && !is_network
-            local_nodemap = zeros(Int, size(nodemap))
-            idx = findin(nodemap, c)
-            local_nodemap[idx] = nodemap[idx]
-            if isempty(polymap)
-                idx = find(local_nodemap)
-                local_nodemap[idx] = 1:length(idx)
-            else
-                local_polymap = zeros(size(local_nodemap))
-                local_polymap[idx] = polymap[idx]
-                local_nodemap = construct_node_map(local_nodemap, local_polymap)
-            end
+            local_nodemap = construct_local_node_map(nodemap, c, polymap)
             accum_currents!(outcurr, voltages, cfg, a_local, voltages, f_local, local_nodemap, hbmeta)
         end
         for i in eachindex(volt)
@@ -302,7 +240,7 @@ function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map, cc;
                 val = Int(nodemap[i])
                 if val in c
                     idx = findfirst(x -> x == val, c)
-                    volt[i] = voltages[idx] 
+                    volt[i] = voltages[idx]
                 end
             end
         end
@@ -332,7 +270,7 @@ function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map, cc;
     if !solver_called
         return [-1.]
     end
-    if scenario == "one-to-all" 
+    if scenario == "one-to-all"
         idx = find(source_map)
         val = volt[idx] ./ source_map[idx]
         if val[1] ≈ 0
@@ -345,6 +283,23 @@ function advanced(cfg, a::SparseMatrixCSC, g::Graph, source_map, ground_map, cc;
     end
 
     return volt
+end
+function construct_local_node_map(nodemap, c, polymap)
+    local_nodemap = zeros(Int, size(nodemap))
+    idx = findin(nodemap, c)
+    local_nodemap[idx] = nodemap[idx]
+    get_local_nodemap(local_nodemap, polymap, idx)
+end
+function get_local_nodemap(local_nodemap, ::NoPoly, i)
+    idx = find(local_nodemap)
+    local_nodemap[idx] = 1:length(idx)
+    local_nodemap
+end
+function get_local_nodemap(local_nodemap, p::Polymap, idx)
+    polymap = p.polymap
+    local_polymap = zeros(size(local_nodemap))
+    local_polymap[idx] = polymap[idx]
+    construct_node_map(local_nodemap, local_polymap)
 end
 
 function del_row_col(a, n::Int)
@@ -372,9 +327,9 @@ function resolve_conflicts(sources, grounds, policy)
         if policy == :rmvsrc
             sources[find(conflicts)] = 0
         elseif policy == :rmvgnd
-            grounds[find(conflicts)] = 0    
+            grounds[find(conflicts)] = 0
         elseif policy == :rmvall
-            sources[find(conflicts)] = 0    
+            sources[find(conflicts)] = 0
         end
     end
 
@@ -387,7 +342,7 @@ function resolve_conflicts(sources, grounds, policy)
 end
 
 
-function multiple_solver(cfg, a, g, sources, grounds, finitegrounds)
+function multiple_solver(cfg, a, sources, grounds, finitegrounds)
 
     asolve = deepcopy(a)
     if finitegrounds[1] != -9999
