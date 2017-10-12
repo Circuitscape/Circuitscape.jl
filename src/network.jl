@@ -162,10 +162,15 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, c::Vector{T},
                 comp_j = findfirst(comp, pj)
                 J = find(x -> x == pj, c)
 
-                # Forget exclude pairs
-                # if (c_i, c_j) in exclude
-                #     continue
-                # end
+                # Forget excluded pairs
+                ex = false
+                for c_i in I, c_j in J
+                    if (c_i, c_j) in exclude
+                        ex = true
+                        break
+                    end
+                end
+                ex && continue
 
                 if pi == pj
                     continue
