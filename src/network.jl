@@ -196,7 +196,7 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, c::Vector{T},
                     push!(ret, (c_i, c_j, r))
                     postprocess(v, c, c_i, c_j, r, comp_i, comp_j, matrix, comp, cfg, voltmatrix,
                                                 get_shortcut_resistances;
-                                                nodemap = nodemap,
+                                                local_nodemap = local_nodemap,
                                                 orig_pts = orig_pts,
                                                 polymap = polymap,
                                                 hbmeta = hbmeta)
@@ -262,15 +262,15 @@ end
 
 function postprocess(volt, cond, i, j, r, pt1, pt2, cond_pruned, cc, cfg, voltmatrix,
                                             get_shortcut_resistances;
-                                            nodemap = Matrix{Float64}(),
+                                            local_nodemap = Matrix{Float64}(),
                                             orig_pts = Vector{Int}(),
                                             polymap = NoPoly(),
                                             hbmeta = hbmeta)
 
     if get_shortcut_resistances
-        local_nodemap = zeros(Int, size(nodemap))
-        idx = findin(nodemap, cc)
-        local_nodemap[idx] = nodemap[idx]
+        # local_nodemap = zeros(Int, size(nodemap))
+        # idx = findin(nodemap, cc)
+        # local_nodemap[idx] = nodemap[idx]
         update_voltmatrix!(voltmatrix, local_nodemap, volt, hbmeta, cond, r, j, cc)
         return nothing
     end
@@ -282,12 +282,12 @@ function postprocess(volt, cond, i, j, r, pt1, pt2, cond_pruned, cc, cfg, voltma
     end
 
     if cfg["write_volt_maps"] == "True"
-        local_nodemap = construct_local_node_map(nodemap, cc, polymap)
+        # local_nodemap = construct_local_node_map(nodemap, cc, polymap)
         write_volt_maps(name, volt, cc, cfg, hbmeta = hbmeta, nodemap = local_nodemap)
     end
 
     if cfg["write_cur_maps"] == "True"
-        local_nodemap = construct_local_node_map(nodemap, cc, polymap)
+        # local_nodemap = construct_local_node_map(nodemap, cc, polymap)
         write_cur_maps(cond_pruned, volt, [-9999.], cc, name, cfg;
                                     nodemap = local_nodemap,
                                     hbmeta = hbmeta)
