@@ -152,6 +152,10 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, c::Vector{T},
             I = find(x -> x == pi, c)
             smash_repeats!(ret, I)
 
+            # Preprocess matrix
+            d = matrix[comp_i, comp_i]
+            matrix[comp_i, comp_i] = 0
+
             # Iteration space through all possible pairs
             rng = i+1:size(csub, 1)
 
@@ -190,18 +194,20 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, c::Vector{T},
                 # Return resistance value
                 for c_i in I, c_j in J
                     push!(ret, (c_i, c_j, r))
+                    postprocess(v, c, c_i, c_j, r, comp_i, comp_j, matrix, comp, cfg, voltmatrix,
+                                                get_shortcut_resistances;
+                                                nodemap = nodemap,
+                                                orig_pts = orig_pts,
+                                                polymap = polymap,
+                                                hbmeta = hbmeta)
                 end
-
             end
+
+        matrix[comp_i, comp_i] = d
+
         ret
         end
 
-       #=for i = 1:size(csub, 1)
-           X = vcat(pmap(x -> f(x, cfg, csub, idx, comp, matrix, M, i, dat, c, voltmatrix, get_shortcut_resistances), i+1:size(csub,1))...)
-           for (i,j,v) in X
-               resistances[i,j] = resistances[j,i] = v
-           end
-       end=#
        X = map(x ->f(x), 1:size(csub,1))
 
        # Set all resistances
@@ -228,28 +234,6 @@ function smash_repeats!(ret, I)
         end
     end
 end
-
-#=function f(j, cfg, csub, idx, comp, matrix, M, i, g, c, voltmatrix, get_shortcut_resistances)
-
-    X = Tuple{Int,Int,Float64}[]
-    pt1 = ingraph(comp, csub[i])
-    pt2 = ingraph(comp, csub[j])
-    curr = zeros(size(matrix, 1))
-    curr[pt1] = -1
-    curr[pt2] = 1
-    info("Solving pt1 = $pt1, pt2 = $pt2")
-    #volt = solve_linear_system(cfg, matrix, curr, M)
-    volt = matrix \ curr
-    nodemap, polymap, hbmeta, orig_pts = g()
-    r = volt[pt2] - volt[pt1]
-    postprocess(volt, c, i, j, r, pt1, pt2, matrix, comp, cfg, voltmatrix, get_shortcut_resistances;
-                                            nodemap = nodemap,
-                                            orig_pts = orig_pts,
-                                            polymap = polymap,
-                                            hbmeta = hbmeta)
-    v = volt[pt2] - volt[pt1]
-    push!(X, (idx[i], idx[j], v))
-end=#
 
 function solve_linear_system!(cfg, v, G, curr, M)
     if cfg["solver"] == "cg+amg"
@@ -283,7 +267,6 @@ function postprocess(volt, cond, i, j, r, pt1, pt2, cond_pruned, cc, cfg, voltma
                                             polymap = NoPoly(),
                                             hbmeta = hbmeta)
 
-    #r = resistances[i, j] = resistances[j, i] = volt[pt2] - volt[pt1]
     if get_shortcut_resistances
         local_nodemap = zeros(Int, size(nodemap))
         idx = findin(nodemap, cc)
