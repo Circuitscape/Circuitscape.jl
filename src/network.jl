@@ -4,7 +4,7 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, c::Vector{T},
                                                     orig_pts = Vector{Int}(),
                                                     polymap = NoPoly(),
                                                     hbmeta = RasterMeta())
-    numpoints = size(c, 1)
+    #=numpoints = size(c, 1)
     cc = connected_components(SimpleWeightedGraph(a))
     debug("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
     resistances = -1 * ones(eltype(a), numpoints, numpoints)
@@ -93,8 +93,144 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, c::Vector{T},
     for i = 1:size(resistances,1)
         resistances[i,i] = 0
     end
+    resistances=#
+
+    # Get number of focal points
+    numpoints = size(c, 1)
+
+    #Get number of connected components
+    cc = connected_components(SimpleWeightedGraph(a))
+
+    info("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
+
+    # Initialize pairwise resistance
+    resistances = -1 * ones(eltype(a), numpoints, numpoints)
+    voltmatrix = zeros(eltype(a), size(resistances))
+
+    # Take laplacian of matrix
+    lap = laplacian(a)
+
+    # Get a vector of connected components
+    comps = getindex.([lap], cc, cc)
+
+    is_raster = cfg["data_type"] == "raster"
+    write_volt_maps = cfg["write_volt_maps"] == "True"
+    write_cur_maps = cfg["write_cur_maps"] == "True"
+
+    get_shortcut_resistances = false
+    if is_raster && !write_volt_maps && !write_cur_maps
+        get_shortcut_resistances = true
+        shortcut = -1 * ones(size(resistances))
+        covered = Dict{Int, Bool}()
+        for i = 1:size(cc, 1)
+            covered[i] = false
+        end
+    end
+
+    for (cid, comp) in enumerate(cc)
+
+        # Subset of points relevant to CC
+        csub = filter(x -> x in comp, c)
+        #idx = findin(c, csub)
+
+        # Conductance matrix corresponding to CC
+        matrix = comps[cid]
+
+        # Construct preconditioner *once* for every CC
+        P = aspreconditioner(SmoothedAggregationSolver(matrix))
+
+        # Get local nodemap for CC - useful for output writing
+        local_nodemap = construct_local_node_map(nodemap, comp, polymap)
+
+        function f(i)
+
+            pi = csub[i]
+            comp_i = findfirst(comp, pi)
+            c_i = findfirst(c, pi)
+
+
+            # Iteration space through all possible pairs
+            rng = i+1:size(csub, 1)
+
+            ret = Vector{Tuple{Int,Int,Float64}}(length(rng))
+
+            # Loop through all possible pairs
+            for (k,j) in enumerate(rng)
+
+                pj = csub[j]
+                comp_j = findfirst(comp, pj)
+                c_j = findfirst(c, pj)
+
+                # Forget exclude pairs
+                if (c_i, c_j) in exclude
+                    continue
+                end
+
+                # Initialize currents
+                current = zeros(size(matrix, 1))
+                current[comp_i] = -1
+                current[comp_j] = 1
+
+                # Solve system
+                v = solve_linear_system(cfg, matrix, current, P)
+
+                # Calculate resistance
+                r = v[comp_j] - v[comp_i]
+
+                # Return resistance value
+                ret[k] = (c_i, c_j, r)
+
+            end
+        ret
+        end
+
+       #=for i = 1:size(csub, 1)
+           X = vcat(pmap(x -> f(x, cfg, csub, idx, comp, matrix, M, i, dat, c, voltmatrix, get_shortcut_resistances), i+1:size(csub,1))...)
+           for (i,j,v) in X
+               resistances[i,j] = resistances[j,i] = v
+           end
+       end=#
+       X = map(x ->f(x), 1:size(csub,1))
+
+       # Set all resistances
+       for x in X
+           for i = 1:size(x, 1)
+               resistances[x[i][1], x[i][2]] = x[i][3]
+               resistances[x[i][2], x[i][1]] = x[i][3]
+           end
+       end
+
+    end
+
+    for i = 1:size(resistances,1)
+       resistances[i,i] = 0
+    end
+
     resistances
 end
+
+
+#=function f(j, cfg, csub, idx, comp, matrix, M, i, g, c, voltmatrix, get_shortcut_resistances)
+
+    X = Tuple{Int,Int,Float64}[]
+    pt1 = ingraph(comp, csub[i])
+    pt2 = ingraph(comp, csub[j])
+    curr = zeros(size(matrix, 1))
+    curr[pt1] = -1
+    curr[pt2] = 1
+    info("Solving pt1 = $pt1, pt2 = $pt2")
+    #volt = solve_linear_system(cfg, matrix, curr, M)
+    volt = matrix \ curr
+    nodemap, polymap, hbmeta, orig_pts = g()
+    r = volt[pt2] - volt[pt1]
+    postprocess(volt, c, i, j, r, pt1, pt2, matrix, comp, cfg, voltmatrix, get_shortcut_resistances;
+                                            nodemap = nodemap,
+                                            orig_pts = orig_pts,
+                                            polymap = polymap,
+                                            hbmeta = hbmeta)
+    v = volt[pt2] - volt[pt1]
+    push!(X, (idx[i], idx[j], v))
+end=#
 
 function solve_linear_system!(cfg, v, G, curr, M)
     if cfg["solver"] == "cg+amg"
@@ -121,14 +257,14 @@ function laplacian(G::SparseMatrixCSC)
     G = -G + spdiagm(vec(sum(G, 1)))
 end
 
-function postprocess(volt, cond, i, j, resistances, pt1, pt2, cond_pruned, cc, cfg, voltmatrix,
+function postprocess(volt, cond, i, j, r, pt1, pt2, cond_pruned, cc, cfg, voltmatrix,
                                             get_shortcut_resistances;
                                             nodemap = Matrix{Float64}(),
                                             orig_pts = Vector{Int}(),
                                             polymap = NoPoly(),
                                             hbmeta = hbmeta)
 
-    r = resistances[i, j] = resistances[j, i] = volt[pt2] - volt[pt1]
+    #r = resistances[i, j] = resistances[j, i] = volt[pt2] - volt[pt1]
     if get_shortcut_resistances
         local_nodemap = zeros(Int, size(nodemap))
         idx = findin(nodemap, cc)
