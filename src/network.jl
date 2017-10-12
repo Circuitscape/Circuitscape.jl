@@ -4,7 +4,7 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, c::Vector{T},
                                                     orig_pts = Vector{Int}(),
                                                     polymap = NoPoly(),
                                                     hbmeta = RasterMeta())
-    numpoints = size(c, 1)
+    #=numpoints = size(c, 1)
     cc = connected_components(SimpleWeightedGraph(a))
     debug("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
     resistances = -1 * ones(eltype(a), numpoints, numpoints)
@@ -93,7 +93,146 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, c::Vector{T},
     for i = 1:size(resistances,1)
         resistances[i,i] = 0
     end
+    resistances=#
+
+    # Get number of focal points
+    numpoints = size(c, 1)
+
+    #Get number of connected components
+    cc = connected_components(SimpleWeightedGraph(a))
+
+    info("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
+
+    # Initialize pairwise resistance
+    resistances = -1 * ones(eltype(a), numpoints, numpoints)
+    voltmatrix = zeros(eltype(a), size(resistances))
+
+    # Take laplacian of matrix
+    lap = laplacian(a)
+
+    # Get a vector of connected components
+    comps = getindex.([lap], cc, cc)
+
+    is_raster = cfg["data_type"] == "raster"
+    write_volt_maps = cfg["write_volt_maps"] == "True"
+    write_cur_maps = cfg["write_cur_maps"] == "True"
+
+    get_shortcut_resistances = false
+    if is_raster && !write_volt_maps && !write_cur_maps
+        get_shortcut_resistances = true
+        shortcut = -1 * ones(size(resistances))
+        covered = Dict{Int, Bool}()
+        for i = 1:size(cc, 1)
+            covered[i] = false
+        end
+    end
+
+    for (cid, comp) in enumerate(cc)
+
+        # Subset of points relevant to CC
+        csub = filter(x -> x in comp, c) |> unique
+        #idx = findin(c, csub)
+
+        # Conductance matrix corresponding to CC
+        matrix = comps[cid]
+
+        # Construct preconditioner *once* for every CC
+        P = aspreconditioner(SmoothedAggregationSolver(matrix))
+
+        # Get local nodemap for CC - useful for output writing
+        local_nodemap = construct_local_node_map(nodemap, comp, polymap)
+
+        function f(i)
+
+            # Generate return type
+            ret = Vector{Tuple{Int,Int,Float64}}()
+
+            pi = csub[i]
+            comp_i = findfirst(comp, pi)
+            I = find(x -> x == pi, c)
+            smash_repeats!(ret, I)
+
+            # Preprocess matrix
+            d = matrix[comp_i, comp_i]
+            matrix[comp_i, comp_i] = 0
+
+            # Iteration space through all possible pairs
+            rng = i+1:size(csub, 1)
+
+            # Loop through all possible pairs
+            for j in rng
+
+                pj = csub[j]
+                comp_j = findfirst(comp, pj)
+                J = find(x -> x == pj, c)
+
+                # Forget excluded pairs
+                ex = false
+                for c_i in I, c_j in J
+                    if (c_i, c_j) in exclude
+                        ex = true
+                        break
+                    end
+                end
+                ex && continue
+
+                if pi == pj
+                    continue
+                end
+
+                # Initialize currents
+                current = zeros(size(matrix, 1))
+                current[comp_i] = -1
+                current[comp_j] = 1
+
+                # Solve system
+                v = solve_linear_system(cfg, matrix, current, P)
+
+                # Calculate resistance
+                r = v[comp_j] - v[comp_i]
+
+                # Return resistance value
+                for c_i in I, c_j in J
+                    push!(ret, (c_i, c_j, r))
+                    postprocess(v, c, c_i, c_j, r, comp_i, comp_j, matrix, comp, cfg, voltmatrix,
+                                                get_shortcut_resistances;
+                                                local_nodemap = local_nodemap,
+                                                orig_pts = orig_pts,
+                                                polymap = polymap,
+                                                hbmeta = hbmeta)
+                end
+            end
+
+        matrix[comp_i, comp_i] = d
+
+        ret
+        end
+
+       X = map(x ->f(x), 1:size(csub,1))
+
+       # Set all resistances
+       for x in X
+           for i = 1:size(x, 1)
+               resistances[x[i][1], x[i][2]] = x[i][3]
+               resistances[x[i][2], x[i][1]] = x[i][3]
+           end
+       end
+
+    end
+
+    for i = 1:size(resistances,1)
+       resistances[i,i] = 0
+    end
+
     resistances
+end
+
+function smash_repeats!(ret, I)
+    for i = 1:size(I,1)
+        for j = i+1:size(I,1)
+            push!(ret, (I[i], I[j], 0))
+        end
+    end
 end
 
 function solve_linear_system!(cfg, v, G, curr, M)
@@ -121,18 +260,17 @@ function laplacian(G::SparseMatrixCSC)
     G = -G + spdiagm(vec(sum(G, 1)))
 end
 
-function postprocess(volt, cond, i, j, resistances, pt1, pt2, cond_pruned, cc, cfg, voltmatrix,
+function postprocess(volt, cond, i, j, r, pt1, pt2, cond_pruned, cc, cfg, voltmatrix,
                                             get_shortcut_resistances;
-                                            nodemap = Matrix{Float64}(),
+                                            local_nodemap = Matrix{Float64}(),
                                             orig_pts = Vector{Int}(),
                                             polymap = NoPoly(),
                                             hbmeta = hbmeta)
 
-    r = resistances[i, j] = resistances[j, i] = volt[pt2] - volt[pt1]
     if get_shortcut_resistances
-        local_nodemap = zeros(Int, size(nodemap))
-        idx = findin(nodemap, cc)
-        local_nodemap[idx] = nodemap[idx]
+        # local_nodemap = zeros(Int, size(nodemap))
+        # idx = findin(nodemap, cc)
+        # local_nodemap[idx] = nodemap[idx]
         update_voltmatrix!(voltmatrix, local_nodemap, volt, hbmeta, cond, r, j, cc)
         return nothing
     end
@@ -144,12 +282,12 @@ function postprocess(volt, cond, i, j, resistances, pt1, pt2, cond_pruned, cc, c
     end
 
     if cfg["write_volt_maps"] == "True"
-        local_nodemap = construct_local_node_map(nodemap, cc, polymap)
+        # local_nodemap = construct_local_node_map(nodemap, cc, polymap)
         write_volt_maps(name, volt, cc, cfg, hbmeta = hbmeta, nodemap = local_nodemap)
     end
 
     if cfg["write_cur_maps"] == "True"
-        local_nodemap = construct_local_node_map(nodemap, cc, polymap)
+        # local_nodemap = construct_local_node_map(nodemap, cc, polymap)
         write_cur_maps(cond_pruned, volt, [-9999.], cc, name, cfg;
                                     nodemap = local_nodemap,
                                     hbmeta = hbmeta)
