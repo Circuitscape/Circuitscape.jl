@@ -272,8 +272,8 @@ weirder_avg(x, y) = 1 / (√2 * (1/x + 1/y) / 2)
 
 function construct_node_map(gmap, ::NoPoly)
     nodemap = zeros(Int, size(gmap))
-    ind::Vector{Int64} = find(x -> x > 0, gmap)
-    nodemap[ind] = 1:length(ind)
+    ind = gmap .> 0
+    nodemap[ind] = 1:sum(ind)
     nodemap
 end
 
