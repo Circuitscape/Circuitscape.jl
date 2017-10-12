@@ -130,7 +130,7 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, c::Vector{T},
     for (cid, comp) in enumerate(cc)
 
         # Subset of points relevant to CC
-        csub = filter(x -> x in comp, c)
+        csub = filter(x -> x in comp, c) |> unique
         #idx = findin(c, csub)
 
         # Conductance matrix corresponding to CC
@@ -144,25 +144,30 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, c::Vector{T},
 
         function f(i)
 
+            # Generate return type
+            ret = Vector{Tuple{Int,Int,Float64}}()
+
             pi = csub[i]
             comp_i = findfirst(comp, pi)
-            c_i = findfirst(c, pi)
-
+            I = find(x -> x == pi, c)
+            smash_repeats!(ret, I)
 
             # Iteration space through all possible pairs
             rng = i+1:size(csub, 1)
 
-            ret = Vector{Tuple{Int,Int,Float64}}(length(rng))
-
             # Loop through all possible pairs
-            for (k,j) in enumerate(rng)
+            for j in rng
 
                 pj = csub[j]
                 comp_j = findfirst(comp, pj)
-                c_j = findfirst(c, pj)
+                J = find(x -> x == pj, c)
 
                 # Forget exclude pairs
-                if (c_i, c_j) in exclude
+                # if (c_i, c_j) in exclude
+                #     continue
+                # end
+
+                if pi == pj
                     continue
                 end
 
@@ -178,7 +183,9 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, c::Vector{T},
                 r = v[comp_j] - v[comp_i]
 
                 # Return resistance value
-                ret[k] = (c_i, c_j, r)
+                for c_i in I, c_j in J
+                    push!(ret, (c_i, c_j, r))
+                end
 
             end
         ret
@@ -209,6 +216,13 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, c::Vector{T},
     resistances
 end
 
+function smash_repeats!(ret, I)
+    for i = 1:size(I,1)
+        for j = i+1:size(I,1)
+            push!(ret, (I[i], I[j], 0))
+        end
+    end
+end
 
 #=function f(j, cfg, csub, idx, comp, matrix, M, i, g, c, voltmatrix, get_shortcut_resistances)
 
