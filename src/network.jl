@@ -255,10 +255,31 @@ end
     findfirst(cc, c)
 end
 
-function laplacian(G::SparseMatrixCSC)
-    G = G - spdiagm(diag(G))
-    G = -G + spdiagm(vec(sum(G, 1)))
+function laplacian(G)
+    n = size(G, 1)
+    s = Vector{eltype(G)}(n)
+    for i = 1:n
+        s[i] = sum_off_diag(G, i)
+        for j in nzrange(G, i)
+            if i == G.rowval[j]
+                G.nzval[j] = 0
+            else
+                G.nzval[j] = -G.nzval[j]
+            end
+        end
+    end
+    G + spdiagm(s)
 end
+
+function sum_off_diag(G, i)
+     sum = zero(eltype(G))
+     for j in nzrange(G, i)
+         if G.rowval[j] != i
+             sum += G.nzval[j]
+         end
+     end
+     sum
+ end
 
 function postprocess(volt, cond, i, j, r, pt1, pt2, cond_pruned, cc, cfg, voltmatrix,
                                             get_shortcut_resistances;
