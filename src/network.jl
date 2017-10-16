@@ -108,7 +108,8 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, c::Vector{T},
     voltmatrix = zeros(eltype(a), size(resistances))
 
     # Take laplacian of matrix
-    lap = laplacian(a)
+    t = @elapsed lap = laplacian(a)
+    info("Time to construct laplacian = $t seconds")
 
     # Get a vector of connected components
     comps = getindex.([lap], cc, cc)
@@ -137,7 +138,8 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, c::Vector{T},
         matrix = comps[cid]
 
         # Construct preconditioner *once* for every CC
-        P = aspreconditioner(SmoothedAggregationSolver(matrix))
+        t1 = @elapsed P = aspreconditioner(SmoothedAggregationSolver(matrix))
+        info("Time taken to construct preconditioner = $t1 seconds")
 
         # Get local nodemap for CC - useful for output writing
         local_nodemap = construct_local_node_map(nodemap, comp, polymap)
@@ -186,7 +188,9 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, c::Vector{T},
                 current[comp_j] = 1
 
                 # Solve system
-                v = solve_linear_system(cfg, matrix, current, P)
+                info("Solving points $pi and $pj")
+                t2 = @elapsed v = solve_linear_system(cfg, matrix, current, P)
+                info("Time taken to solve linear system = $t2 seconds")
 
                 # Calculate resistance
                 r = v[comp_j] - v[comp_i]
@@ -304,14 +308,16 @@ function postprocess(volt, cond, i, j, r, pt1, pt2, cond_pruned, cc, cfg, voltma
 
     if cfg["write_volt_maps"] == "True"
         # local_nodemap = construct_local_node_map(nodemap, cc, polymap)
-        write_volt_maps(name, volt, cc, cfg, hbmeta = hbmeta, nodemap = local_nodemap)
+        t = @elapsed write_volt_maps(name, volt, cc, cfg, hbmeta = hbmeta, nodemap = local_nodemap)
+        info("Time taken to write voltage maps = $t seconds")
     end
 
     if cfg["write_cur_maps"] == "True"
         # local_nodemap = construct_local_node_map(nodemap, cc, polymap)
-        write_cur_maps(cond_pruned, volt, [-9999.], cc, name, cfg;
+        t = @elapsed write_cur_maps(cond_pruned, volt, [-9999.], cc, name, cfg;
                                     nodemap = local_nodemap,
                                     hbmeta = hbmeta)
+        info("Time taken to write current maps = $t seconds")
     end
     nothing
 end

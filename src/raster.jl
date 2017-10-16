@@ -11,7 +11,8 @@ end=#
 function compute{S}(obj::Raster{S}, cfg)
 
     flags = inputflags(obj, cfg)
-    data, hbmeta = grab_input(obj, flags)
+    t = @elapsed data, hbmeta = grab_input(obj, flags)
+    info("Time taken to read input = $t seconds")
     compflags = computeflags(obj, cfg, data.points_rc)
     compute(obj, data, compflags, hbmeta, cfg)
 end
