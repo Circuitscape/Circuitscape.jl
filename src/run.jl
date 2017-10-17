@@ -12,7 +12,9 @@ Inputs:
 function compute(path::String)
     cfg = parse_config(path)
     T = parse_mode(cfg["data_type"], cfg["scenario"])
-    compute(T, cfg)
+    t = @elapsed r = compute(T, cfg)
+    info("Job took $t seconds")
+    r
 end
 function parse_mode(dt, scen)
     d = dt == "network" ? :Network : :Raster
