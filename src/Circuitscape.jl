@@ -1,6 +1,6 @@
 module Circuitscape
 
-using PyAMG
+using AMG
 using Logging
 using SimpleWeightedGraphs
 using LightGraphs

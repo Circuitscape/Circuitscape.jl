@@ -48,7 +48,7 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, c::Vector{T},
             pt1 = ingraph(cc[rcc], c[i])
             d = cond_pruned[pt1, pt1]
             cond_pruned[pt1, pt1] = 0
-            M = aspreconditioner(SmoothedAggregationSolver(cond_pruned))
+            M = aspreconditioner(ruge_stuben(cond_pruned))
         end
         for j = i+1:numpoints
             if (i,j) in exclude
@@ -134,15 +134,20 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, c::Vector{T},
         csub = filter(x -> x in comp, c) |> unique
         #idx = findin(c, csub)
 
+        if isempty(csub)
+            continue
+        end
+
         # Conductance matrix corresponding to CC
         matrix = comps[cid]
 
         # Construct preconditioner *once* for every CC
-        t1 = @elapsed P = aspreconditioner(SmoothedAggregationSolver(matrix))
+        t1 = @elapsed P = aspreconditioner(ruge_stuben(matrix))
         info("Time taken to construct preconditioner = $t1 seconds")
 
         # Get local nodemap for CC - useful for output writing
-        local_nodemap = construct_local_node_map(nodemap, comp, polymap)
+        t2 = @elapsed local_nodemap = construct_local_node_map(nodemap, comp, polymap)
+        info("Time taken to construct local nodemap = $t2 seconds")
 
         function f(i)
 
@@ -522,7 +527,7 @@ function multiple_solver(cfg, a, sources, grounds, finitegrounds)
     deleteat!(r, dst_del)
     asolve = asolve[r, r]
 
-    M = aspreconditioner(SmoothedAggregationSolver(asolve))
+    M = aspreconditioner(ruge_stuben(asolve))
     volt = solve_linear_system(cfg, asolve, sources, M)
 
     # Replace the inf with 0
