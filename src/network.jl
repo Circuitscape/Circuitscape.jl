@@ -161,7 +161,7 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, c::Vector{T},
 
             # Preprocess matrix
             d = matrix[comp_i, comp_i]
-            matrix[comp_i, comp_i] = 0
+            #matrix[comp_i, comp_i] = 0
 
             # Iteration space through all possible pairs
             rng = i+1:size(csub, 1)
@@ -196,6 +196,7 @@ function single_ground_all_pair_resistances{T}(a::SparseMatrixCSC, c::Vector{T},
                 info("Solving points $pi and $pj")
                 t2 = @elapsed v = solve_linear_system(cfg, matrix, current, P)
                 info("Time taken to solve linear system = $t2 seconds")
+                v .= v .- v[comp_i]
 
                 # Calculate resistance
                 r = v[comp_j] - v[comp_i]
