@@ -13,6 +13,7 @@ include("io.jl")
 include("out.jl")
 include("network.jl")
 include("raster.jl")
+include("utils.jl")
 
 include("run.jl")
 
