@@ -1,5 +1,7 @@
+export compute
+
 """
-    `compute(path::String)`
+`compute(path::String)`
 
 Call the `compute` function on the configuration file.
 
@@ -11,22 +13,24 @@ Inputs:
 """
 function compute(path::String)
     cfg = parse_config(path)
-    T = parse_mode(cfg["data_type"], cfg["scenario"])
-    t = @elapsed r = compute(T, cfg)
-    info("Job took $t seconds")
-    r
-end
-function parse_mode(dt, scen)
-    d = dt == "network" ? :Network : :Raster
-    s = :none
-    if scen == "pairwise"
-        s = :Pairwise
-    elseif scen == "advanced"
-        s = :Advanced
-    elseif scen == "one-to-all"
-        s = :OneToAll
+    is_raster = cfg["data_type"] == "raster"
+    scenario = cfg["scenario"]
+    T = cfg["precision"] == "single" ? Float32 : Float64    
+    if is_raster
+        if scenario == "pairwise"
+            raster_pairwise(T, cfg)
+        elseif scenario == "advanced"
+            raster_advanced(T, cfg)
+        elseif scenario == "one-to-all"
+            raster_one_to_all(T, cfg)
+        else
+            raster_all_to_one(T, cfg)
+        end
     else
-        s = :AllToOne
+        if scenario == "pairwise"
+            network_pairwise(T, cfg)
+        else
+            network_advanced(T, cfg)
+        end
     end
-    eval(Expr(:call, Expr(:curly, d, s)))
 end
