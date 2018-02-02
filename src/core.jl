@@ -1,19 +1,34 @@
+struct GraphData{T,V}
+    G::SparseMatrixCSC{T,V}
+    cc::Vector{Vector{V}}
+    points::Vector{V}
+    user_points::Vector{V}
+    exclude_pairs::Vector{Tuple{V,V}}
+    nodemap::Matrix{V}
+    polymap::Matrix{V}
+end
+
 """
 Core kernel of Circuitscape - used to solve several pairs
 
 Input:
-* data::GraphData - all the 
+* data::GraphData
 """
-function single_ground_all_pair(data, computeflags, outputflags)
+function single_ground_all_pairs(data, flags, cfg)
 
     # Data
     a = data.G
     cc = data.cc
     points = data.points
-    exclude_pairs = data.exclude_pairs
+    exclude = data.exclude_pairs
+    nodemap = data.nodemap
+    polymap = data.polymap
+    orig_pts = data.user_points
+    hbmeta = RasterMeta()
 
     # Flags
-    is_raster = computeflags.is_raster
+    outputflags = flags.outputflags
+    is_raster = flags.is_raster
     write_volt_maps = outputflags.write_volt_maps
     write_cur_maps = outputflags.write_cur_maps
 
@@ -30,11 +45,11 @@ function single_ground_all_pair(data, computeflags, outputflags)
     voltmatrix = zeros(eltype(a), size(resistances))
     
     # Take laplacian of matrix
-    t = @elapsed lap = laplacian(a)
-    info("Time to construct laplacian = $t seconds")
+    # t = @elapsed lap = laplacian(a)
+    # info("Time to construct laplacian = $t seconds")
     
     # Get a vector of connected components
-    comps = getindex.([lap], cc, cc)
+    comps = getindex.([a], cc, cc)
     
     get_shortcut_resistances = false
     if is_raster && !write_volt_maps && !write_cur_maps
@@ -74,7 +89,7 @@ function single_ground_all_pair(data, computeflags, outputflags)
 
             pi = csub[i]
             comp_i = findfirst(comp, pi)
-            I = find(x -> x == pi, c)
+            I = find(x -> x == pi, points)
             smash_repeats!(ret, I)
 
             # Preprocess matrix
@@ -88,7 +103,7 @@ function single_ground_all_pair(data, computeflags, outputflags)
 
                 pj = csub[j]
                 comp_j = findfirst(comp, pj)
-                J = find(x -> x == pj, c)
+                J = find(x -> x == pj, points)
 
                 # Forget excluded pairs
                 ex = false
@@ -121,7 +136,7 @@ function single_ground_all_pair(data, computeflags, outputflags)
                 # Return resistance value
                 for c_i in I, c_j in J
                     push!(ret, (c_i, c_j, r))
-                    postprocess(v, c, c_i, c_j, r, comp_i, comp_j, matrix, comp, cfg, voltmatrix,
+                    postprocess(v, points, c_i, c_j, r, comp_i, comp_j, matrix, comp, cfg, voltmatrix,
                                                 get_shortcut_resistances;
                                                 local_nodemap = local_nodemap,
                                                 orig_pts = orig_pts,
@@ -151,7 +166,8 @@ function single_ground_all_pair(data, computeflags, outputflags)
         resistances[i,i] = 0
     end
 
-    resistances
+    # Pad it with the user points
+    vcat(vcat(0,orig_pts)', hcat(orig_pts, resistances))
 
 end
 
@@ -180,7 +196,6 @@ function get_num_pairs(ccs, fp, exclude_pairs)
                 if (pt1, pt2) in exclude_pairs
                     continue
                 else
-                    #push!(pairs, (i, pt1, pt2))
                     num += 1
                 end
             end
@@ -195,4 +210,70 @@ function smash_repeats!(ret, I)
             push!(ret, (I[i], I[j], 0))
         end
     end
+end
+
+"""
+Calculate laplacian of the adjacency matrix of a graph
+"""
+function laplacian(G)
+    n = size(G, 1)
+    s = Vector{eltype(G)}(n)
+    for i = 1:n
+        s[i] = sum_off_diag(G, i)
+        for j in nzrange(G, i)
+            if i == G.rowval[j]
+                G.nzval[j] = 0
+            else
+                G.nzval[j] = -G.nzval[j]
+            end
+        end
+    end
+    G + spdiagm(s)
+end
+
+function sum_off_diag(G, i)
+     sum = zero(eltype(G))
+     for j in nzrange(G, i)
+         if G.rowval[j] != i
+             sum += G.nzval[j]
+         end
+     end
+     sum
+ end
+
+function solve_linear_system(v, G, curr, M)
+    cg(G, curr, Pl = M, tol = 1e-6, maxiter = 100000)
+end
+#solve_linear_system(cfg, G, curr, M) = solve_linear_system!(cfg, zeros(size(curr)), G, curr, M)
+
+function postprocess(volt, cond, i, j, r, pt1, pt2, cond_pruned, cc, cfg, voltmatrix,
+                                                                get_shortcut_resistances;
+                                                                local_nodemap = Matrix{Float64}(),
+                                                                orig_pts = Vector{Int}(),
+                                                                polymap = NoPoly(),
+                                                                hbmeta = hbmeta)
+
+    if get_shortcut_resistances
+        update_voltmatrix!(voltmatrix, local_nodemap, volt, hbmeta, cond, r, j, cc)
+        return nothing
+    end
+
+    name = "_$(cond[i])_$(cond[j])"
+
+    if cfg["data_type"] == "raster"
+        name = "_$(Int(orig_pts[i]))_$(Int(orig_pts[j]))"
+    end
+
+    if cfg["write_volt_maps"] == "True"
+        t = @elapsed write_volt_maps(name, volt, cc, cfg, hbmeta = hbmeta, nodemap = local_nodemap)
+        info("Time taken to write voltage maps = $t seconds")
+    end
+
+    if cfg["write_cur_maps"] == "True"
+        t = @elapsed write_cur_maps(cond_pruned, volt, [-9999.], cc, name, cfg;
+        nodemap = local_nodemap,
+        hbmeta = hbmeta)
+        info("Time taken to write current maps = $t seconds")
+    end
+    nothing
 end
