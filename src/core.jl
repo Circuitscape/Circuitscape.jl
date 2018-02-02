@@ -193,7 +193,6 @@ function get_num_pairs(ccs, fp, exclude_pairs)
                     continue
                 else
                     num += 1
-                    @show num
                 end
             end
         end
