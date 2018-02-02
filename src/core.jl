@@ -32,21 +32,17 @@ function single_ground_all_pairs(data, flags, cfg)
     write_volt_maps = outputflags.write_volt_maps
     write_cur_maps = outputflags.write_cur_maps
 
-    #pairs = get_num_pairs(cc, points, exclude_pairs)
-    #info("Total number of pair solves = $(length(pairs))")
-
     # Get number of focal points
     numpoints = size(points, 1)
     
     info("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
+
+    num = get_num_pairs(cc, points, exclude)
+    info("Total number of pair solves = $num")
     
     # Initialize pairwise resistance
     resistances = -1 * ones(eltype(a), numpoints, numpoints)
     voltmatrix = zeros(eltype(a), size(resistances))
-    
-    # Take laplacian of matrix
-    # t = @elapsed lap = laplacian(a)
-    # info("Time to construct laplacian = $t seconds")
     
     # Get a vector of connected components
     comps = getindex.([a], cc, cc)
@@ -187,7 +183,7 @@ function get_num_pairs(ccs, fp, exclude_pairs)
     num = 0
 
     for (i,cc) in enumerate(ccs)
-        sub_fp = findin(x -> x in cc, fp)
+        sub_fp = filter(x -> x in cc, fp) |> unique
         l = endof(sub_fp)
         for ii = 1:l
             pt1 = sub_fp[ii]
@@ -197,6 +193,7 @@ function get_num_pairs(ccs, fp, exclude_pairs)
                     continue
                 else
                     num += 1
+                    @show num
                 end
             end
         end
