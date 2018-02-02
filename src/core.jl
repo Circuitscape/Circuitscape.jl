@@ -116,7 +116,7 @@ function single_ground_all_pairs(data, flags, cfg)
                 end
 
                 # Initialize currents
-                current = zeros(size(matrix, 1))
+                current = zeros(eltype(a), size(matrix, 1))
                 current[comp_i] = -1
                 current[comp_j] = 1
 

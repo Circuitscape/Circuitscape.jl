@@ -15,7 +15,9 @@ function compute(path::String)
     cfg = parse_config(path)
     is_raster = cfg["data_type"] == "raster"
     scenario = cfg["scenario"]
-    T = cfg["precision"] == "single" ? Float32 : Float64    
+    @show cfg["precision"]
+    T = cfg["precision"] in SINGLE ? Float32 : Float64 
+    @show T   
     if is_raster
         if scenario == "pairwise"
             raster_pairwise(T, cfg)

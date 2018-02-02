@@ -5,6 +5,7 @@ const PAIRWISE = ["pairwise", "Pairwise"]
 const ADVANCED = ["advanced", "Advanced"]
 const ONETOALL = ["one-to-all", "one_to_all"]
 const ALLTOONE = ["all-to-one", "all_to_one"]
+const SINGLE = ["single", "Single"]
 
 # Constants used in IO
 const AAGRID = 2
