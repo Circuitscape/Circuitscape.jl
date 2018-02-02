@@ -237,9 +237,11 @@ function sum_off_diag(G, i)
      sum
  end
 
-function solve_linear_system(v, G, curr, M)
-    cg(G, curr, Pl = M, tol = 1e-6, maxiter = 100000)
-end
+solve_linear_system(cfg, 
+            G::SparseMatrixCSC{T,V}, 
+            curr::Vector{T}, M) where {T,V} = 
+            cg(G, curr, Pl = M, tol = T(1e-6), maxiter = 100_000)
+
 #solve_linear_system(cfg, G, curr, M) = solve_linear_system!(cfg, zeros(size(curr)), G, curr, M)
 
 function postprocess(volt, cond, i, j, r, pt1, pt2, cond_pruned, cc, cfg, voltmatrix,
