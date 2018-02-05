@@ -7,6 +7,10 @@ const ONETOALL = ["one-to-all", "one_to_all"]
 const ALLTOONE = ["all-to-one", "all_to_one"]
 const SINGLE = ["single", "Single"]
 
+# Solver constants
+const AMG = ["cg+amg", "amg+cg"]
+const CHOLMOD = ["cholmod", "cholesky", "cholfact"]
+
 # Constants used in IO
 const AAGRID = 2
 const TXTLIST = 3
