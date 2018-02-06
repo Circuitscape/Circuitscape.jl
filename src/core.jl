@@ -42,6 +42,9 @@ function single_ground_all_pairs(data, flags, cfg)
         amg_solver_path(data, flags, cfg)
     else
         info("Solver used: CHOLMOD")
+        if eltype(data.G) == Float32
+            warn("CHOLMOD solver mode works only in double precision")
+        end
         cholmod_solver_path(data, flags, cfg)
     end
 end
@@ -216,6 +219,12 @@ function cholmod_solver_path(data, flags, cfg)
     is_raster = flags.is_raster
     write_volt_maps = outputflags.write_volt_maps
     write_cur_maps = outputflags.write_cur_maps
+
+     # CHOLMOD solver mode works only in double precision
+     if eltype(a) == Float32
+        warn("Converting single precision matrix to double")
+        a = Float64.(a)
+    end
 
     # Get number of focal points
     numpoints = size(points, 1)
