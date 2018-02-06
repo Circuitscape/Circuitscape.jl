@@ -88,6 +88,7 @@ function amg_solver_path(data, flags, cfg)
             covered[i] = false
         end
     end
+    shortcut = Shortcut(get_shortcut_resistances, voltmatrix)    
   
     for (cid, comp) in enumerate(cc)
     
@@ -109,6 +110,8 @@ function amg_solver_path(data, flags, cfg)
         # Get local nodemap for CC - useful for output writing
         t2 = @elapsed local_nodemap = construct_local_node_map(nodemap, comp, polymap)
         info("Time taken to construct local nodemap = $t2 seconds")
+
+        component_data = ComponentData(comp, matrix, local_nodemap, hbmeta)        
 
         function f(i)
 
@@ -164,12 +167,9 @@ function amg_solver_path(data, flags, cfg)
                 # Return resistance value
                 for c_i in I, c_j in J
                     push!(ret, (c_i, c_j, r))
-                    postprocess(v, points, c_i, c_j, r, comp_i, comp_j, matrix, comp, cfg, voltmatrix,
-                                                get_shortcut_resistances;
-                                                local_nodemap = local_nodemap,
-                                                orig_pts = orig_pts,
-                                                polymap = polymap,
-                                                hbmeta = hbmeta)
+                    output = Output(points, v, (orig_pts[c_i], orig_pts[c_j]),
+                                        (comp_i, comp_j), r, c_j)
+                    postprocess(output, component_data, flags, shortcut, cfg)
                 end
             end
 
@@ -332,12 +332,6 @@ function cholmod_solver_path(data, flags, cfg)
                     push!(ret, (c_i, c_j, r))
                     output = Output(points, v, (orig_pts[c_i], orig_pts[c_j]),
                                         (comp_i, comp_j), r, c_j)
-                    #=postprocess(v, points, c_i, c_j, r, comp_i, comp_j, matrix, comp, cfg, voltmatrix,
-                                                get_shortcut_resistances;
-                                                local_nodemap = local_nodemap,
-                                                orig_pts = orig_pts,
-                                                polymap = polymap,
-                                                hbmeta = hbmeta)=#
                     postprocess(output, component_data, flags, shortcut, cfg)
                 end
             end
@@ -435,19 +429,6 @@ solve_linear_system(cfg,
             curr::Vector{T}, M) where {T,V} = 
             cg(G, curr, Pl = M, tol = T(1e-6), maxiter = 100_000)
 
-#solve_linear_system(cfg, G, curr, M) = solve_linear_system!(cfg, zeros(size(curr)), G, curr, M)
-
-#=function postprocess(volt, cond, i, j, r, pt1, pt2, cond_pruned, cc, cfg, voltmatrix,
-                                                                get_shortcut_resistances;
-                                                                local_nodemap = Matrix{Float64}(),
-                                                                orig_pts = Vector{Int}(),
-                                                                hbmeta = hbmeta)=#
-
-#=function postprocess(voltages, points, i, j, r, matrix, cc, cfg, voltmatrix,
-                                                                get_shortcut_resistances;
-                                                                local_nodemap = Matrix{Float64}(),
-                                                                orig_pts = Vector{Int}(),
-                                                                hbmeta = hbmeta)=#
 function postprocess(output, component_data, flags, shortcut, cfg)
 
     
