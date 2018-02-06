@@ -17,3 +17,10 @@ const TXTLIST = 3
 const PAIRS_AAGRID = 4
 const PAIRS_LIST = 5
 const truelist = ["True", "true"]
+
+# Constants for logging
+const NONE = ["NONE", "None", "none"]
+const INFO = ["INFO", "info", "Info"]
+const DEBUG = ["DEBUG", "debug", "Debug"]
+const WARNING = ["WARNING", "WARN", "warning", "warn", "Warning", "Warn"]
+const CRITICAL = ["CRITICAL", "critical", "Critical"]

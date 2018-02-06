@@ -13,6 +13,7 @@ Inputs:
 """
 function compute(path::String)
     cfg = parse_config(path)
+    update_logging!(cfg)
     is_raster = cfg["data_type"] == "raster"
     scenario = cfg["scenario"]
     T = cfg["precision"] in SINGLE ? Float32 : Float64 

@@ -3,9 +3,10 @@ using AMG
 using SimpleWeightedGraphs
 using LightGraphs
 using IterativeSolvers
+using Memento
 
-include("logging.jl")
 include("config.jl")
+include("logging.jl")
 include("consts.jl")
 include("utils.jl")
 include("io.jl")

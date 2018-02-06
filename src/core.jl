@@ -38,12 +38,12 @@ Input:
 function single_ground_all_pairs(data, flags, cfg)
 
     if flags.solver in AMG
-        info("Solver used: AMG accelerated by CG")
+        csinfo("Solver used: AMG accelerated by CG")
         amg_solver_path(data, flags, cfg)
     else
-        info("Solver used: CHOLMOD")
+        csinfo("Solver used: CHOLMOD")
         if eltype(data.G) == Float32
-            warn("CHOLMOD solver mode works only in double precision")
+            cswarn("CHOLMOD solver mode works only in double precision")
         end
         cholmod_solver_path(data, flags, cfg)
     end
@@ -70,10 +70,10 @@ function amg_solver_path(data, flags, cfg)
     # Get number of focal points
     numpoints = size(points, 1)
     
-    info("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
+    csinfo("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
 
     num = get_num_pairs(cc, points, exclude)
-    info("Total number of pair solves = $num")
+    csinfo("Total number of pair solves = $num")
     
     # Initialize pairwise resistance
     resistances = -1 * ones(eltype(a), numpoints, numpoints)
@@ -108,11 +108,11 @@ function amg_solver_path(data, flags, cfg)
     
         # Construct preconditioner *once* for every CC
         t1 = @elapsed P = aspreconditioner(smoothed_aggregation(matrix))
-        info("Time taken to construct preconditioner = $t1 seconds")
+        csinfo("Time taken to construct preconditioner = $t1 seconds")
 
         # Get local nodemap for CC - useful for output writing
         t2 = @elapsed local_nodemap = construct_local_node_map(nodemap, comp, polymap)
-        info("Time taken to construct local nodemap = $t2 seconds")
+        csinfo("Time taken to construct local nodemap = $t2 seconds")
 
         component_data = ComponentData(comp, matrix, local_nodemap, hbmeta)        
 
@@ -159,9 +159,9 @@ function amg_solver_path(data, flags, cfg)
                 current[comp_j] = 1
 
                 # Solve system
-                info("Solving points $pi and $pj")
+                csinfo("Solving points $pi and $pj")
                 t2 = @elapsed v = solve_linear_system(cfg, matrix, current, P)
-                info("Time taken to solve linear system = $t2 seconds")
+                csinfo("Time taken to solve linear system = $t2 seconds")
                 v .= v .- v[comp_i]
 
                 # Calculate resistance
@@ -222,17 +222,17 @@ function cholmod_solver_path(data, flags, cfg)
 
      # CHOLMOD solver mode works only in double precision
      if eltype(a) == Float32
-        warn("Converting single precision matrix to double")
+        cswarn("Converting single precision matrix to double")
         a = Float64.(a)
     end
 
     # Get number of focal points
     numpoints = size(points, 1)
     
-    info("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
+    csinfo("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
 
     num = get_num_pairs(cc, points, exclude)
-    info("Total number of pair solves = $num")
+    csinfo("Total number of pair solves = $num")
     
     # Initialize pairwise resistance
     resistances = -1 * ones(eltype(a), numpoints, numpoints)
@@ -273,11 +273,11 @@ function cholmod_solver_path(data, flags, cfg)
         else
             t = @elapsed factor = cholfact(matrix + speye(size(matrix,1))/10^6)
         end
-        info("Time taken to construct cholesky factor = $t")
+        csinfo("Time taken to construct cholesky factor = $t")
 
         # Get local nodemap for CC - useful for output writing
         t2 = @elapsed local_nodemap = construct_local_node_map(nodemap, comp, polymap)
-        info("Time taken to construct local nodemap = $t2 seconds")
+        csinfo("Time taken to construct local nodemap = $t2 seconds")
 
         component_data = ComponentData(comp, matrix, local_nodemap, hbmeta)
 
@@ -328,9 +328,9 @@ function cholmod_solver_path(data, flags, cfg)
                 current[comp_j] = 1
 
                 # Solve system
-                info("Solving points $pi and $pj")
+                csinfo("Solving points $pi and $pj")
                 t2 = @elapsed v = factor \ current
-                info("Time taken to solve linear system = $t2 seconds")
+                csinfo("Time taken to solve linear system = $t2 seconds")
                 v .= v .- v[comp_i]
 
                 # Calculate resistance
@@ -465,13 +465,13 @@ function postprocess(output, component_data, flags, shortcut, cfg)
 
     if flags.outputflags.write_volt_maps
         t = @elapsed write_volt_maps(name, output, component_data, flags, cfg)
-        info("Time taken to write voltage maps = $t seconds")
+        csinfo("Time taken to write voltage maps = $t seconds")
     end
 
     if flags.outputflags.write_cur_maps
         t = @elapsed write_cur_maps(name, output, component_data, 
                                     [-9999.], flags, cfg)
-        info("Time taken to write current maps = $t seconds")
+        csinfo("Time taken to write current maps = $t seconds")
     end
     nothing
 end
