@@ -8,6 +8,27 @@ struct GraphData{T,V}
     polymap::Matrix{V}
 end
 
+struct ComponentData{T,V}
+    cc::Vector{V}
+    matrix::SparseMatrixCSC{T,V}
+    local_nodemap::Matrix{V}
+    hbmeta::RasterMeta
+end
+
+struct Output{T,V}
+    points::Vector{V}
+    voltages::Vector{T}
+    orig_pts::Tuple{V,V}
+    comp_idx::Tuple{V,V}
+    resistance::T
+    col::V
+end
+
+struct Shortcut{T}
+    get_shortcut_resistances::Bool
+    voltmatrix::Matrix{T}
+end
+
 """
 Core kernel of Circuitscape - used to solve several pairs
 
@@ -220,6 +241,7 @@ function cholmod_solver_path(data, flags, cfg)
             covered[i] = false
         end
     end
+    shortcut = Shortcut(get_shortcut_resistances, voltmatrix)
   
     for (cid, comp) in enumerate(cc)
     
@@ -247,6 +269,8 @@ function cholmod_solver_path(data, flags, cfg)
         # Get local nodemap for CC - useful for output writing
         t2 = @elapsed local_nodemap = construct_local_node_map(nodemap, comp, polymap)
         info("Time taken to construct local nodemap = $t2 seconds")
+
+        component_data = ComponentData(comp, matrix, local_nodemap, hbmeta)
 
         ret = Vector{Tuple{Int,Int,Float64}}()
         
@@ -306,12 +330,15 @@ function cholmod_solver_path(data, flags, cfg)
                 # Return resistance value
                 for c_i in I, c_j in J
                     push!(ret, (c_i, c_j, r))
-                    postprocess(v, points, c_i, c_j, r, comp_i, comp_j, matrix, comp, cfg, voltmatrix,
+                    output = Output(points, v, (orig_pts[c_i], orig_pts[c_j]),
+                                        (comp_i, comp_j), r, c_j)
+                    #=postprocess(v, points, c_i, c_j, r, comp_i, comp_j, matrix, comp, cfg, voltmatrix,
                                                 get_shortcut_resistances;
                                                 local_nodemap = local_nodemap,
                                                 orig_pts = orig_pts,
                                                 polymap = polymap,
-                                                hbmeta = hbmeta)
+                                                hbmeta = hbmeta)=#
+                    postprocess(output, component_data, flags, shortcut, cfg)
                 end
             end
         end
@@ -410,33 +437,50 @@ solve_linear_system(cfg,
 
 #solve_linear_system(cfg, G, curr, M) = solve_linear_system!(cfg, zeros(size(curr)), G, curr, M)
 
-function postprocess(volt, cond, i, j, r, pt1, pt2, cond_pruned, cc, cfg, voltmatrix,
+#=function postprocess(volt, cond, i, j, r, pt1, pt2, cond_pruned, cc, cfg, voltmatrix,
                                                                 get_shortcut_resistances;
                                                                 local_nodemap = Matrix{Float64}(),
                                                                 orig_pts = Vector{Int}(),
-                                                                polymap = NoPoly(),
-                                                                hbmeta = hbmeta)
+                                                                hbmeta = hbmeta)=#
+
+#=function postprocess(voltages, points, i, j, r, matrix, cc, cfg, voltmatrix,
+                                                                get_shortcut_resistances;
+                                                                local_nodemap = Matrix{Float64}(),
+                                                                orig_pts = Vector{Int}(),
+                                                                hbmeta = hbmeta)=#
+function postprocess(output, component_data, flags, shortcut, cfg)
+
+    
+    voltages = output.voltages
+    matrix = component_data.matrix
+    local_nodemap = component_data.local_nodemap
+    hbmeta = component_data.hbmeta
+    orig_pts = output.orig_pts
+
+    # Shortcut flags and data
+    get_shortcut_resistances = shortcut.get_shortcut_resistances
 
     if get_shortcut_resistances
-        update_voltmatrix!(voltmatrix, local_nodemap, volt, hbmeta, cond, r, j, cc)
+        # update_voltmatrix!(voltmatrix, local_nodemap, voltages, hbmeta, points, r, j, cc)
+        update_voltmatrix!(shortcut, output, component_data)
         return nothing
     end
 
-    name = "_$(cond[i])_$(cond[j])"
+    # name = "_$(points[i])_$(points[j])"
 
-    if cfg["data_type"] == "raster"
-        name = "_$(Int(orig_pts[i]))_$(Int(orig_pts[j]))"
-    end
+    #if flags.is_raster
+        # name = "_$(Int(orig_pts[i]))_$(Int(orig_pts[j]))"
+    name = "_$(orig_pts[1])_$(orig_pts[2])"
+    #end
 
-    if cfg["write_volt_maps"] == "True"
-        t = @elapsed write_volt_maps(name, volt, cc, cfg, hbmeta = hbmeta, nodemap = local_nodemap)
+    if flags.outputflags.write_volt_maps
+        t = @elapsed write_volt_maps(name, output, component_data, flags, cfg)
         info("Time taken to write voltage maps = $t seconds")
     end
 
-    if cfg["write_cur_maps"] == "True"
-        t = @elapsed write_cur_maps(cond_pruned, volt, [-9999.], cc, name, cfg;
-        nodemap = local_nodemap,
-        hbmeta = hbmeta)
+    if flags.outputflags.write_cur_maps
+        t = @elapsed write_cur_maps(name, output, component_data, 
+                                    [-9999.], flags, cfg)
         info("Time taken to write current maps = $t seconds")
     end
     nothing

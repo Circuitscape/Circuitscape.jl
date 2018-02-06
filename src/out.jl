@@ -23,18 +23,26 @@ function compute_3col{T}(resistances::Matrix{T}, fp)
     r3col
 end
 
-function write_cur_maps(G, voltages, finitegrounds, cc, name, cfg; nodemap = Matrix{Float64}(0,0),
-                                                                    hbmeta = RasterMeta())
+    
+function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
+    
+    # Get desired data
+    G = component_data.matrix
+    voltages = output.voltages
+    cc = component_data.cc
+    nodemap = component_data.local_nodemap
+    hbmeta = component_data.hbmeta
 
     node_currents, branch_currents = _create_current_maps(G, voltages, finitegrounds, cfg, nodemap = nodemap, hbmeta = hbmeta)
 
-    if cfg["data_type"] == "network"
+    if !flags.is_raster
         branch_currents_array = _convert_to_3col(branch_currents, cc)
         node_currents_array = _append_name_to_node_currents(node_currents, cc)
         write_currents(node_currents_array, branch_currents_array, name, cfg)
     else
        current_map = node_currents
-       log_transform = cfg["log_transform_maps"] == "True"
+       # log_transform = cfg["log_transform_maps"] == "True"
+       log_transform = flags.outputflags.log_transform_maps
        write_aagrid(current_map, name, cfg, hbmeta; log_transform = log_transform)
    end
 end
@@ -191,9 +199,15 @@ function write_aagrid(cmap, name, cfg, hbmeta;
     close(f)
 end
 
-function write_volt_maps(name, voltages, cc, cfg; hbmeta = RasterMeta(), nodemap = Matrix{Float64}(0, 0))
+function write_volt_maps(name, output, component_data, flags, cfg)
 
-    if cfg["data_type"] == "network"
+    # Get desired data
+    voltages = output.voltages
+    cc = component_data.cc
+    hbmeta = component_data.hbmeta
+    nodemap = component_data.local_nodemap
+
+    if !flags.is_raster
         write_voltages(cfg["output_file"], name, voltages, cc)
     else
         vm = _create_voltage_map(voltages, nodemap, hbmeta)
