@@ -39,8 +39,10 @@ function compute_graph_data(data::NetworkData)
 
     nodemap = Matrix{T}(0,0)
     polymap = Matrix{T}(0,0)
+    hbmeta = RasterMeta()
 
-    GraphData(G, cc, data.fp, data.fp, exclude_pairs, nodemap, polymap)
+    GraphData(G, cc, data.fp, data.fp, 
+                exclude_pairs, nodemap, polymap, hbmeta)
 end
 
 function get_network_flags(cfg)
@@ -57,11 +59,12 @@ function get_network_flags(cfg)
     set_null_currents_to_nodata = cfg["set_null_currents_to_nodata"] in truelist
     set_null_voltages_to_nodata = cfg["set_null_voltages_to_nodata"] in truelist
     compress_grids = cfg["compress_grids"] in truelist
+    log_transform_maps = cfg["log_transform_maps"] in truelist
 
     o = OutputFlags(write_volt_maps, write_cur_maps,
                     write_cum_cur_maps_only, write_max_cur_maps,
                     set_null_currents_to_nodata, set_null_voltages_to_nodata,
-                    compress_grids)
+                    compress_grids, log_transform_maps)
     
     NetworkFlags(is_raster, solver, o)
 end

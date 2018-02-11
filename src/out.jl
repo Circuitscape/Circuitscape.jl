@@ -6,6 +6,7 @@ struct OutputFlags
     set_null_currents_to_nodata::Bool
     set_null_voltages_to_nodata::Bool
     compress_grids::Bool
+    log_transform_maps::Bool
 end
 
 function compute_3col{T}(resistances::Matrix{T}, fp)

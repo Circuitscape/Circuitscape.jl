@@ -14,20 +14,6 @@ abstract type InputFlags <: Flags end
 abstract type ComputeFlags <: Flags end
 abstract type PointFilePolygons end
 
-struct PointFileContainsPolygons <: PointFilePolygons
-end
-struct PointFileNoPolygons <: PointFilePolygons
-end
-
-struct UsePoly <: Polygon
-    file::String
-end
-struct NoPoly <: Polygon
-end
-struct Polymap{T} <: Polygon
-    polymap::Matrix{T}
-end
-
 struct UseVarSrc <: VarSource
     file::String
 end
@@ -67,20 +53,6 @@ struct NetAdvFlags{T} <: InputFlags
     ground_file::String
 end
 
-struct RasInputFlags{T,P,M,V,I} <: InputFlags
-    precision::T
-    hab_is_res::Bool
-    hab_file::String
-    poly::P
-    mask::M
-    point_file::String
-    var_source::V
-    included_pairs::I
-    source_file::String
-    ground_file::String
-    ground_is_res::Bool
-end
-
 struct RasCompFlags{P} <: ComputeFlags
     four_neighbors::Bool
     avg_res::Bool
@@ -106,6 +78,7 @@ struct RasData{T,V,P,S} <: Data
     points_rc::Tuple{Vector{S},Vector{S},Vector{S}}
     strengths::Matrix{T}
     included_pairs::IncludeExcludePairs
+    hbmeta::RasterMeta
 end
 
 struct RasterMeta

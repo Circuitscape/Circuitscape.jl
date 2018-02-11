@@ -6,7 +6,7 @@ struct IncludeExcludePairs{T}
     include_pairs::Matrix{T}
 end
 function IncludeExcludePairs()
-    IncludeExcludePairs(:undef, Int32[], Matrix{Int32}(0, 0))
+    IncludeExcludePairs(:undef, Int[], Matrix{Int}(0, 0))
 end
 
 struct RasInputFlags{T}
@@ -41,16 +41,6 @@ struct NetworkData{T,V} <: Data
     ground_map::Matrix{V}
 end
 
-struct RasData{T} <: Data
-    cellmap::Matrix{T}
-    polymap::Matrix{Int32}
-    source_map::Matrix{T}
-    ground_map::Matrix{T}
-    points_rc::Tuple{Vector{Int32},Vector{Int32},Vector{Int32}}
-    strengths::Matrix{T}
-    included_pairs::IncludeExcludePairs{Int32}
-end
-
 struct RasterMeta
     ncols::Int64
     nrows::Int64
@@ -62,6 +52,17 @@ struct RasterMeta
 end
 function RasterMeta()
     RasterMeta(0,0,0,0,0,0,0)
+end
+
+struct RasData{T,V} <: Data
+    cellmap::Matrix{T}
+    polymap::Matrix{V}
+    source_map::Matrix{T}
+    ground_map::Matrix{T}
+    points_rc::Tuple{Vector{V},Vector{V},Vector{V}}
+    strengths::Matrix{T}
+    included_pairs::IncludeExcludePairs{V}
+    hbmeta::RasterMeta
 end
 
 function read_graph(is_res::Bool, gpath::String, ::Type{T}) where {T}
@@ -103,7 +104,7 @@ end
 
 function read_cellmap(habitat_file::String, is_res::Bool, ::Type{T}) where {T}
 
-    cell_map, rastermeta = _ascii_grid_reader(habitat_file, T)
+    cell_map, rastermeta = _ascii_grid_reader(T, habitat_file)
 
     gmap = similar(cell_map)
     ind = find(x -> x == -9999, cell_map)
@@ -123,7 +124,7 @@ function read_cellmap(habitat_file::String, is_res::Bool, ::Type{T}) where {T}
     gmap, rastermeta
 end
 
-function _ascii_grid_reader(file, ::Type{T}) where {T}
+function _ascii_grid_reader(T, file)
     f = endswith(file, ".gz") ? GZip.open(file, "r") : open(file, "r")
     rastermeta = _ascii_grid_read_header(file, f)
     c = Matrix{T}(0,0)
@@ -177,10 +178,10 @@ function _guess_file_type(filename, f)
 
 end
 
-function read_polymap(file::String, habitatmeta, ::Type{T};
-                            nodata_as = 0, resample = true) where T
+function read_polymap(file::String, habitatmeta;
+                            nodata_as = 0, resample = true)
 
-    polymap, rastermeta = _ascii_grid_reader(file, T)
+    polymap, rastermeta = _ascii_grid_reader(Int64, file)
 
     ind = find(x -> x == rastermeta.nodata, polymap)
     if nodata_as != -1
@@ -206,17 +207,17 @@ function read_point_map(file, habitatmeta)
 
     # Advanced mode 
     if file == "none" 
-        return (Int32[], Int32[], Int32[])
+        return (Int[], Int[], Int[])
     end
 
     f = endswith(file, ".gz") ? GZip.open(file, "r") : open(file, "r")
     filetype = _guess_file_type(file, f)
     _points_rc = filetype == TXTLIST ? readdlm(file, Int64) :
-                        read_polymap(file, habitatmeta, Int64)
+                        read_polymap(file, habitatmeta)
 
-    i = Int32[]
-    j = Int32[]
-    v = Int32[]
+    i = Int[]
+    j = Int[]
+    v = Int[]
     if filetype == TXTLIST
         I = _points_rc[:,2]
         J = _points_rc[:,3]
@@ -242,7 +243,7 @@ function read_point_map(file, habitatmeta)
     j = j[idx]
     v = v[idx]
 
-    Int32.(i), Int32.(j), Int32.(v)
+    Int.(i), Int.(j), Int.(v)
 end
 
 function read_source_and_ground_maps(source_file, ground_file, habitatmeta,
@@ -359,6 +360,89 @@ function get_network_data(T, cfg)
     end
 
     NetworkData((I,J,V), fp, source_map, ground_map)
+end
+
+function load_raster_data(T, cfg)
+
+    # Habitat file
+    hab_file = cfg["habitat_file"]
+    hab_is_res = cfg["habitat_map_is_resistances"] in truelist
+
+    # Polygons
+    use_polygons = cfg["use_polygons"] in truelist
+    polygon_file = cfg["polygon_file"]
+
+    # Mask file
+    use_mask = cfg["use_mask"] in truelist 
+    mask_file = cfg["mask_file"]
+
+    # Point file
+    point_file = cfg["point_file"]
+
+    # Variable source strengths
+    use_var_source = cfg["use_variable_source_strengths"] in truelist 
+    var_source_file = cfg["variable_source_file"]
+
+    # Included Pairs
+    use_inc_pairs = cfg["use_included_pairs"] in truelist 
+    inc_pairs_file = ["included_pairs_file"]
+
+    # Advanced mode
+    is_pairwise = cfg["scenario"] in PAIRWISE
+    source_file = cfg["source_file"]
+    ground_file = cfg["ground_file"]
+    ground_is_res = cfg["ground_file_is_resistances"] in truelist
+    
+    csinfo("Reading maps")
+
+    # Read cell map
+    cellmap, hbmeta = read_cellmap(hab_file, hab_is_res, T)
+    c = count(x -> x > 0, cellmap)
+    csinfo("Resistance/Conductance map has $c nodes")
+
+    # Read polymap
+    if use_polygons
+        polymap = read_polymap(polygon_file, hbmeta)
+    else
+        polymaps = Matrix{Int}{0,0}
+    end
+
+    # Read and update cellmap with mask file
+    if use_mask
+        update!(cellmap, mask_file, hbmeta)
+        sum(cellmap) == 0 && throw("Mask file deleted everything!")
+    end
+
+    # Read point file
+    if is_pairwise
+        points_rc = read_point_map(point_file, hbmeta)
+    else
+        points_rc = (Int64[], Int64[], Int64[]) 
+    end
+
+    # Advanced mode reading
+    if !is_pairwise
+        source_map, ground_map = advanced_read(T, hbmeta, flags)
+    else
+        source_map, ground_map = Matrix{T}(0,0), Matrix{T}(0,0)
+    end
+
+    # Included Pairs
+    if use_inc_pairs
+        included_pairs = read_included_pairs(flags)
+    else
+        included_pairs = IncludeExcludePairs()
+    end
+
+    # Variable source strengths
+    if use_var_source
+        strengths = read_point_strengths(flags)
+    else
+        strengths = Matrix{T}(0,0)
+    end
+    
+    RasData(cellmap, polymap, source_map, ground_map, points_rc, strengths,
+                    included_pairs, hbmeta)
 end
 
 function inputflags_raster(cfg)

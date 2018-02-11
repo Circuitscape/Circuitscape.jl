@@ -6,6 +6,7 @@ struct GraphData{T,V}
     exclude_pairs::Vector{Tuple{V,V}}
     nodemap::Matrix{V}
     polymap::Matrix{V}
+    hbmeta::RasterMeta
 end
 
 struct ComponentData{T,V}
@@ -59,7 +60,7 @@ function amg_solver_path(data, flags, cfg)
     nodemap = data.nodemap
     polymap = data.polymap
     orig_pts = data.user_points
-    hbmeta = RasterMeta()
+    hbmeta = data.hbmeta
 
     # Flags
     outputflags = flags.outputflags
@@ -181,7 +182,7 @@ function amg_solver_path(data, flags, cfg)
         ret
         end
 
-        X = pmap(x ->f(x), 1:size(csub,1))
+        X = map(x ->f(x), 1:size(csub,1))
 
         # Set all resistances
         for x in X
