@@ -404,7 +404,7 @@ function load_raster_data(T, cfg)
     if use_polygons
         polymap = read_polymap(polygon_file, hbmeta)
     else
-        polymaps = Matrix{Int}{0,0}
+        polymap = Matrix{Int}(0,0)
     end
 
     # Read and update cellmap with mask file

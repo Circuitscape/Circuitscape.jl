@@ -15,12 +15,20 @@ function raster_pairwise(T, cfg)
     
     # Get compute flags
     flags = get_raster_flags(cfg)
+
+    pt_file_contains_polygons = length(rasterdata.points_rc[1]) != 
+                                length(unique(rasterdata.points_rc[3]))
     
+    if pt_file_contains_polygons
+        _pt_file_polygons_path(rasterdata, flags, cfg)
+    else
+        _pt_file_no_polygons_path(rasterdata, flags, cfg)
+    end
     # Compute graph data based on compute flags
-    graphdata = compute_graph_data(rasterdata, flags)
+    # graphdata = compute_graph_data(rasterdata, flags)
     
     # Send to main kernel
-    single_ground_all_pairs(graphdata, flags, cfg)
+    # single_ground_all_pairs(graphdata, flags, cfg)
 end
 
 function get_raster_flags(cfg)
@@ -52,7 +60,99 @@ function get_raster_flags(cfg)
                 four_neighbors, avg_res, solver, o)
 end
 
-function compute_graph_data(rasterdata, flags)
+function _pt_file_no_polygons_path(rasterdata, flags, cfg)
+
+    graphdata = compute_graph_data_no_polygons(rasterdata, flags)
+    single_ground_all_pairs(graphdata, flags, cfg)
+end
+
+function _pt_file_polygons_path(rasterdata, flags, cfg)
+
+    # get unique list of points
+    # for every point pair do
+        # construct new polymap
+        # construct new nodemap
+        # construct new graph
+        # solve for two points
+    # end
+
+    # Data
+    gmap = rasterdata.cellmap
+    polymap = rasterdata.polymap
+    points_rc = rasterdata.points_rc
+    avg_res = flags.avg_res
+    four_neighbors = flags.four_neighbors
+
+    pts = unique(points_rc[3])
+    resistances = -1 * ones(length(pts), length(pts))
+
+    for i = 1:size(pts, 1)
+        pt1 = pts[i]
+        for j = i+1:size(pts, 1)
+            pt2 = pts[j]
+            #=newpoly = create_new_polymap(gmap, polymap, points_rc, pt1, pt2)
+            nodemap = construct_node_map(gmap, newpoly)
+            a = construct_graph(gmap, nodemap, avg_res, four_neighbors)
+            x,y = 0,0
+            x = find(x -> x == pt1, points_rc[3])[1]
+            y = find(x -> x == pt2, points_rc[3])[1]
+            c1 = nodemap[points_rc[1][x], points_rc[2][x]]
+            c2 = nodemap[points_rc[1][y], points_rc[2][y]]
+            c = Int[c1, c2]=#
+            graphdata = compute_graph_data_polygons(rasterdata, flags, pt1, pt2)
+            # pairwise_resistance = single_ground_all_pair_resistances(a, c, cfg; orig_pts =[points_rc[3][x], points_rc[3][y]],
+            #                                                                        nodemap = nodemap,
+            #                                                                        polymap = Polymap(newpoly),
+            #                                                                        hbmeta = hbmeta)
+            pairwise_resistance = single_ground_all_pairs(graphdata, flags, cfg)
+            resistances[i,j] = resistances[j,i] = pairwise_resistance[2,3]
+        end
+    end
+    for i = 1:size(pts, 1)
+        resistances[i,i] = 0
+    end
+    resistances
+end
+
+function compute_graph_data_polygons(rasterdata, flags, pt1, pt2)
+
+    # Data
+    gmap = rasterdata.cellmap
+    polymap = rasterdata.polymap
+    points_rc = rasterdata.points_rc
+    hbmeta = rasterdata.hbmeta
+
+    # Flags
+    avg_res = flags.avg_res
+    four_neighbors = flags.four_neighbors
+
+    # Construct new polymap
+    newpoly = create_new_polymap(gmap, polymap, points_rc, pt1, pt2)
+    nodemap = construct_node_map(gmap, newpoly)
+
+    # Construct graph
+    a = construct_graph(gmap, nodemap, avg_res, four_neighbors)
+    G = laplacian(a)
+
+    # Find connected components
+    cc = connected_components(SimpleWeightedGraph(a))
+
+    # Construct points vector
+    x,y = 0,0
+    x = find(x -> x == pt1, points_rc[3])[1]
+    y = find(x -> x == pt2, points_rc[3])[1]
+    c1 = nodemap[points_rc[1][x], points_rc[2][x]]
+    c2 = nodemap[points_rc[1][y], points_rc[2][y]]
+    points = Int[c1, c2]
+
+    # Exclude pairs array
+    exclude_pairs = Tuple{Int,Int}[]
+    
+    GraphData(G, cc, points, [pt1, pt2], 
+            exclude_pairs, nodemap, polymap, hbmeta)
+end
+
+#=function compute_graph_data(rasterdata, flags)
     
     points_rc = rasterdata.points_rc
 
@@ -64,9 +164,9 @@ function compute_graph_data(rasterdata, flags)
     end
 
     graphdata
-end
+end=#
 
-function _pairwise_no_polygons(data, flags)
+function compute_graph_data_no_polygons(data, flags)
 
     # Data
     cellmap = data.cellmap
@@ -236,3 +336,78 @@ res_avg(x, y) = 1 / ((1/x + 1/y) / 2)
 cond_avg(x, y) = (x + y) / 2
 weird_avg(x,y) = (x + y) / (2*√2)
 weirder_avg(x, y) = 1 / (√2 * (1/x + 1/y) / 2)
+
+function create_new_polymap(gmap, polymap, points_rc, 
+                pt1 = 0, pt2 = 0, point_map = Matrix{Int64}(0,0))
+    
+    f(x) = (points_rc[1][x], points_rc[2][x])
+
+    if !isempty(point_map)
+        # Combine polymap and pointmap
+        newpoly = deepcopy(polymap)
+        point_file_no_polygons = length(points_rc[3]) == 
+                        length(unique(points_rc[3]))
+        if isempty(polymap)
+            newpoly = point_map
+        elseif point_file_no_polygons
+            k = maximum(polymap)
+            for i in find(point_map)
+                if polymap[i] == 0
+                    newpoly[i] = point_map[i] + k
+                end
+            end
+        else
+            k = max(maximum(polymap), maximum(point_map))
+            for i in find(point_map)
+                v1 = point_map[i]
+                v2 = newpoly[i]
+                if v2 == 0
+                    newpoly[i] = k + v1
+                    continue
+                end
+                if v1 != v2
+                    ind = find(x -> x == v2, newpoly)
+                    newpoly[ind] = v1
+                end
+            end
+        end
+        return newpoly
+    end
+
+    if isempty(polymap)
+        newpoly = zeros(Int, size(gmap)...)
+        id1 = find(x -> x == pt1, points_rc[3])
+        id2 = find(x -> x == pt2, points_rc[3])
+        map(x -> newpoly[f(x)...] = pt1, id1)
+        map(x -> newpoly[f(x)...] = pt2, id2)
+        return newpoly
+    else
+        newpoly = deepcopy(polymap)
+        k = maximum(polymap)
+        for p in (pt1, pt2)
+            # find the locations of the point
+            idx = find(x -> x == p, points_rc[3])
+
+            if length(idx) == 1
+                continue
+            end
+            allzero = mapreduce(x -> polymap[f(x)...] == 0, &, idx)
+            if allzero
+                map(x -> newpoly[f(x)...] = k + 1, idx)
+                k += 1
+            else
+                nz = filter(x -> polymap[f(x)...]!= 0, idx)
+                if length(nz) == 1
+                    map(x -> newpoly[f(x)...] = polymap[overlap[1]], idx)
+                else
+                    coords = map(x -> f(x), nz)
+                    vals = map(x -> polymap[x...], coords)
+                    overlap = findin(polymap, vals)
+                    newpoly[overlap] = k + 1
+                    k += 1
+                end
+            end
+        end
+        return newpoly
+    end
+end
