@@ -178,10 +178,10 @@ function _guess_file_type(filename, f)
 
 end
 
-function read_polymap(file::String, habitatmeta;
+function read_polymap(T, file::String, habitatmeta;
                             nodata_as = 0, resample = true)
 
-    polymap, rastermeta = _ascii_grid_reader(Int64, file)
+    polymap, rastermeta = _ascii_grid_reader(T, file)
 
     ind = find(x -> x == rastermeta.nodata, polymap)
     if nodata_as != -1
@@ -213,7 +213,7 @@ function read_point_map(file, habitatmeta)
     f = endswith(file, ".gz") ? GZip.open(file, "r") : open(file, "r")
     filetype = _guess_file_type(file, f)
     _points_rc = filetype == TXTLIST ? readdlm(file, Int64) :
-                        read_polymap(file, habitatmeta)
+                        read_polymap(Int, file, habitatmeta)
 
     i = Int[]
     j = Int[]
@@ -246,8 +246,8 @@ function read_point_map(file, habitatmeta)
     Int.(i), Int.(j), Int.(v)
 end
 
-function read_source_and_ground_maps(source_file, ground_file, habitatmeta,
-                                        is_res, ::Type{T}) where {T}
+function read_source_and_ground_maps(T, source_file, ground_file, habitatmeta,
+                                        is_res) 
 
     ground_map = Matrix{T}(0,0)
     source_map = Matrix{T}(0,0)
@@ -256,8 +256,8 @@ function read_source_and_ground_maps(source_file, ground_file, habitatmeta,
     filetype = _guess_file_type(ground_file, f)
 
     if filetype == AAGRID
-        ground_map = read_polymap(ground_file, habitatmeta, T; nodata_as = -1)
-        ground_map = map(Float64, ground_map)
+        ground_map = read_polymap(T, ground_file, habitatmeta; nodata_as = -1)
+        ground_map = map(T, ground_map)
     else
         rc = readdlm(ground_file, Int)
         ground_map = -9999 * ones(T, habitatmeta.nrows, habitatmeta.ncols)
@@ -268,7 +268,7 @@ function read_source_and_ground_maps(source_file, ground_file, habitatmeta,
     filetype = _guess_file_type(source_file, f)
 
     if filetype == AAGRID
-        source_map = read_polymap(source_file, habitatmeta, T)
+        source_map = read_polymap(T, source_file, habitatmeta)
         source_map = map(T, source_map)
     else
         rc = readdlm(source_file, Int)
@@ -402,7 +402,7 @@ function load_raster_data(T, cfg)
 
     # Read polymap
     if use_polygons
-        polymap = read_polymap(polygon_file, hbmeta)
+        polymap = read_polymap(Int, polygon_file, hbmeta)
     else
         polymap = Matrix{Int}(0,0)
     end
@@ -422,7 +422,9 @@ function load_raster_data(T, cfg)
 
     # Advanced mode reading
     if !is_pairwise
-        source_map, ground_map = advanced_read(T, hbmeta, flags)
+        source_map, ground_map = 
+        read_source_and_ground_maps(T, source_file, ground_file,
+                                    hbmeta, ground_is_res)
     else
         source_map, ground_map = Matrix{T}(0,0), Matrix{T}(0,0)
     end
@@ -550,7 +552,7 @@ function grab_input_raster(flags)
 end
 
 function update!(cellmap::Matrix{T}, m::String, hbmeta) where {T}
-    mask = read_polymap(m, hbmeta, T)
+    mask = read_polymap(T, m, hbmeta)
     map!(x -> x > 0 ? 1 : 0, mask, mask)
     cellmap .= cellmap .* mask
 end

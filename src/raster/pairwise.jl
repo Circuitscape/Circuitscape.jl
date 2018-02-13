@@ -2,6 +2,10 @@ struct RasterFlags
     is_raster::Bool 
     is_pairwise::Bool
     is_advanced::Bool 
+    is_onetoall::Bool
+    is_alltoone::Bool
+    grnd_file_is_res::Bool
+    policy::Symbol
     four_neighbors::Bool
     avg_res::Bool
     solver::String
@@ -37,9 +41,14 @@ function get_raster_flags(cfg)
     is_raster = true
     is_pairwise = cfg["scenario"] in PAIRWISE
     is_advanced = cfg["scenario"] in ADVANCED
+    is_onetoall = cfg["scenario"] in ONETOALL
+    is_alltoone = cfg["scenario"] in ALLTOONE
     four_neighbors = cfg["connect_four_neighbors_only"] in truelist
     avg_res = cfg["connect_using_avg_resistances"] in truelist
     solver = cfg["solver"]
+    ground_file_is_resistances = 
+        cfg["ground_file_is_resistances"] in truelist
+    policy = cfg["remove_src_or_gnd"]
 
     # Output flags
     write_volt_maps = cfg["write_volt_maps"] in truelist
@@ -57,6 +66,8 @@ function get_raster_flags(cfg)
                     compress_grids, log_transform_maps)
     
     RasterFlags(is_raster, is_pairwise, is_advanced, 
+                is_onetoall, is_alltoone,
+                ground_file_is_resistances, policy,
                 four_neighbors, avg_res, solver, o)
 end
 
