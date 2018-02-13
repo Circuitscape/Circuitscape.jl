@@ -4,7 +4,7 @@ using SimpleWeightedGraphs
 using LightGraphs
 using IterativeSolvers
 using Memento
-using JLD
+using GZip
 
 include("config.jl")
 include("logging.jl")

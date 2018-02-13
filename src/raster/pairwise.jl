@@ -139,11 +139,14 @@ function compute_graph_data_polygons(rasterdata, flags, pt1, pt2)
 
     # Construct points vector
     x,y = 0,0
-    x = find(x -> x == pt1, points_rc[3])[1]
-    y = find(x -> x == pt2, points_rc[3])[1]
+    # x = find(x -> x == pt1, points_rc[3])[1]
+    # y = find(x -> x == pt2, points_rc[3])[1]
+    x = findfirst(points_rc[3], pt1)
+    y = findfirst(points_rc[3], pt2)
     c1 = nodemap[points_rc[1][x], points_rc[2][x]]
     c2 = nodemap[points_rc[1][y], points_rc[2][y]]
     points = Int[c1, c2]
+    @show points
 
     # Exclude pairs array
     exclude_pairs = Tuple{Int,Int}[]
