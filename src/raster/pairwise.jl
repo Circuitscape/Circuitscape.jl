@@ -149,7 +149,7 @@ function compute_graph_data_polygons(rasterdata, flags, pt1, pt2)
     exclude_pairs = Tuple{Int,Int}[]
     
     GraphData(G, cc, points, [pt1, pt2], 
-            exclude_pairs, nodemap, polymap, hbmeta)
+            exclude_pairs, nodemap, newpoly, hbmeta)
 end
 
 #=function compute_graph_data(rasterdata, flags)

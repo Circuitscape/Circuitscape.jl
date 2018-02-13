@@ -14,11 +14,17 @@ end
 function _construct_local_nodemap(local_nodemap, polymap, idx)
     if isempty(polymap)
         i = find(local_nodemap)
-        local_nodemap[idx] = 1:length(i)
+        local_nodemap[i] = 1:length(i)
         return local_nodemap
     else
         local_polymap = zeros(eltype(local_nodemap), size(local_nodemap))
         local_polymap[idx] = polymap[idx]
+        println("Local polymap")
+        display(local_polymap)
+        println()
+        println("Polymap")
+        display(polymap)
+        println()
         return construct_node_map(local_nodemap, local_polymap)
     end
 end
