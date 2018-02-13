@@ -48,7 +48,7 @@ function get_raster_flags(cfg)
     solver = cfg["solver"]
     ground_file_is_resistances = 
         cfg["ground_file_is_resistances"] in truelist
-    policy = cfg["remove_src_or_gnd"]
+    policy = Symbol(cfg["remove_src_or_gnd"])
 
     # Output flags
     write_volt_maps = cfg["write_volt_maps"] in truelist

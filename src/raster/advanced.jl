@@ -26,7 +26,7 @@ function raster_advanced(T, cfg)
     advanced_kernel(advanced_data, flags, cfg)
 end
 
-function compute_advanced_data(data, flags)
+function compute_advanced_data(data::RasData, flags)
 
     # Data
     cellmap = data.cellmap
@@ -147,8 +147,8 @@ function advanced_kernel(data, flags, cfg)
     is_raster = flags.is_raster
     is_alltoone = flags.is_alltoone
     is_onetoall = flags.is_onetoall
-    write_volt_maps = flags.outputflags.write_volt_maps
-    write_cur_maps = flags.outputflags.write_cur_maps
+    write_v_maps = flags.outputflags.write_volt_maps
+    write_c_maps = flags.outputflags.write_cur_maps
 
     volt = zeros(eltype(G), size(nodemap))
     ind = find(nodemap)
@@ -182,11 +182,11 @@ function advanced_kernel(data, flags, cfg)
         voltages = multiple_solver(cfg, a_local, s_local, g_local, f_local)
         solver_called = true
 
-        if write_volt_maps && is_raster
+        if write_v_maps && is_raster
             local_nodemap = construct_local_node_map(nodemap, c, polymap)
             accum_voltages!(outvolt, voltages, local_nodemap, hbmeta)
         end
-        if write_cur_maps && is_raster
+        if write_c_maps && is_raster
             local_nodemap = construct_local_node_map(nodemap, c, polymap)
             accum_currents!(outcurr, voltages, cfg, a_local, voltages, f_local, local_nodemap, hbmeta)
         end
@@ -203,17 +203,17 @@ function advanced_kernel(data, flags, cfg)
     end
 
     name = src == 0 ? "" : "_$(Int(src))"
-    if write_volt_maps
+    if write_v_maps
         if !is_raster
-            write_volt_maps(name, voltages, collect(1:size(a,1)), cfg)
+            write_volt_maps(name, voltages, FullGraph(G), flags, cfg)
         else
             write_aagrid(outvolt, name, cfg, hbmeta, voltage = true)
         end
     end
 
-    if write_cur_maps
+    if write_c_maps
         if !is_raster
-            write_cur_maps(laplacian(a), voltages, finitegrounds, collect(1:size(a,1)), name, cfg)
+            write_cur_maps(name, voltages, FullGraph(G), finitegrounds, flags, cfg)
         else
             write_aagrid(outcurr, name, cfg, hbmeta)
         end
@@ -276,4 +276,11 @@ function multiple_solver(cfg, a, sources, grounds, finitegrounds)
     end
     voltages
 end
-    
+
+struct FullGraph{T,V}
+    matrix::SparseMatrixCSC{T,V}
+    cc::Vector{V}
+    local_nodemap::Matrix{V}
+    hbmeta::RasterMeta
+end
+FullGraph(G) = FullGraph(G, collect(1:size(G,1)), Matrix{Int}(0,0), RasterMeta())

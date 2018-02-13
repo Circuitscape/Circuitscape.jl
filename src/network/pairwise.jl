@@ -49,6 +49,10 @@ function get_network_flags(cfg)
     
     # Computation flags
     is_raster = false
+    is_alltoone = false
+    is_onetoall = false
+    grnd_file_is_res = cfg["ground_file_is_resistances"] in truelist
+    policy = Symbol(cfg["remove_src_or_gnd"])
     solver = cfg["solver"]
 
     # Output flags
@@ -66,11 +70,16 @@ function get_network_flags(cfg)
                     set_null_currents_to_nodata, set_null_voltages_to_nodata,
                     compress_grids, log_transform_maps)
     
-    NetworkFlags(is_raster, solver, o)
+    NetworkFlags(is_raster, is_alltoone, is_onetoall, 
+                grnd_file_is_res, policy, solver, o)
 end
 
 struct NetworkFlags
     is_raster::Bool
+    is_alltoone::Bool
+    is_onetoall::Bool
+    grnd_file_is_res::Bool
+    policy::Symbol
     solver::String
     outputflags::OutputFlags
 end

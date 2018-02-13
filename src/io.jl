@@ -349,7 +349,11 @@ function get_network_data(T, cfg)
         V = 1./V
     end
 
-    fp = read_focal_points(fp_file)
+    if is_pairwise
+        fp = read_focal_points(fp_file)
+    else
+        fp = Int[]
+    end
 
     if !is_pairwise
         source_map = read_point_strengths(source_file, T)

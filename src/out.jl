@@ -29,7 +29,7 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
     
     # Get desired data
     G = component_data.matrix
-    voltages = output.voltages
+    voltages = flags.is_raster ? output.voltages : output
     cc = component_data.cc
     nodemap = component_data.local_nodemap
     hbmeta = component_data.hbmeta
@@ -202,15 +202,21 @@ end
 
 function write_volt_maps(name, output, component_data, flags, cfg)
 
-    # Get desired data
-    voltages = output.voltages
-    cc = component_data.cc
-    hbmeta = component_data.hbmeta
-    nodemap = component_data.local_nodemap
 
     if !flags.is_raster
+
+        cc = component_data.cc
+        voltages = output
         write_voltages(cfg["output_file"], name, voltages, cc)
+
     else
+
+        # Desired data
+        voltages = output.voltages
+        cc = component_data.cc
+        hbmeta = component_data.hbmeta
+        nodemap = component_data.local_nodemap
+
         vm = _create_voltage_map(voltages, nodemap, hbmeta)
         write_aagrid(vm, name, cfg, hbmeta, voltage = true)
     end
