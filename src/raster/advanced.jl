@@ -6,6 +6,7 @@ struct AdvancedData{T,V}
     hbmeta::RasterMeta    
     sources::Vector{T}
     grounds::Vector{T}
+    source_map::Matrix{T} # Needed for one to all mode
     finite_grounds::Vector{T}
     check_node::V
     src::V
@@ -34,6 +35,7 @@ function compute_advanced_data(data::RasData, flags)
     points_rc = data.points_rc
     included_pairs = data.included_pairs    
     hbmeta = data.hbmeta
+    source_map = data.source_map
     
     # Flags
     avg_res = flags.avg_res
@@ -42,8 +44,8 @@ function compute_advanced_data(data::RasData, flags)
 
     # Nodemap and graph construction
     nodemap = construct_node_map(cellmap, polymap)
-    G = construct_graph(cellmap, nodemap, avg_res, four_neighbors)
-    G = laplacian(G)
+    A = construct_graph(cellmap, nodemap, avg_res, four_neighbors)
+    G = laplacian(A)
 
     # Connected Components
     cc = connected_components(SimpleWeightedGraph(G))
@@ -52,8 +54,8 @@ function compute_advanced_data(data::RasData, flags)
     sources, grounds, finite_grounds = 
             get_sources_and_grounds(data, flags, G, nodemap)
 
-    AdvancedData(G, cc, nodemap, polymap, hbmeta,
-                sources, grounds, finite_grounds, -1, 0)
+    AdvancedData(A, cc, nodemap, polymap, hbmeta,
+                sources, grounds, source_map, finite_grounds, -1, 0)
 end
 
 function get_sources_and_grounds(data, flags, G, nodemap)
@@ -62,10 +64,15 @@ function get_sources_and_grounds(data, flags, G, nodemap)
     source_map = data.source_map
     ground_map = data.ground_map
 
+    _get_sources_and_grounds(source_map, ground_map, flags, G, nodemap)
+end
+
+function _get_sources_and_grounds(source_map, ground_map, 
+                            flags, G, nodemap, override_policy = :none)
     # Flags
     is_raster = flags.is_raster
     grnd_file_is_res = flags.grnd_file_is_res
-    policy = flags.policy
+    policy = override_policy == :none ? flags.policy : override_policy
 
     # Initialize sources and grounds
     sources = zeros(eltype(G), size(G, 1))
@@ -142,6 +149,7 @@ function advanced_kernel(data, flags, cfg)
     cc = data.cc
     src = data.src
     check_node = data.check_node
+    source_map = data.source_map # Need it for one to all mode
 
     # Flags
     is_raster = flags.is_raster
@@ -164,8 +172,8 @@ function advanced_kernel(data, flags, cfg)
             continue
         end
 
-        # a_local = laplacian(a[c, c])
-        a_local = G[c,c]
+        a_local = laplacian(G[c, c])
+        # a_local = G[c,c]
         s_local = sources[c]
         g_local = grounds[c]
 
@@ -258,6 +266,7 @@ function multiple_solver(cfg, a, sources, grounds, finitegrounds)
     r = collect(1:size(a, 1))
     deleteat!(r, dst_del)
     asolve = asolve[r, r]
+    @show size(asolve)
 
     M = aspreconditioner(smoothed_aggregation(asolve))
     volt = solve_linear_system(cfg, asolve, sources, M)

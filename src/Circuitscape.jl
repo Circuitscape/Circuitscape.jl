@@ -17,6 +17,7 @@ include("network/pairwise.jl")
 include("raster/pairwise.jl")
 include("raster/advanced.jl")
 include("network/advanced.jl")
+include("raster/onetoall.jl")
 include("run.jl")
 
 end

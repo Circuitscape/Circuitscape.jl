@@ -393,6 +393,7 @@ function load_raster_data(T, cfg)
 
     # Advanced mode
     is_pairwise = cfg["scenario"] in PAIRWISE
+    is_advanced = cfg["scenario"] in ADVANCED
     source_file = cfg["source_file"]
     ground_file = cfg["ground_file"]
     ground_is_res = cfg["ground_file_is_resistances"] in truelist
@@ -418,14 +419,14 @@ function load_raster_data(T, cfg)
     end
 
     # Read point file
-    if is_pairwise
+    if !is_advanced
         points_rc = read_point_map(point_file, hbmeta)
     else
         points_rc = (Int64[], Int64[], Int64[]) 
     end
 
     # Advanced mode reading
-    if !is_pairwise
+    if is_advanced
         source_map, ground_map = 
         read_source_and_ground_maps(T, source_file, ground_file,
                                     hbmeta, ground_is_res)
