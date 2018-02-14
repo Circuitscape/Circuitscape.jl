@@ -71,7 +71,6 @@ function onetoall_kernel(data, flags, cfg)
         unique_point_map[f(1,ind), f(2,ind)] = f(3,ind)
     end
 
-    @show num_points_to_solve
     for i = 1:num_points_to_solve
         copy!(point_map, original_point_map)
         str = use_variable_strengths ? strengths[i,2] : 1
@@ -111,7 +110,7 @@ function onetoall_kernel(data, flags, cfg)
                     _get_sources_and_grounds(source_map, ground_map, 
                             flags, G, nodemap, policy)
       
-        advanced_data = AdvancedData(a, cc, nodemap, newpoly, hbmeta,
+        advanced_data = AdvancedData(G, cc, nodemap, newpoly, hbmeta,
                         sources, grounds, source_map, finite_grounds, check_node, n)
 
         

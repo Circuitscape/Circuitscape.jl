@@ -54,7 +54,7 @@ function compute_advanced_data(data::RasData, flags)
     sources, grounds, finite_grounds = 
             get_sources_and_grounds(data, flags, G, nodemap)
 
-    AdvancedData(A, cc, nodemap, polymap, hbmeta,
+    AdvancedData(G, cc, nodemap, polymap, hbmeta,
                 sources, grounds, source_map, finite_grounds, -1, 0)
 end
 
@@ -172,8 +172,8 @@ function advanced_kernel(data, flags, cfg)
             continue
         end
 
-        a_local = laplacian(G[c, c])
-        # a_local = G[c,c]
+        # a_local = laplacian(G[c, c])
+        a_local = G[c,c]
         s_local = sources[c]
         g_local = grounds[c]
 
@@ -266,7 +266,6 @@ function multiple_solver(cfg, a, sources, grounds, finitegrounds)
     r = collect(1:size(a, 1))
     deleteat!(r, dst_del)
     asolve = asolve[r, r]
-    @show size(asolve)
 
     M = aspreconditioner(smoothed_aggregation(asolve))
     volt = solve_linear_system(cfg, asolve, sources, M)
