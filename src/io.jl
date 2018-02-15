@@ -94,7 +94,7 @@ end
 
 read_focal_points(path::String) = Int.(vec(readcsv(path)) + 1)
 
-function read_point_strengths(path::String, ::Type{T}, inc = true) where {T}
+function read_point_strengths(T, path::String, inc = true)
     a = readdlm(path, T)
     if inc
         a[:,1] = a[:,1] + 1
@@ -320,7 +320,7 @@ function read_included_pairs(file)
             deleteat!(point_ids, 1)
         end
 
-        mat = zeros(size(point_ids, 1), size(point_ids, 1))
+        mat = zeros(Int, size(point_ids, 1), size(point_ids, 1))
 
         for i = 1:size(included_pairs, 1)
             idx1 = findfirst(x -> x == included_pairs[i, 1], point_ids)
@@ -389,7 +389,7 @@ function load_raster_data(T, cfg)
 
     # Included Pairs
     use_inc_pairs = cfg["use_included_pairs"] in truelist 
-    inc_pairs_file = ["included_pairs_file"]
+    inc_pairs_file = cfg["included_pairs_file"]
 
     # Advanced mode
     is_pairwise = cfg["scenario"] in PAIRWISE
@@ -436,14 +436,14 @@ function load_raster_data(T, cfg)
 
     # Included Pairs
     if use_inc_pairs
-        included_pairs = read_included_pairs(flags)
+        included_pairs = read_included_pairs(inc_pairs_file)
     else
         included_pairs = IncludeExcludePairs()
     end
 
     # Variable source strengths
     if use_var_source
-        strengths = read_point_strengths(flags)
+        strengths = read_point_strengths(T, var_source_file)
     else
         strengths = Matrix{T}(0,0)
     end

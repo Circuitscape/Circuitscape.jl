@@ -25,7 +25,7 @@ function compute(path::String)
         elseif scenario == "one-to-all"
             raster_one_to_all(T, cfg)
         else
-            raster_all_to_one(T, cfg)
+            raster_one_to_all(T, cfg)
         end
     else
         if scenario == "pairwise"
