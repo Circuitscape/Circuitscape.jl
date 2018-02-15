@@ -125,7 +125,7 @@ function onetoall_kernel(data, flags, cfg)
         end
         res[i] = v[1]
     end
-    res
+    hcat(points_unique, res)
 end
 
 function prune_points!(points_rc, point_ids)
