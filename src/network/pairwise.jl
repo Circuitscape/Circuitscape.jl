@@ -49,6 +49,7 @@ function get_network_flags(cfg)
     
     # Computation flags
     is_raster = false
+    is_advanced = cfg["scenario"] in ADVANCED
     is_alltoone = false
     is_onetoall = false
     grnd_file_is_res = cfg["ground_file_is_resistances"] in truelist
@@ -70,12 +71,13 @@ function get_network_flags(cfg)
                     set_null_currents_to_nodata, set_null_voltages_to_nodata,
                     compress_grids, log_transform_maps)
     
-    NetworkFlags(is_raster, is_alltoone, is_onetoall, 
+    NetworkFlags(is_raster, is_advanced, is_alltoone, is_onetoall, 
                 grnd_file_is_res, policy, solver, o)
 end
 
 struct NetworkFlags
     is_raster::Bool
+    is_advanced::Bool
     is_alltoone::Bool
     is_onetoall::Bool
     grnd_file_is_res::Bool

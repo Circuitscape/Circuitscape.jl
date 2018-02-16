@@ -36,7 +36,7 @@ function compute_advanced_data(data::NetworkData, flags)
     sources, grounds, finite_grounds = 
                 get_sources_and_grounds(data, flags, G, nodemap)
 
-    source_map = Matrix{eltype(a)}(0,0)
+    source_map = Matrix{eltype(A)}(0,0)
     AdvancedData(G, cc, nodemap, polymap, RasterMeta(), 
                 sources, grounds, source_map, finite_grounds, -1, 0)
 end

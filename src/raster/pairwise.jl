@@ -122,7 +122,12 @@ function _pt_file_polygons_path(rasterdata, flags, cfg)
     for i = 1:size(pts, 1)
         resistances[i,i] = 0
     end
-    resistances
+    P = [0, pts...]
+    @show P
+    display(resistances)
+    println()
+    hcat(P, vcat(pts', resistances))
+    # resistances
 end
 
 function compute_graph_data_polygons(rasterdata, flags, pt1, pt2)

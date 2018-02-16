@@ -1,7 +1,7 @@
 using Circuitscape
 using Base.Test
 
-include("internal.jl")
+# include("internal.jl")
 include("compare_output.jl")
 
 # Network pairwise tests
@@ -9,8 +9,12 @@ for i = 1:3
     info("Testing sgNetworkVerify$i")
     r = compute("input/network/sgNetworkVerify$(i).ini")
     x = readdlm("output_verify/sgNetworkVerify$(i)_resistances.out")
-    x = x[2:end, 2:end]
-    @test sum(abs2, x - r) < 1e-6
+    valx = x[2:end, 2:end]
+    valr = r[2:end, 2:end]
+    @test sum(abs2, valx - valr) < 1e-6
+    pts_x = x[2:end,1]
+    pts_r = r[2:end,1]
+    @test pts_x + 1 == pts_r
     compare_all_output("sgNetworkVerify$(i)")
     info("Test sgNetworkVerify$i passed")
 end
@@ -28,11 +32,21 @@ end
 
 
 # Raster pairwise tests
-for i = 1:15
+for i = 1:11
     info("Testing sgVerify$i")
     r = compute("input/raster/pairwise/$i/sgVerify$(i).ini")
     x = readdlm("output_verify/sgVerify$(i)_resistances.out")
-    x = x[2:end, 2:end]
+    # x = x[2:end, 2:end]
+    @test sum(abs2, x - r) < 1e-6
+    compare_all_output("sgVerify$(i)")
+    info("Test sgVerify$i passed")
+end
+
+for i = 13:15
+    info("Testing sgVerify$i")
+    r = compute("input/raster/pairwise/$i/sgVerify$(i).ini")
+    x = readdlm("output_verify/sgVerify$(i)_resistances.out")
+    # x = x[2:end, 2:end]
     @test sum(abs2, x - r) < 1e-6
     compare_all_output("sgVerify$(i)")
     info("Test sgVerify$i passed")
@@ -53,7 +67,7 @@ for i in 1:13
     info("Testing oneToAllVerify$i")
     r = compute("input/raster/one_to_all/$i/oneToAllVerify$(i).ini")
     x = readdlm("output_verify/oneToAllVerify$(i)_resistances.out")
-    x = x[:,2]
+    # x = x[:,2]
     @test sum(abs2, x - r) < 1e-6
     compare_all_output("oneToAllVerify$(i)")
     info("Test oneToAllVerify$i passed")
@@ -64,7 +78,7 @@ for i in 1:12
     info("Testing allToOneVerify$i")
     r = compute("input/raster/all_to_one/$i/allToOneVerify$(i).ini")
     x = readdlm("output_verify/allToOneVerify$(i)_resistances.out")
-    x = x[:,2]
+    # x = x[:,2]
 
     @test sum(abs2, x - r) < 1e-6
     info("Test allToOneVerify$i passed")

@@ -356,8 +356,8 @@ function get_network_data(T, cfg)
     end
 
     if !is_pairwise
-        source_map = read_point_strengths(source_file, T)
-        ground_map = read_point_strengths(ground_file, T)
+        source_map = read_point_strengths(T, source_file)
+        ground_map = read_point_strengths(T, ground_file)
     else
         source_map = Matrix{T}(0,0)
         ground_map = Matrix{T}(0,0)
