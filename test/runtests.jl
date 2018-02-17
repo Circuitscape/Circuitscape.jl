@@ -32,7 +32,7 @@ end
 
 
 # Raster pairwise tests
-for i = 1:11
+for i = 1:15
     info("Testing sgVerify$i")
     r = compute("input/raster/pairwise/$i/sgVerify$(i).ini")
     x = readdlm("output_verify/sgVerify$(i)_resistances.out")
@@ -42,7 +42,7 @@ for i = 1:11
     info("Test sgVerify$i passed")
 end
 
-for i = 13:15
+#=for i = 13:15
     info("Testing sgVerify$i")
     r = compute("input/raster/pairwise/$i/sgVerify$(i).ini")
     x = readdlm("output_verify/sgVerify$(i)_resistances.out")
@@ -50,7 +50,7 @@ for i = 13:15
     @test sum(abs2, x - r) < 1e-6
     compare_all_output("sgVerify$(i)")
     info("Test sgVerify$i passed")
-end
+end=#
 
 # Raster advanced tests
 for i in 1:5

@@ -468,7 +468,9 @@ function update_voltmatrix!(voltmatrix, local_nodemap, voltages, hbmeta, c, r, j
 end
 
 function update_shortcut_resistances!(anchor, shortcut, resistances, voltmatrix, c, cc)
-    check = map(x -> x in cc, c)
+
+    
+    check = map(x -> x in cc, x)
     l = size(resistances, 1)
     for pointx = 1:l
         if check[pointx]

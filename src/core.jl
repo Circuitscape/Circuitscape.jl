@@ -28,6 +28,7 @@ end
 struct Shortcut{T}
     get_shortcut_resistances::Bool
     voltmatrix::Matrix{T}
+    shortcut_res::Matrix{T}
 end
 
 """
@@ -79,6 +80,8 @@ function amg_solver_path(data, flags, cfg)
     # Initialize pairwise resistance
     resistances = -1 * ones(eltype(a), numpoints, numpoints)
     voltmatrix = zeros(eltype(a), size(resistances))
+    # shortcut_res = -1 * ones(eltype(a), size(resistances))
+    shortcut_res = deepcopy(resistances)
     
     # Get a vector of connected components
     comps = getindex.([a], cc, cc)
@@ -86,13 +89,13 @@ function amg_solver_path(data, flags, cfg)
     get_shortcut_resistances = false
     if is_raster && !write_volt_maps && !write_cur_maps
         get_shortcut_resistances = true
-        shortcut = -1 * ones(size(resistances))
-        covered = Dict{Int, Bool}()
-        for i = 1:size(cc, 1)
-            covered[i] = false
-        end
+        # shortcut_res = -1 * ones(eltype(a), size(resistances))
+        # covered = Dict{Int, Bool}()
+        # for i = 1:size(cc, 1)
+        #     covered[i] = false
+        # end
     end
-    shortcut = Shortcut(get_shortcut_resistances, voltmatrix)    
+    shortcut = Shortcut(get_shortcut_resistances, voltmatrix, shortcut_res)    
   
     for (cid, comp) in enumerate(cc)
     
@@ -128,7 +131,7 @@ function amg_solver_path(data, flags, cfg)
             smash_repeats!(ret, I)
 
             # Preprocess matrix
-            d = matrix[comp_i, comp_i]
+            # d = matrix[comp_i, comp_i]
 
             # Iteration space through all possible pairs
             rng = i+1:size(csub, 1)
@@ -171,27 +174,42 @@ function amg_solver_path(data, flags, cfg)
                 # Return resistance value
                 for c_i in I, c_j in J
                     push!(ret, (c_i, c_j, r))
+                    if get_shortcut_resistances
+                        resistances[c_i, c_j] = r
+                        resistances[c_j, c_i] = r
+                    end
                     output = Output(points, v, (orig_pts[c_i], orig_pts[c_j]),
                                         (comp_i, comp_j), r, c_j)
                     postprocess(output, component_data, flags, shortcut, cfg)
                 end
             end
 
-        matrix[comp_i, comp_i] = d
+        # matrix[comp_i, comp_i] = d
 
         ret
         end
 
-        X = map(x ->f(x), 1:size(csub,1))
 
-        # Set all resistances
-        for x in X
-            for i = 1:size(x, 1)
-                resistances[x[i][1], x[i][2]] = x[i][3]
-                resistances[x[i][2], x[i][1]] = x[i][3]
+        if get_shortcut_resistances        
+            idx = findfirst(points, csub[1])
+            f(1)
+            update_shortcut_resistances!(idx, shortcut, resistances, points, comp)
+        else
+            X = map(x ->f(x), 1:size(csub,1))
+
+            # Set all resistances
+            for x in X
+                for i = 1:size(x, 1)
+                    resistances[x[i][1], x[i][2]] = x[i][3]
+                    resistances[x[i][2], x[i][1]] = x[i][3]
+                end
             end
         end
 
+    end
+
+    if get_shortcut_resistances
+        resistances = shortcut.shortcut_res
     end
 
     for i = 1:size(resistances,1)
@@ -666,4 +684,60 @@ function postprocess(output, component_data, flags, shortcut, cfg)
         csinfo("Time taken to write current maps = $t seconds")
     end
     nothing
+end
+
+function update_voltmatrix!(shortcut, output, component_data)
+
+    # Data
+    voltmatrix = shortcut.voltmatrix
+    c = output.points
+    cc = component_data.cc
+    voltages = output.voltages
+    r = output.resistance
+    j = output.col
+
+    for i = 2:size(c, 1)
+        ind = findfirst(cc, c[i])
+        if ind != 0
+            voltageAtPoint = voltages[ind]
+            voltageAtPoint = 1 - (voltageAtPoint/r)
+            voltmatrix[i,j] = voltageAtPoint
+        end
+    end
+end
+
+                            
+function update_shortcut_resistances!(anchor, sc, resistances, points, comp)
+
+    # Data
+    voltmatrix = sc.voltmatrix
+    shortcut = sc.shortcut_res
+
+    check = map(x -> x in comp, points)
+    l = size(resistances, 1)
+    for pointx = 1:l
+        if check[pointx]
+            R1x = resistances[anchor, pointx]
+            if R1x != -1
+                shortcut[pointx, anchor] = shortcut[anchor, pointx] = R1x
+                for point2 = pointx:l
+                    if check[point2]
+                        R12 = resistances[anchor, point2]
+                        if R12 != -1
+                            if R1x != -777
+                                shortcut[anchor, point2] = shortcut[point2, anchor] = R12
+                                Vx = voltmatrix[pointx, point2]
+                                R2x = 2*R12*Vx + R1x - R12
+                                if shortcut[point2, pointx] != -777
+                                    shortcut[point2, pointx] = shortcut[pointx, point2] = R2x
+                                end
+                            else
+                                shortcut[pointx, :] = shortcut[:, pointx] = -777
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
 end
