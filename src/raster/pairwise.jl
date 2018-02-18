@@ -125,9 +125,6 @@ function _pt_file_polygons_path(rasterdata::RasData{T,V},
         resistances[i,i] = 0
     end
     P = [0, pts...]
-    @show P
-    display(resistances)
-    println()
     hcat(P, vcat(pts', resistances))
     # resistances
 end
