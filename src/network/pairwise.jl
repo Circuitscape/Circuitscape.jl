@@ -1,7 +1,7 @@
 """
 Primary driver for network pairwise. 
 """
-function network_pairwise(T, cfg)
+function network_pairwise(T, cfg)::Matrix{T}
     
     # Get input
     networkdata = get_network_data(T, cfg)
@@ -16,7 +16,7 @@ function network_pairwise(T, cfg)
     single_ground_all_pairs(graphdata, flags, cfg)
 end
 
-function compute_graph_data(data::NetworkData)
+function compute_graph_data(data::NetworkData{T,V})::GraphData{T,V} where {T,V}
 
     i,j,v = data.coords
 
@@ -34,11 +34,11 @@ function compute_graph_data(data::NetworkData)
     t = @elapsed G = laplacian(A)
     csinfo("Time taken to construct graph laplacian = $t")
 
-    T = eltype(i)
-    exclude_pairs = Tuple{T,T}[]
+    # T = eltype(i)
+    exclude_pairs = Tuple{V,V}[]
 
-    nodemap = Matrix{T}(0,0)
-    polymap = Matrix{T}(0,0)
+    nodemap = Matrix{V}(0,0)
+    polymap = Matrix{V}(0,0)
     hbmeta = RasterMeta()
 
     GraphData(G, cc, data.fp, data.fp, 

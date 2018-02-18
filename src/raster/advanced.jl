@@ -12,7 +12,7 @@ struct AdvancedData{T,V}
     src::V
 end
 
-function raster_advanced(T, cfg)
+function raster_advanced(T, cfg)::Matrix{T}
     
     # Load raster data
     rasterdata = load_raster_data(T, cfg)
@@ -27,7 +27,8 @@ function raster_advanced(T, cfg)
     advanced_kernel(advanced_data, flags, cfg)
 end
 
-function compute_advanced_data(data::RasData, flags)
+function compute_advanced_data(data::RasData{T,V}, 
+                        flags)::AdvancedData{T,V} where {T,V}
 
     # Data
     cellmap = data.cellmap
@@ -136,7 +137,7 @@ function resolve_conflicts(sources, grounds, policy)
     sources, grounds, finitegrounds
 end
 
-function advanced_kernel(data, flags, cfg)
+function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Matrix{T} where {T,V}
 
     # Data 
     G = data.G
@@ -234,19 +235,27 @@ function advanced_kernel(data, flags, cfg)
 
     scenario = cfg["scenario"]
     if !solver_called
-        return [-1.]
+        ret = Matrix{T}(1,1)
+        ret[1] = -1
+        return ret
     end
 
     if is_onetoall
         idx = find(source_map)
         val = volt[idx] ./ source_map[idx]
         if val[1] ≈ 0
-            return [-1.]
+            ret = Matrix{T}(1,1)
+            ret[1] = -1
+            return ret
         else
-            return val
+            ret = Matrix{T}(length(val),1)
+            ret[:,1] = val
+            return ret
         end
     elseif is_alltoone
-        return [0.]
+        ret = Matrix{T}(1,1)
+        ret[1] = 0
+        return ret
     end
 
     return volt

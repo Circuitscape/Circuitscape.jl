@@ -37,7 +37,7 @@ Core kernel of Circuitscape - used to solve several pairs
 Input:
 * data::GraphData
 """
-function single_ground_all_pairs(data, flags, cfg)
+function single_ground_all_pairs(data::GraphData{T,V}, flags, cfg) where {T,V}
 
     if flags.solver in AMG
         csinfo("Solver used: AMG accelerated by CG")
@@ -51,7 +51,7 @@ function single_ground_all_pairs(data, flags, cfg)
     end
 end
 
-function amg_solver_path(data, flags, cfg)
+function amg_solver_path(data::GraphData{T,V}, flags, cfg)::Matrix{T} where {T,V}
 
     # Data
     a = data.G
@@ -78,10 +78,10 @@ function amg_solver_path(data, flags, cfg)
     csinfo("Total number of pair solves = $num")
     
     # Initialize pairwise resistance
-    resistances = -1 * ones(eltype(a), numpoints, numpoints)
-    voltmatrix = zeros(eltype(a), size(resistances))
+    resistances = -1 * ones(T, numpoints, numpoints)::Matrix{T}
+    voltmatrix = zeros(T, size(resistances))::Matrix{T}
     # shortcut_res = -1 * ones(eltype(a), size(resistances))
-    shortcut_res = deepcopy(resistances)
+    shortcut_res = deepcopy(resistances)::Matrix{T}
     
     # Get a vector of connected components
     comps = getindex.([a], cc, cc)
@@ -123,7 +123,7 @@ function amg_solver_path(data, flags, cfg)
         function f(i)
 
             # Generate return type
-            ret = Vector{Tuple{Int,Int,Float64}}()
+            ret = Vector{Tuple{Int,Int,T}}()
 
             pi = csub[i]
             comp_i = findfirst(comp, pi)
@@ -158,7 +158,7 @@ function amg_solver_path(data, flags, cfg)
                 end
 
                 # Initialize currents
-                current = zeros(eltype(a), size(matrix, 1))
+                current = zeros(T, size(matrix, 1))
                 current[comp_i] = -1
                 current[comp_j] = 1
 
@@ -188,7 +188,6 @@ function amg_solver_path(data, flags, cfg)
 
         ret
         end
-
 
         if get_shortcut_resistances        
             idx = findfirst(points, csub[1])
@@ -643,10 +642,11 @@ function sum_off_diag(G, i)
      sum
  end
 
-solve_linear_system(cfg, 
+function solve_linear_system(cfg, 
             G::SparseMatrixCSC{T,V}, 
-            curr::Vector{T}, M) where {T,V} = 
-            cg(G, curr, Pl = M, tol = T(1e-6), maxiter = 100_000)
+            curr::Vector{T}, M)::Vector{T} where {T,V} 
+    cg(G, curr, Pl = M, tol = T(1e-6), maxiter = 100_000)
+end
 
 function postprocess(output, component_data, flags, shortcut, cfg)
 

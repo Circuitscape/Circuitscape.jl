@@ -1,4 +1,4 @@
-function network_advanced(T, cfg)
+function network_advanced(T, cfg)::Matrix{T}
 
     # Get data
     data = get_network_data(T, cfg)
@@ -13,7 +13,8 @@ function network_advanced(T, cfg)
     advanced_kernel(advanced_data, flags, cfg)
 end
 
-function compute_advanced_data(data::NetworkData, flags)
+function compute_advanced_data(data::NetworkData{T,V}, 
+                            flags)::AdvancedData{T,V} where {T,V}
 
     i,j,v = data.coords
     

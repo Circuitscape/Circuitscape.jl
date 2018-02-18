@@ -35,10 +35,10 @@ struct RasCompFlags
 end
 
 struct NetworkData{T,V} <: Data
-    coords::Tuple{Vector{T},Vector{T},Vector{V}}
-    fp::Vector{T}
-    source_map::Matrix{V}
-    ground_map::Matrix{V}
+    coords::Tuple{Vector{V},Vector{V},Vector{T}}
+    fp::Vector{V}
+    source_map::Matrix{T}
+    ground_map::Matrix{T}
 end
 
 struct RasterMeta
@@ -334,7 +334,7 @@ function read_included_pairs(file)
     end
 end
 
-function get_network_data(T, cfg)
+function get_network_data(T, cfg)::NetworkData{T,Int}
     
     hab_is_res = cfg["habitat_map_is_resistances"] in truelist
     hab_file = cfg["habitat_file"]
@@ -366,7 +366,7 @@ function get_network_data(T, cfg)
     NetworkData((I,J,V), fp, source_map, ground_map)
 end
 
-function load_raster_data(T, cfg)
+function load_raster_data(T, cfg)::RasData{T,Int}
 
     # Habitat file
     hab_file = cfg["habitat_file"]

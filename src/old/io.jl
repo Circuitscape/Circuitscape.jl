@@ -70,12 +70,12 @@ struct NetAdvData{Ti,Tv} <: Data
     ground_map::Matrix{Ti}
 end
 
-struct RasData{T,V,P,S} <: Data
+struct RasData{T,V} <: Data
     cellmap::Matrix{T}
-    polymap::P
-    source_map::Matrix{V}
-    ground_map::Matrix{V}
-    points_rc::Tuple{Vector{S},Vector{S},Vector{S}}
+    polymap::Matrix{T}
+    source_map::Matrix{T}
+    ground_map::Matrix{T}
+    points_rc::Tuple{Vector{V},Vector{V},Vector{V}}
     strengths::Matrix{T}
     included_pairs::IncludeExcludePairs
     hbmeta::RasterMeta

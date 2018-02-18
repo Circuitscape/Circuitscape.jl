@@ -12,7 +12,7 @@ struct RasterFlags
     outputflags::OutputFlags
 end
 
-function raster_pairwise(T, cfg)
+function raster_pairwise(T, cfg)::Matrix{T}
 
     # Get input
     rasterdata = load_raster_data(T, cfg)
@@ -71,13 +71,15 @@ function get_raster_flags(cfg)
                 four_neighbors, avg_res, solver, o)
 end
 
-function _pt_file_no_polygons_path(rasterdata, flags, cfg)
+function _pt_file_no_polygons_path(rasterdata::RasData{T,V}, 
+                    flags, cfg)::Matrix{T} where {T,V}
 
     graphdata = compute_graph_data_no_polygons(rasterdata, flags)
     single_ground_all_pairs(graphdata, flags, cfg)
 end
 
-function _pt_file_polygons_path(rasterdata, flags, cfg)
+function _pt_file_polygons_path(rasterdata::RasData{T,V}, 
+                        flags, cfg)::Matrix{T} where {T,V}
 
     # get unique list of points
     # for every point pair do
@@ -130,7 +132,8 @@ function _pt_file_polygons_path(rasterdata, flags, cfg)
     # resistances
 end
 
-function compute_graph_data_polygons(rasterdata, flags, pt1, pt2)
+function compute_graph_data_polygons(rasterdata::RasData{T,V}, 
+                            flags, pt1, pt2)::GraphData{T,V} where {T,V}
 
     # Data
     gmap = rasterdata.cellmap
@@ -185,7 +188,8 @@ end
     graphdata
 end=#
 
-function compute_graph_data_no_polygons(data, flags)
+function compute_graph_data_no_polygons(data::RasData{T,V}, 
+                    flags)::GraphData{T,V} where {T,V}
 
     # Data
     cellmap = data.cellmap

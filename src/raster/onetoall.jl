@@ -1,4 +1,4 @@
-function raster_one_to_all(T, cfg)
+function raster_one_to_all(T, cfg)::Matrix{T}
 
     # Load the data
     rasterdata = load_raster_data(T, cfg)
@@ -10,7 +10,7 @@ function raster_one_to_all(T, cfg)
     onetoall_kernel(rasterdata, flags, cfg)
 end
 
-function onetoall_kernel(data, flags, cfg)
+function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
 
     # Data
     strengths = data.strengths
@@ -89,7 +89,7 @@ function onetoall_kernel(data, flags, cfg)
             nodemap = construct_node_map(gmap, polymap)
             a = construct_graph(gmap, nodemap, avg_res, four_neighbors)
         end
-        T = eltype(a)
+        # T = eltype(a)
         if one_to_all
             #source_map = map(x -> x == n ? str : 0, point_map)
             source_map = map(x -> x == n ? T(str) : T(0), unique_point_map)
