@@ -28,11 +28,6 @@ function raster_pairwise(T, cfg)::Matrix{T}
     else
         _pt_file_no_polygons_path(rasterdata, flags, cfg)
     end
-    # Compute graph data based on compute flags
-    # graphdata = compute_graph_data(rasterdata, flags)
-    
-    # Send to main kernel
-    # single_ground_all_pairs(graphdata, flags, cfg)
 end
 
 function get_raster_flags(cfg)
@@ -103,20 +98,7 @@ function _pt_file_polygons_path(rasterdata::RasData{T,V},
         pt1 = pts[i]
         for j = i+1:size(pts, 1)
             pt2 = pts[j]
-            #=newpoly = create_new_polymap(gmap, polymap, points_rc, pt1, pt2)
-            nodemap = construct_node_map(gmap, newpoly)
-            a = construct_graph(gmap, nodemap, avg_res, four_neighbors)
-            x,y = 0,0
-            x = find(x -> x == pt1, points_rc[3])[1]
-            y = find(x -> x == pt2, points_rc[3])[1]
-            c1 = nodemap[points_rc[1][x], points_rc[2][x]]
-            c2 = nodemap[points_rc[1][y], points_rc[2][y]]
-            c = Int[c1, c2]=#
             graphdata = compute_graph_data_polygons(rasterdata, flags, pt1, pt2)
-            # pairwise_resistance = single_ground_all_pair_resistances(a, c, cfg; orig_pts =[points_rc[3][x], points_rc[3][y]],
-            #                                                                        nodemap = nodemap,
-            #                                                                        polymap = Polymap(newpoly),
-            #                                                                        hbmeta = hbmeta)
             pairwise_resistance = single_ground_all_pairs(graphdata, flags, cfg)
             resistances[i,j] = resistances[j,i] = pairwise_resistance[2,3]
         end
