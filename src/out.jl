@@ -122,19 +122,16 @@ end
 function get_node_currents(G, voltages, finitegrounds)
 
     @time node_currents_pos = _get_node_currents_posneg(G, voltages, finitegrounds, true)
-    @time node_currents_neg = _get_node_currents_posneg(G, voltages, finitegrounds, false)
-    node_currents = map((x,y) -> x > y ? x : y, node_currents_pos, node_currents_neg)
+    node_currents_neg = _get_node_currents_posneg(G, voltages, finitegrounds, false)
+    @time node_currents = map((x,y) -> x > y ? x : y, node_currents_pos, node_currents_neg)
 
 end
 
-function _get_node_currents_posneg(G, voltages, finitegrounds, pos)
+function _get_node_currents_posneg(G::SparseMatrixCSC{T,V}, 
+                            voltages, finitegrounds, pos) where {T,V}
 
     branch_currents = _get_branch_currents(G, voltages, pos)
     branch_currents = branch_currents - branch_currents'
-    #I,J,V = findnz(branch_currents)
-    #mask = V .> 0
-    #n = size(G, 1)
-    #branch_currents = sparse( I[mask], J[mask], V[mask], n, n)
     dropnonzeros!(branch_currents)
 
 	if finitegrounds[1]!= -9999
@@ -167,11 +164,6 @@ end
 function _get_branch_currents(G, voltages, pos)
 
 	branch_currents = _get_branch_currents_posneg(G, voltages, pos)
-    #=I,J,V = findnz(G)
-    n = size(G, 1)
-	mask = I .< J
-    branch_currents = sparse(I[mask], J[mask], branch_currents, n, n)
-    dropzeros!(branch_currents)=#
     N = size(G, 1)
     n = size(branch_currents, 1)
     I = zeros(Int, n)
@@ -190,7 +182,7 @@ function _get_branch_currents(G, voltages, pos)
     @assert n + 1 == k
 
     B = sparse(I, J, branch_currents, N, N)
-    
+
     B
 	# branch_currents
 end
