@@ -8,7 +8,6 @@ struct OutputFlags
     compress_grids::Bool
     log_transform_maps::Bool
 end
-using JLD
 
 function compute_3col{T}(resistances::Matrix{T}, fp)
     l = length(fp)
