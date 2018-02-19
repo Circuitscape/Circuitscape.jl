@@ -445,6 +445,7 @@ function _cholmod_solver_path(data, flags, cfg)
         # Check if positive definite (laplacians may be semi definite too)
         posdef = isposdef(matrix)
 
+        # FIXME - redundant compute 
         if posdef
             t = @elapsed factor = cholfact(matrix)
         else

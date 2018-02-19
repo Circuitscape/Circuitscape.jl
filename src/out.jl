@@ -8,6 +8,7 @@ struct OutputFlags
     compress_grids::Bool
     log_transform_maps::Bool
 end
+using JLD
 
 function compute_3col{T}(resistances::Matrix{T}, fp)
     l = length(fp)
@@ -92,18 +93,36 @@ function _create_current_maps(G, voltages, finitegrounds, cfg; nodemap = Matrix{
     else
 
         idx = find(nodemap)
-        current_map = zeros(hbmeta.nrows, hbmeta.ncols)
+        current_map = zeros(eltype(G), hbmeta.nrows, hbmeta.ncols)
         current_map[idx] = node_currents[Int.(nodemap[idx])]
+
+        #=v = voltages
+        S = deepcopy(G)
+        for i = 1:size(S, 1)
+            for j in nzrange(S,i)
+                row = S.rowval[j]
+                S.nzval[j] = abs(S.nzval[j] * (v[i] - v[row]))
+            end
+        end
+
+        n = vec(sum(G, 1))
+        c_map = zeros(eltype(G), hbmeta.nrows, hbmeta.ncols)
+        c_map[idx] = n[nodemap[idx]]
+
+        @show sum(abs2, c_map - current_map)
+        save("cmap.jld", "m", c_map)=#
+
         return current_map, spzeros(0,0)
 
     end
 
+    
 end
 
 function get_node_currents(G, voltages, finitegrounds)
 
-    node_currents_pos = _get_node_currents_posneg(G, voltages, finitegrounds, true)
-    node_currents_neg = _get_node_currents_posneg(G, voltages, finitegrounds, false)
+    @time node_currents_pos = _get_node_currents_posneg(G, voltages, finitegrounds, true)
+    @time node_currents_neg = _get_node_currents_posneg(G, voltages, finitegrounds, false)
     node_currents = map((x,y) -> x > y ? x : y, node_currents_pos, node_currents_neg)
 
 end
@@ -112,10 +131,11 @@ function _get_node_currents_posneg(G, voltages, finitegrounds, pos)
 
     branch_currents = _get_branch_currents(G, voltages, pos)
     branch_currents = branch_currents - branch_currents'
-    I,J,V = findnz(branch_currents)
-    mask = V .> 0
-    n = size(G, 1)
-    branch_currents = sparse( I[mask], J[mask], V[mask], n, n)
+    #I,J,V = findnz(branch_currents)
+    #mask = V .> 0
+    #n = size(G, 1)
+    #branch_currents = sparse( I[mask], J[mask], V[mask], n, n)
+    dropnonzeros!(branch_currents)
 
 	if finitegrounds[1]!= -9999
         finiteground_currents = finitegrounds .* voltages
@@ -131,22 +151,55 @@ function _get_node_currents_posneg(G, voltages, finitegrounds, pos)
     vec(sum(branch_currents, 1))
 end
 
+function dropnonzeros!(G)
+    for i = 1:size(G, 1)
+        for j in nzrange(G, i)
+            row = G.rowval[j]
+            val = G.nzval[j]
+            if val < 0
+                G.nzval[j] = 0
+            end
+        end
+    end
+    dropzeros!(G)
+end
+
 function _get_branch_currents(G, voltages, pos)
 
 	branch_currents = _get_branch_currents_posneg(G, voltages, pos)
-	I,J,V = findnz(G)
+    #=I,J,V = findnz(G)
     n = size(G, 1)
 	mask = I .< J
-	branch_currents = sparse(I[mask], J[mask], branch_currents, n, n)
-    dropzeros!(branch_currents)
+    branch_currents = sparse(I[mask], J[mask], branch_currents, n, n)
+    dropzeros!(branch_currents)=#
+    N = size(G, 1)
+    n = size(branch_currents, 1)
+    I = zeros(Int, n)
+    J = zeros(Int, n)
+    k = 1
+    for i = 1:N
+        for j in nzrange(G, i)
+            row = G.rowval[j]
+            if i > row
+                I[k] = row
+                J[k] = i
+                k += 1
+            end
+        end
+    end
+    @assert n + 1 == k
 
-	branch_currents
+    B = sparse(I, J, branch_currents, N, N)
+    
+    B
+	# branch_currents
 end
 
-function _get_branch_currents_posneg{T}(G, v::Vector{T}, pos)
+function _get_branch_currents_posneg(G, v::Vector{T}, pos) where {T}
 
-    I,J,V = findnz(G)
+    #=I,J,V = findnz(G)
     mask = I .< J
+    @show sum(mask)
     vdiff = zeros(T, sum(mask))
     if pos
         vdiff = v[I[mask]] - v[J[mask]]
@@ -163,8 +216,60 @@ function _get_branch_currents_posneg{T}(G, v::Vector{T}, pos)
 
     branch_currents = vdiff .* V[mask]
     maxcur = maximum(branch_currents)
-    map!(x -> abs(x / maxcur) < 1e-8 ? 0 : x, branch_currents, branch_currents)
-    branch_currents
+    map!(x -> abs(x / maxcur) < 1e-8 ? 0 : x, branch_currents, branch_currents)=#
+
+    n = count_upper(G)
+    b = zeros(T, n)
+    k = 1
+    if pos
+        for i = 1:size(G, 1)
+            for j in nzrange(G, i)
+                row = G.rowval[j]
+                val = G.nzval[j]
+                if i > row
+                    b[k] = abs(val) * (v[row] - v[i])
+                    k += 1
+                end
+            end
+        end
+    else
+        for i = 1:size(G, 1)
+            for j in nzrange(G, i)
+                row = G.rowval[j]
+                val = G.nzval[j]
+                if i > row
+                    b[k] = abs(val) * (v[i] - v[row])
+                    k += 1
+                end
+            end
+        end
+    end
+    # @show n, k
+    @assert n + 1 == k
+    maxcur = maximum(b)
+    # map!(x -> abs(x / maxcur) < 1e-8 ? 0 : x, b, b)
+    for i = 1:size(b, 1)
+        if abs(b[i]/ maxcur) < 1e-8
+            b[i] = 0
+        end
+    end
+
+    # @show sum(abs2, b - branch_currents)
+    # branch_currents
+    b
+end
+
+function count_upper(G)
+    n = 0
+    for i = 1:size(G, 1)
+        for j in nzrange(G,i)
+            row = G.rowval[j]
+            if i > row
+                n += 1
+            end
+        end
+    end
+    n
 end
 
 function write_aagrid(cmap, name, cfg, hbmeta;
@@ -222,7 +327,7 @@ function write_volt_maps(name, output, component_data, flags, cfg)
     end
 end
 
-function write_voltages{T}(output, name, voltages::Vector{T}, cc)
+function write_voltages(output, name, voltages::Vector{T}, cc) where {T}
 
     volt_arr = zeros(T, size(voltages, 1), 2)
     volt_arr[:,1] = cc
@@ -233,7 +338,7 @@ function write_voltages{T}(output, name, voltages::Vector{T}, cc)
 
 end
 
-function _create_voltage_map{T}(voltages::Vector{T}, nodemap, hbmeta)
+function _create_voltage_map(voltages::Vector{T}, nodemap, hbmeta) where {T}
     voltmap = zeros(T, hbmeta.nrows, hbmeta.ncols)
     idx = find(nodemap)
     voltmap[idx] = voltages[Int.(nodemap[idx])]

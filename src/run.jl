@@ -29,10 +29,8 @@ function compute(path::String)
         end
     else
         if scenario == "pairwise"
-            @code_warntype network_pairwise(T, cfg)
             network_pairwise(T, cfg)
         else
-            @code_warntype network_advanced(T, cfg)
             network_advanced(T, cfg)
         end
     end
