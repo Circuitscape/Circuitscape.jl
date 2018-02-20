@@ -176,6 +176,7 @@ function compute_graph_data_no_polygons(data::RasData{T,V},
     points_rc = data.points_rc
     included_pairs = data.included_pairs    
     hbmeta = data.hbmeta
+    @show eltype(cellmap)
     
     # Flags
     avg_res = flags.avg_res
@@ -184,6 +185,7 @@ function compute_graph_data_no_polygons(data::RasData{T,V},
     # Nodemap and graph construction
     nodemap = construct_node_map(cellmap, polymap)
     G = construct_graph(cellmap, nodemap, avg_res, four_neighbors)
+    @show eltype(G)
     G = laplacian(G)
 
     # Connected Components
@@ -201,6 +203,7 @@ function compute_graph_data_no_polygons(data::RasData{T,V},
         points[i] = nodemap[v...]
     end
 
+    @show eltype(G)
     GraphData(G, cc, points, points_rc[3], 
                 exclude_pairs, nodemap, polymap, hbmeta)
 end
@@ -289,9 +292,9 @@ end
 function construct_graph(gmap, nodemap, avg_res, four_neighbors)
     f1 = avg_res ? res_avg : cond_avg
     f2 = avg_res ? weirder_avg : weird_avg
-    I = Int64[]
-    J = Int64[]
-    V = Float64[]
+    I = Vector{Int}()
+    J = Vector{Int}()
+    V = Vector{eltype(gmap)}()
     for j = 1:size(gmap, 2)
         for i = 1:size(gmap, 1)
             if nodemap[i,j] == 0

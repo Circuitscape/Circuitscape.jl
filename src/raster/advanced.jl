@@ -105,14 +105,15 @@ function _get_sources_and_grounds(source_map, ground_map,
         resolve_conflicts(sources, grounds, policy)
 end
 
-function resolve_conflicts(sources, grounds, policy)
+function resolve_conflicts(sources::Vector{T}, 
+                            grounds::Vector{T}, policy) where T
     
     finitegrounds = similar(sources)
     l = size(sources, 1)
 
-    finitegrounds = map(x -> x < Inf ? x : 0., grounds)
+    finitegrounds = map(x -> x < T(Inf) ? x : T(0.), grounds)
     if count(x -> x != 0, finitegrounds) == 0
-        finitegrounds = [-9999.]
+        finitegrounds = T.([-9999.])
     end
 
     conflicts = falses(l)

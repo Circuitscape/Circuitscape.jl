@@ -61,3 +61,20 @@ function test_problem(str)
         config_path = joinpath(base_path, "network", str)
     end
 end    
+
+# Utility funciton for calling Circuitscape with Cholmod
+function compute_cholmod(str)
+    cfg = parse_config(str)
+    T = cfg["precision"] in SINGLE ? Float32 : Float64
+    if T == Float32
+        cswarn("Cholmod supports only double precision. Implicit conversion may occur")
+    end
+    cfg["solver"] = "cholmod"
+    _compute(T, cfg)
+end
+
+function compute_single(str)
+    cfg = parse_config(str)
+    cfg["precision"] = "single"
+    _compute(Float32, cfg)
+end
