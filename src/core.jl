@@ -389,7 +389,7 @@ function _cholmod_solver_path(data, flags, cfg)
     nodemap = data.nodemap
     polymap = data.polymap
     orig_pts = data.user_points
-    hbmeta = RasterMeta()
+    hbmeta = data.hbmeta
 
     # Flags
     outputflags = flags.outputflags
@@ -414,6 +414,7 @@ function _cholmod_solver_path(data, flags, cfg)
     # Initialize pairwise resistance
     resistances = -1 * ones(eltype(a), numpoints, numpoints)
     voltmatrix = zeros(eltype(a), size(resistances))
+    shortcut_res = -1 * ones(eltype(a), size(resistances))
     
     # Get a vector of connected components
     comps = getindex.([a], cc, cc)
@@ -421,13 +422,8 @@ function _cholmod_solver_path(data, flags, cfg)
     get_shortcut_resistances = false
     if is_raster && !write_volt_maps && !write_cur_maps
         get_shortcut_resistances = true
-        shortcut = -1 * ones(size(resistances))
-        covered = Dict{Int, Bool}()
-        for i = 1:size(cc, 1)
-            covered[i] = false
-        end
     end
-    shortcut = Shortcut(get_shortcut_resistances, voltmatrix)
+    shortcut = Shortcut(get_shortcut_resistances, voltmatrix, shortcut_res)
     
     for (cid, comp) in enumerate(cc)
     
@@ -449,7 +445,7 @@ function _cholmod_solver_path(data, flags, cfg)
         if posdef
             t = @elapsed factor = cholfact(matrix)
         else
-            t = @elapsed factor = cholfact(matrix + speye(size(matrix,1))/10^6)
+            t = @elapsed factor = cholfact(matrix + speye(size(matrix,1))/10^8)
         end
         csinfo("Time taken to construct cholesky factor = $t")
 
@@ -469,7 +465,8 @@ function _cholmod_solver_path(data, flags, cfg)
             pi = csub[i]
             comp_i = findfirst(comp, pi)
             I = find(x -> x == pi, points)
-            smash_repeats!(ret, I)
+            # smash_repeats!(ret, I)
+            smash_repeats!(resistances, I)
 
             # Iteration space through all possible pairs
             rng = i+1:size(csub, 1)
@@ -548,7 +545,7 @@ function _cholmod_solver_path(data, flags, cfg)
             postprocess(output, component_data, flags, shortcut, cfg)
         end
 
-        pmap(x -> f(x), 1:l)
+        map(x -> f(x), 1:l)
         # Set all resistances
         # for i = 1:size(ret, 1)
         #     resistances[ret[i][1], ret[i][2]] = ret[i][3]
@@ -610,6 +607,15 @@ function smash_repeats!(ret, I)
     for i = 1:size(I,1)
         for j = i+1:size(I,1)
             push!(ret, (I[i], I[j], 0))
+        end
+    end
+end
+
+function smash_repeats!(resistances::Matrix{T}, I) where T
+    for i = 1:size(I,1)
+        for j = i+1:size(I,1)
+            resistances[I[i], I[j]] = 0
+            resistances[I[j], I[i]] = 0
         end
     end
 end
