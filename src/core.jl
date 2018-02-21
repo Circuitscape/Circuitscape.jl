@@ -439,14 +439,17 @@ function _cholmod_solver_path(data, flags, cfg)
         matrix = comps[cid]
 
         # Check if positive definite (laplacians may be semi definite too)
-        posdef = isposdef(matrix)
+        # posdef = isposdef(matrix)
 
-        # FIXME - redundant compute 
-        if posdef
-            t = @elapsed factor = cholfact(matrix)
-        else
-            t = @elapsed factor = cholfact(matrix + speye(size(matrix,1))/10^8)
+        # If positive definite, will work directly 
+        #=t = @elapsed begin 
+        try 
+            factor = cholfact(matrix)
+        catch
+            factor = cholfact(matrix + sparse(10eps()*I,size(matrix,1)))
         end
+        end=#
+        t = @elapsed factor = construct_cholesky_factor(matrix)
         csinfo("Time taken to construct cholesky factor = $t")
 
         # Get local nodemap for CC - useful for output writing
@@ -568,6 +571,14 @@ function _cholmod_solver_path(data, flags, cfg)
     # Pad it with the user points
     vcat(vcat(0,orig_pts)', hcat(orig_pts, resistances))
 
+end
+
+function construct_cholesky_factor(matrix)
+    try 
+        return cholfact(matrix)
+    catch
+        return cholfact(matrix + sparse(10eps()*I,size(matrix,1)))
+    end
 end
 
 """
