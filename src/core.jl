@@ -194,7 +194,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg)::Matrix{T} where {T,V
             f(1)
             update_shortcut_resistances!(idx, shortcut, resistances, points, comp)
         else
-            X = map(x ->f(x), 1:size(csub,1))
+            X = pmap(x ->f(x), 1:size(csub,1))
 
             # Set all resistances
             for x in X
@@ -545,7 +545,7 @@ function _cholmod_solver_path(data, flags, cfg)
             postprocess(output, component_data, flags, shortcut, cfg)
         end
 
-        map(x -> f(x), 1:l)
+        pmap(x -> f(x), 1:l)
         # Set all resistances
         # for i = 1:size(ret, 1)
         #     resistances[ret[i][1], ret[i][2]] = ret[i][3]

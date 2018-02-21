@@ -5,6 +5,7 @@ import Circuitscape: compute_single, compute_cholmod
 # include("internal.jl")
 include("compare_output.jl")
 
+function f()
 for f in (compute, compute_single, compute_cholmod)
 str =  f == compute ? "Double" : "Single"
 
@@ -80,3 +81,13 @@ for i in 1:12
     info("Test allToOneVerify$i passed")
 end
 end
+end
+
+f()
+
+info("Parallel Tests")
+addprocs(2)
+
+@everywhere using Circuitscape
+@everywhere import Circuitscape: compute_cholmod, compute_single
+f()
