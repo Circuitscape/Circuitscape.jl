@@ -1,3 +1,14 @@
+struct OutputFlags
+    write_volt_maps::Bool
+    write_cur_maps::Bool
+    write_cum_cur_maps_only::Bool
+    write_max_cur_maps::Bool
+    set_null_currents_to_nodata::Bool
+    set_null_voltages_to_nodata::Bool
+    compress_grids::Bool
+    log_transform_maps::Bool
+end
+
 function compute_3col{T}(resistances::Matrix{T}, fp)
     l = length(fp)
     r3col = zeros(T, div(l * (l-1), 2), 3)
@@ -13,18 +24,26 @@ function compute_3col{T}(resistances::Matrix{T}, fp)
     r3col
 end
 
-function write_cur_maps(G, voltages, finitegrounds, cc, name, cfg; nodemap = Matrix{Float64}(0,0),
-                                                                    hbmeta = RasterMeta())
+    
+function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
+    
+    # Get desired data
+    G = component_data.matrix
+    voltages = flags.is_advanced ? output : output.voltages
+    cc = component_data.cc
+    nodemap = component_data.local_nodemap
+    hbmeta = component_data.hbmeta
 
     node_currents, branch_currents = _create_current_maps(G, voltages, finitegrounds, cfg, nodemap = nodemap, hbmeta = hbmeta)
 
-    if cfg["data_type"] == "network"
+    if !flags.is_raster
         branch_currents_array = _convert_to_3col(branch_currents, cc)
         node_currents_array = _append_name_to_node_currents(node_currents, cc)
         write_currents(node_currents_array, branch_currents_array, name, cfg)
     else
        current_map = node_currents
-       log_transform = cfg["log_transform_maps"] == "True"
+       # log_transform = cfg["log_transform_maps"] == "True"
+       log_transform = flags.outputflags.log_transform_maps
        write_aagrid(current_map, name, cfg, hbmeta; log_transform = log_transform)
    end
 end
@@ -73,12 +92,30 @@ function _create_current_maps(G, voltages, finitegrounds, cfg; nodemap = Matrix{
     else
 
         idx = find(nodemap)
-        current_map = zeros(hbmeta.nrows, hbmeta.ncols)
+        current_map = zeros(eltype(G), hbmeta.nrows, hbmeta.ncols)
         current_map[idx] = node_currents[Int.(nodemap[idx])]
+
+        #=v = voltages
+        S = deepcopy(G)
+        for i = 1:size(S, 1)
+            for j in nzrange(S,i)
+                row = S.rowval[j]
+                S.nzval[j] = abs(S.nzval[j] * (v[i] - v[row]))
+            end
+        end
+
+        n = vec(sum(G, 1))
+        c_map = zeros(eltype(G), hbmeta.nrows, hbmeta.ncols)
+        c_map[idx] = n[nodemap[idx]]
+
+        @show sum(abs2, c_map - current_map)
+        save("cmap.jld", "m", c_map)=#
+
         return current_map, spzeros(0,0)
 
     end
 
+    
 end
 
 function get_node_currents(G, voltages, finitegrounds)
@@ -89,15 +126,13 @@ function get_node_currents(G, voltages, finitegrounds)
 
 end
 
-function _get_node_currents_posneg(G, voltages, finitegrounds, pos)
+function _get_node_currents_posneg(G::SparseMatrixCSC{T,V}, 
+                            voltages, finitegrounds, pos) where {T,V}
 
     branch_currents = _get_branch_currents(G, voltages, pos)
     branch_currents = branch_currents - branch_currents'
-    I,J,V = findnz(branch_currents)
-    mask = V .> 0
-    n = size(G, 1)
-    branch_currents = sparse( I[mask], J[mask], V[mask], n, n)
-
+    dropnonzeros!(branch_currents)
+   
 	if finitegrounds[1]!= -9999
         finiteground_currents = finitegrounds .* voltages
         if pos
@@ -109,25 +144,57 @@ function _get_node_currents_posneg(G, voltages, finitegrounds, pos)
         branch_currents = branch_currents + spdiagm(finiteground_currents, 0, n, n)
     end
 
-    vec(sum(branch_currents, 1))
+    s = vec(sum(branch_currents, 1))
+    s
+end
+
+function dropnonzeros!(G)
+    for i = 1:size(G, 1)
+        for j in nzrange(G, i)
+            row = G.rowval[j]
+            val = G.nzval[j]
+            if val < 0
+                G.nzval[j] = 0
+            end
+        end
+    end
+    dropzeros!(G)
 end
 
 function _get_branch_currents(G, voltages, pos)
 
-	branch_currents = _get_branch_currents_posneg(G, voltages, pos)
-	I,J,V = findnz(G)
-    n = size(G, 1)
-	mask = I .< J
-	branch_currents = sparse(I[mask], J[mask], branch_currents, n, n)
-    dropzeros!(branch_currents)
+    branch_currents = _get_branch_currents_posneg(G, voltages, pos)
+    
+    # Make sparse matrix with branch_currents as right upper triangle
+    N = size(G, 1)
+    n = size(branch_currents, 1)
+    I = zeros(Int, n)
+    J = zeros(Int, n)
+    k = 1
+    for i = 1:N
+        for j in nzrange(G, i)
+            row = G.rowval[j]
+            if i > row
+                I[k] = row
+                J[k] = i
+                k += 1
+            end
+        end
+    end
+    @assert n + 1 == k
 
-	branch_currents
+    B = sparse(I, J, branch_currents, N, N)
+
+    B
+	# branch_currents
 end
 
-function _get_branch_currents_posneg{T}(G, v::Vector{T}, pos)
+function _get_branch_currents_posneg(G::SparseMatrixCSC{T,V}, 
+                                v::Vector{T}, pos) where {T,V}
 
-    I,J,V = findnz(G)
+    #=I,J,V = findnz(G)
     mask = I .< J
+    @show sum(mask)
     vdiff = zeros(T, sum(mask))
     if pos
         vdiff = v[I[mask]] - v[J[mask]]
@@ -144,8 +211,60 @@ function _get_branch_currents_posneg{T}(G, v::Vector{T}, pos)
 
     branch_currents = vdiff .* V[mask]
     maxcur = maximum(branch_currents)
-    map!(x -> abs(x / maxcur) < 1e-8 ? 0 : x, branch_currents, branch_currents)
-    branch_currents
+    map!(x -> abs(x / maxcur) < 1e-8 ? 0 : x, branch_currents, branch_currents)=#
+
+    n = count_upper(G)
+    b = zeros(T, n)
+    k = 1
+    if pos
+        for i = 1:size(G, 1)
+            for j in nzrange(G, i)
+                row = G.rowval[j]
+                val = G.nzval[j]
+                if i > row
+                    b[k] = abs(val) * (v[row] - v[i])
+                    k += 1
+                end
+            end
+        end
+    else
+        for i = 1:size(G, 1)
+            for j in nzrange(G, i)
+                row = G.rowval[j]
+                val = G.nzval[j]
+                if i > row
+                    b[k] = abs(val) * (v[i] - v[row])
+                    k += 1
+                end
+            end
+        end
+    end
+    # @show n, k
+    @assert n + 1 == k
+    maxcur = maximum(b)
+    # map!(x -> abs(x / maxcur) < 1e-8 ? 0 : x, b, b)
+    for i = 1:size(b, 1)
+        if abs(b[i]/ maxcur) < 1e-8
+            b[i] = 0
+        end
+    end
+
+    # @show sum(abs2, b - branch_currents)
+    # branch_currents
+    b
+end
+
+function count_upper(G)
+    n = 0
+    for i = 1:size(G, 1)
+        for j in nzrange(G,i)
+            row = G.rowval[j]
+            if i > row
+                n += 1
+            end
+        end
+    end
+    n
 end
 
 function write_aagrid(cmap, name, cfg, hbmeta;
@@ -181,17 +300,29 @@ function write_aagrid(cmap, name, cfg, hbmeta;
     close(f)
 end
 
-function write_volt_maps(name, voltages, cc, cfg; hbmeta = RasterMeta(), nodemap = Matrix{Float64}(0, 0))
+function write_volt_maps(name, output, component_data, flags, cfg)
 
-    if cfg["data_type"] == "network"
+    voltages = flags.is_advanced ? output : output.voltages
+
+    if !flags.is_raster
+
+        cc = component_data.cc
         write_voltages(cfg["output_file"], name, voltages, cc)
+
     else
+
+        # Desired data
+        # voltages = output.voltages
+        cc = component_data.cc
+        hbmeta = component_data.hbmeta
+        nodemap = component_data.local_nodemap
+
         vm = _create_voltage_map(voltages, nodemap, hbmeta)
         write_aagrid(vm, name, cfg, hbmeta, voltage = true)
     end
 end
 
-function write_voltages{T}(output, name, voltages::Vector{T}, cc)
+function write_voltages(output, name, voltages::Vector{T}, cc) where {T}
 
     volt_arr = zeros(T, size(voltages, 1), 2)
     volt_arr[:,1] = cc
@@ -202,7 +333,7 @@ function write_voltages{T}(output, name, voltages::Vector{T}, cc)
 
 end
 
-function _create_voltage_map{T}(voltages::Vector{T}, nodemap, hbmeta)
+function _create_voltage_map(voltages::Vector{T}, nodemap, hbmeta) where {T}
     voltmap = zeros(T, hbmeta.nrows, hbmeta.ncols)
     idx = find(nodemap)
     voltmap[idx] = voltages[Int.(nodemap[idx])]
@@ -226,3 +357,4 @@ function accum_currents!(base, newcurr, cfg, G, voltages, finitegrounds, nodemap
         base[i] += node_currents[i]
     end
 end
+

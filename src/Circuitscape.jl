@@ -1,22 +1,23 @@
 module Circuitscape
-
 using AMG
-using Logging
 using SimpleWeightedGraphs
 using LightGraphs
 using IterativeSolvers
+using Memento
 using GZip
-Logging.configure(level = DEBUG)
 
 include("config.jl")
+include("logging.jl")
+include("consts.jl")
+include("utils.jl")
 include("io.jl")
 include("out.jl")
-include("network.jl")
-include("raster.jl")
-include("utils.jl")
-
+include("core.jl")
+include("network/pairwise.jl")
+include("raster/pairwise.jl")
+include("raster/advanced.jl")
+include("network/advanced.jl")
+include("raster/onetoall.jl")
 include("run.jl")
 
-export compute
-
-end # module
+end

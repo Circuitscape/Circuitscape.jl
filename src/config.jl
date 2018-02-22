@@ -64,14 +64,8 @@ function init_config()
     a["log_level"] = "INFO"
     a["screenprint_log"] = "False"
     a["precision"] = "Double"
+    a["log_file"] = "None"
+    a["log_level"] = "INFO"
 
     a
 end
-abstract type Scenario end
-abstract type Datatype{S<:Scenario} end
-struct Pairwise <: Scenario end
-struct Advanced <: Scenario end
-struct OneToAll <: Scenario end
-struct AllToOne <: Scenario end
-struct Raster{S} <: Datatype{S} end
-struct Network{S} <: Datatype{S} end
