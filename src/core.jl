@@ -574,11 +574,7 @@ function _cholmod_solver_path(data, flags, cfg)
 end
 
 function construct_cholesky_factor(matrix)
-    try 
-        return cholfact(matrix)
-    catch
-        return cholfact(matrix + sparse(10eps()*I,size(matrix,1)))
-    end
+    cholfact(matrix + sparse(10eps()*I,size(matrix,1)))
 end
 
 """
