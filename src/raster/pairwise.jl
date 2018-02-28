@@ -45,20 +45,8 @@ function get_raster_flags(cfg)
         cfg["ground_file_is_resistances"] in truelist
     policy = Symbol(cfg["remove_src_or_gnd"])
 
-    # Output flags
-    write_volt_maps = cfg["write_volt_maps"] in truelist
-    write_cur_maps = cfg["write_cur_maps"] in truelist
-    write_cum_cur_maps_only = cfg["write_cum_cur_map_only"] in truelist
-    write_max_cur_maps = cfg["write_max_cur_maps"] in truelist
-    set_null_currents_to_nodata = cfg["set_null_currents_to_nodata"] in truelist
-    set_null_voltages_to_nodata = cfg["set_null_voltages_to_nodata"] in truelist
-    compress_grids = cfg["compress_grids"] in truelist
-    log_transform_maps = cfg["log_transform_maps"] in truelist
-
-    o = OutputFlags(write_volt_maps, write_cur_maps,
-                    write_cum_cur_maps_only, write_max_cur_maps,
-                    set_null_currents_to_nodata, set_null_voltages_to_nodata,
-                    compress_grids, log_transform_maps)
+    # Output Flags
+    o = get_output_flags(cfg)
     
     RasterFlags(is_raster, is_pairwise, is_advanced, 
                 is_onetoall, is_alltoone,

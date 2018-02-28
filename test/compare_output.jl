@@ -3,6 +3,8 @@ function compare_all_output(str)
     gen_list, list_to_comp = generate_lists(str)
 
     for f in gen_list
+        contains(f, "resistances") && continue
+
         info("Testing $f")
 
         # Raster output files
