@@ -74,7 +74,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg)::Matrix{T} where {T,V
     
     csinfo("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
 
-    num = get_num_pairs(cc, points, exclude)
+    num, d = get_num_pairs(cc, points, exclude)
     csinfo("Total number of pair solves = $num")
     
     # Initialize pairwise resistance
@@ -163,7 +163,8 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg)::Matrix{T} where {T,V
                 current[comp_j] = 1
 
                 # Solve system
-                csinfo("Solving points $pi and $pj")
+                # csinfo("Solving points $pi and $pj")
+                csinfo("Solving pair $(d[(pi,pj)]) of $num")
                 t2 = @elapsed v = solve_linear_system(cfg, matrix, current, P)
                 csinfo("Time taken to solve linear system = $t2 seconds")
                 v .= v .- v[comp_i]
@@ -220,160 +221,6 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg)::Matrix{T} where {T,V
 
 end
 
-function cholmod_solver_path(data, flags, cfg)
-
-    # Data
-    a = data.G
-    cc = data.cc
-    points = data.points
-    exclude = data.exclude_pairs
-    nodemap = data.nodemap
-    polymap = data.polymap
-    orig_pts = data.user_points
-    hbmeta = RasterMeta()
-
-    # Flags
-    outputflags = flags.outputflags
-    is_raster = flags.is_raster
-    write_volt_maps = outputflags.write_volt_maps
-    write_cur_maps = outputflags.write_cur_maps
-
-     # CHOLMOD solver mode works only in double precision
-     if eltype(a) == Float32
-        cswarn("Converting single precision matrix to double")
-        a = Float64.(a)
-    end
-
-    # Get number of focal points
-    numpoints = size(points, 1)
-    
-    csinfo("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
-
-    num = get_num_pairs(cc, points, exclude)
-    csinfo("Total number of pair solves = $num")
-    
-    # Initialize pairwise resistance
-    resistances = -1 * ones(eltype(a), numpoints, numpoints)
-    voltmatrix = zeros(eltype(a), size(resistances))
-    
-    # Get a vector of connected components
-    comps = getindex.([a], cc, cc)
-    
-    get_shortcut_resistances = false
-    if is_raster && !write_volt_maps && !write_cur_maps
-        get_shortcut_resistances = true
-        shortcut = -1 * ones(size(resistances))
-        covered = Dict{Int, Bool}()
-        for i = 1:size(cc, 1)
-            covered[i] = false
-        end
-    end
-    shortcut = Shortcut(get_shortcut_resistances, voltmatrix)
-  
-    for (cid, comp) in enumerate(cc)
-    
-        # Subset of points relevant to CC
-        csub = filter(x -> x in comp, points) |> unique
-        #idx = findin(c, csub)
-    
-        if isempty(csub)
-            continue
-        end
-
-        # Conductance matrix corresponding to CC
-        matrix = comps[cid]
-
-        # Check if positive definite (laplacians may be semi definite too)
-        posdef = isposdef(matrix)
-
-        if posdef
-            t = @elapsed factor = cholfact(matrix)
-        else
-            t = @elapsed factor = cholfact(matrix + speye(size(matrix,1))/10^6)
-        end
-        csinfo("Time taken to construct cholesky factor = $t")
-
-        # Get local nodemap for CC - useful for output writing
-        t2 = @elapsed local_nodemap = construct_local_node_map(nodemap, comp, polymap)
-        csinfo("Time taken to construct local nodemap = $t2 seconds")
-
-        component_data = ComponentData(comp, matrix, local_nodemap, hbmeta)
-
-        ret = Vector{Tuple{Int,Int,Float64}}()
-        
-        # Batched backsubstitution
-        for i = 1:size(csub,1)
-
-            pi = csub[i]
-            comp_i = findfirst(comp, pi)
-            I = find(x -> x == pi, points)
-            smash_repeats!(ret, I)
-
-            # Iteration space through all possible pairs
-            rng = i+1:size(csub, 1)
-
-            # Loop through all possible pairs
-            for j in rng
-
-                pj = csub[j]
-                comp_j = findfirst(comp, pj)
-                J = find(x -> x == pj, points)
-
-                # Forget excluded pairs
-                ex = false
-                for c_i in I, c_j in J
-                    if (c_i, c_j) in exclude
-                        ex = true
-                        break
-                    end
-                end
-                ex && continue
-
-                if pi == pj
-                    continue
-                end
-
-                # Initialize currents
-                current = zeros(eltype(a), size(matrix, 1))
-                current[comp_i] = -1
-                current[comp_j] = 1
-
-                # Solve system
-                csinfo("Solving points $pi and $pj")
-                t2 = @elapsed v = factor \ current
-                csinfo("Time taken to solve linear system = $t2 seconds")
-                v .= v .- v[comp_i]
-
-                # Calculate resistance
-                r = v[comp_j] - v[comp_i]
-
-                # Return resistance value
-                for c_i in I, c_j in J
-                    push!(ret, (c_i, c_j, r))
-                    output = Output(points, v, (orig_pts[c_i], orig_pts[c_j]),
-                                        (comp_i, comp_j), r, c_j)
-                    postprocess(output, component_data, flags, shortcut, cfg)
-                end
-            end
-        end
-
-        # Set all resistances
-        for i = 1:size(ret, 1)
-            resistances[ret[i][1], ret[i][2]] = ret[i][3]
-            resistances[ret[i][2], ret[i][1]] = ret[i][3]
-        end
-
-    end
-
-    for i = 1:size(resistances,1)
-        resistances[i,i] = 0
-    end
-
-    # Pad it with the user points
-    vcat(vcat(0,orig_pts)', hcat(orig_pts, resistances))
-
-end
-
 struct CholmodNode{T}
     cc_idx::Tuple{T,T}
     points_idx::Tuple{T,T}
@@ -408,7 +255,7 @@ function _cholmod_solver_path(data, flags, cfg)
     
     csinfo("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
 
-    num = get_num_pairs(cc, points, exclude)
+    num, d = get_num_pairs(cc, points, exclude)
     csinfo("Total number of pair solves = $num")
     
     # Initialize pairwise resistance
@@ -495,26 +342,7 @@ function _cholmod_solver_path(data, flags, cfg)
                     continue
                 end
 
-                # Initialize currents
-                # current = zeros(eltype(a), size(matrix, 1))
-                # current[comp_i] = -1
-                # current[comp_j] = 1
-
-                # Solve system
-                # csinfo("Solving points $pi and $pj")
-                # t2 = @elapsed v = factor \ current
-                # csinfo("Time taken to solve linear system = $t2 seconds")
-                # v .= v .- v[comp_i]
-
-                # Calculate resistance
-                # r = v[comp_j] - v[comp_i]
-
-                # Return resistance value
                 for c_i in I, c_j in J
-                    # push!(ret, (c_i, c_j, r))
-                    # output = Output(points, v, (orig_pts[c_i], orig_pts[c_j]),
-                    #                     (comp_i, comp_j), r, c_j)
-                    # postprocess(output, component_data, flags, shortcut, cfg)
                     push!(cholmod_batch, 
                         CholmodNode((comp_i, comp_j), (c_i, c_j)))
                 end
@@ -549,11 +377,6 @@ function _cholmod_solver_path(data, flags, cfg)
         end
 
         pmap(x -> f(x), 1:l)
-        # Set all resistances
-        # for i = 1:size(ret, 1)
-        #     resistances[ret[i][1], ret[i][2]] = ret[i][3]
-        #     resistances[ret[i][2], ret[i][1]] = ret[i][3]
-        # end
         for i = 1:l
             coords = cholmod_batch[i].points_idx
             r = lhs[cholmod_batch[i].cc_idx[2], i] - 
@@ -591,6 +414,7 @@ Output:
 function get_num_pairs(ccs, fp, exclude_pairs)
 
     num = 0
+    d = Dict{Tuple{Int,Int}, Int}()
 
     for (i,cc) in enumerate(ccs)
         sub_fp = filter(x -> x in cc, fp) |> unique
@@ -603,11 +427,12 @@ function get_num_pairs(ccs, fp, exclude_pairs)
                     continue
                 else
                     num += 1
+                    d[(pt1, pt2)] = num
                 end
             end
         end
     end
-    num
+    num, d
 end
 
 function smash_repeats!(ret, I)
