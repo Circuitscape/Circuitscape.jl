@@ -355,3 +355,10 @@ function accum_currents!(base, newcurr, cfg, G, voltages, finitegrounds, nodemap
     end
 end
 
+function save_resistances(r, cfg)
+    pref = split(cfg["output_file"], '.')[1]
+    filename = "$(pref)_resistances.out"
+    open(filename, "w") do f
+        writedlm(f, r, ' ')
+    end
+end

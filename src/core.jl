@@ -223,8 +223,12 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg)::Matrix{T} where {T,V
     end
 
     # Pad it with the user points
-    vcat(vcat(0,orig_pts)', hcat(orig_pts, resistances))
+    r = vcat(vcat(0,orig_pts)', hcat(orig_pts, resistances))
 
+    # Save resistances
+    save_resistances(r, cfg)
+
+    r
 end
 
 struct CholmodNode{T}
@@ -398,8 +402,12 @@ function _cholmod_solver_path(data, flags, cfg)
     end
 
     # Pad it with the user points
-    vcat(vcat(0,orig_pts)', hcat(orig_pts, resistances))
+    r = vcat(vcat(0,orig_pts)', hcat(orig_pts, resistances))
 
+    # Save resistances
+    save_resistances(r, cfg)
+
+    r
 end
 
 function construct_cholesky_factor(matrix)

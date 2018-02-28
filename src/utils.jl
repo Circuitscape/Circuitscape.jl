@@ -78,3 +78,21 @@ function compute_single(str)
     cfg["precision"] = "single"
     _compute(Float32, cfg)
 end
+
+function get_output_flags(cfg)
+
+    # Output flags
+    write_volt_maps = cfg["write_volt_maps"] in truelist
+    write_cur_maps = cfg["write_cur_maps"] in truelist
+    write_cum_cur_maps_only = cfg["write_cum_cur_map_only"] in truelist
+    write_max_cur_maps = cfg["write_max_cur_maps"] in truelist
+    set_null_currents_to_nodata = cfg["set_null_currents_to_nodata"] in truelist
+    set_null_voltages_to_nodata = cfg["set_null_voltages_to_nodata"] in truelist
+    compress_grids = cfg["compress_grids"] in truelist
+    log_transform_maps = cfg["log_transform_maps"] in truelist
+
+    o = OutputFlags(write_volt_maps, write_cur_maps,
+                    write_cum_cur_maps_only, write_max_cur_maps,
+                    set_null_currents_to_nodata, set_null_voltages_to_nodata,
+                    compress_grids, log_transform_maps)
+end
