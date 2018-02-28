@@ -135,6 +135,12 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg)::Matrix{T} where {T,V
 
             # Iteration space through all possible pairs
             rng = i+1:size(csub, 1)
+            if nprocs() > 1 
+                for j in rng
+                    pj = csub[j]
+                    csinfo("Scheduling pair $(d[(pi,pj)]) of $num to be solved")
+                end
+            end
 
             # Loop through all possible pairs
             for j in rng
