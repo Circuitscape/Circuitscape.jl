@@ -9,7 +9,8 @@ struct OutputFlags
     log_transform_maps::Bool
 end
 
-function compute_3col{T}(resistances::Matrix{T}, fp)
+function compute_3col(resistances::Matrix{T}) where {T}
+    fp = deleteat!(resistances[:,1], 1)
     l = length(fp)
     r3col = zeros(T, div(l * (l-1), 2), 3)
     k = 1
@@ -358,7 +359,12 @@ end
 function save_resistances(r, cfg)
     pref = split(cfg["output_file"], '.')[1]
     filename = "$(pref)_resistances.out"
+    filename_3col = "$(pref)_resistances_3columns.out"
+    rcol = compute_3col(r)
     open(filename, "w") do f
         writedlm(f, r, ' ')
+    end
+    open(filename_3col, "w") do f
+        writedlm(f, rcol, ' ')
     end
 end
