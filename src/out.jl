@@ -91,31 +91,20 @@ function _create_current_maps(G, voltages, finitegrounds, cfg; nodemap = Matrix{
 
     else
 
-        idx = find(nodemap)
         current_map = zeros(eltype(G), hbmeta.nrows, hbmeta.ncols)
-        current_map[idx] = node_currents[Int.(nodemap[idx])]
-
-        #=v = voltages
-        S = deepcopy(G)
-        for i = 1:size(S, 1)
-            for j in nzrange(S,i)
-                row = S.rowval[j]
-                S.nzval[j] = abs(S.nzval[j] * (v[i] - v[row]))
+        for j = 1:size(nodemap, 2)
+            for i = 1:size(nodemap, 1)
+                idx = nodemap[i,j]
+                if idx == 0
+                    continue
+                else
+                    current_map[i,j] = node_currents[idx]
+                end
             end
         end
 
-        n = vec(sum(G, 1))
-        c_map = zeros(eltype(G), hbmeta.nrows, hbmeta.ncols)
-        c_map[idx] = n[nodemap[idx]]
-
-        @show sum(abs2, c_map - current_map)
-        save("cmap.jld", "m", c_map)=#
-
         return current_map, spzeros(0,0)
-
     end
-
-    
 end
 
 function get_node_currents(G, voltages, finitegrounds)
@@ -335,8 +324,16 @@ end
 
 function _create_voltage_map(voltages::Vector{T}, nodemap, hbmeta) where {T}
     voltmap = zeros(T, hbmeta.nrows, hbmeta.ncols)
-    idx = find(nodemap)
-    voltmap[idx] = voltages[Int.(nodemap[idx])]
+    for j = 1:size(nodemap, 2)
+        for i = 1:size(nodemap, 1)
+            idx = nodemap[i,j]
+            if idx == 0
+                continue
+            else
+                voltmap[i,j] = voltages[idx]
+            end
+        end
+    end
     voltmap
 end
 
