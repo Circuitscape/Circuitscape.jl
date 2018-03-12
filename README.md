@@ -13,7 +13,80 @@ Circuitscape has now been rewritten in [Julia](https://julialang.org) for better
 This work is based on the original [Circuitscape](https://github.com/Circuitscape/Circuitscape) project by Brad McRae, Viral B. Shah 
 and Tanmay Mohapatra. 
 
-## Requirements
+## The New Circuitscape - Modern, Fast and Flexible
+
+The new Circuitscape is built entirely in the Julia language, a new
+programming language for technical computing. Julia is built from the
+ground up to be [fast](http://julialang.org/benchmarks). As such, this offers a
+number of advantages over the previous version, and these are detailed below.
+
+### Faster and More Scalable
+
+We benchmarked `Circuitscape.jl` with the Python version to obtain the
+following results. We started up Circuitscape with 16 parallel processes,
+and used benchmark problems from the standard Circuitscape 
+[benchmark suite.](https://github.com/Circuitscape/BigTests)
+
+<img src="/benchmark/benchmark.png" width=650 height=450>
+
+These benchmarks were run on a Linux (Ubuntu) server machine with the following specs: 
+* Name: Intel(R) Xeon(R) Silver 4114 CPU 
+* Clock Speed: 2.20GHz
+* Number of cores: 20  
+* RAM: 384 GB
+
+From the benchmark, we see that the new version is upto *4x faster*
+on 16 processes. However, the best performing bar in the chart is 
+_Julia-CHOLMOD_, which is a new feature introduced.
+
+### New Solver Mode - CHOLMOD
+
+Julia-CHOLMOD is a new solver mode used in the new Circuitscape. It performs a [cholesky
+decomposition](https://en.wikipedia.org/wiki/Cholesky_decomposition) on the graph 
+constructed, and performs a batched back substitution
+to compute the voltages. It plugs into the 
+[CHOLMOD](http://faculty.cse.tamu.edu/davis/suitesparse.html) library, 
+which is part of the SuiteSparse collection of high performance sparse 
+matrix algorithms.
+
+To use the this new mode, include a line in your Circuitscape 
+INI file:
+```
+solver = cholmod
+```
+
+The cholesky decomposition is a direct solver method, unlike the algebraic
+multigrid method used by default in both the old and the new version.
+The advantage with this new direct method is that it can be much faster than
+the iterative solution, within a particular problem size. 
+
+*Word of caution*: The cholesky decomposition is not practical
+to use beyond a certain problem size because of phenomenon called
+[fill-in](https://algowiki-project.org/en/Cholesky_method#Reordering_to_reduce_the_number_of_fill-in_elements), which results in loss of sparsity and large memory consumption.
+
+### Parallel, everywhere 
+
+The old Circuitscape had limited support for parallelism, which worked on Mac and
+Linux, but didn't work on Windows. 
+
+Julia as a programming language is built from the ground up to be parallel,
+and as a result the new Circuitscape natively supports parallelism on all three
+platforms.
+
+### Single Precision (Experimental)
+
+The new Circuitscape introduces the ability to run problems in
+single precision as opposed to the standard double precision.
+
+Single precision usually takes much less memory, but trades off
+against solution accuracy. 
+
+Use this new feature by including a line in your config file:
+```
+precision = single
+```
+
+## Installation 
 
 You will need to [install](https://julialang.org/downloads/) Julia on your system first. 
 
