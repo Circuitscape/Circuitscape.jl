@@ -57,12 +57,12 @@ solver = cholmod
 
 The cholesky decomposition is a direct solver method, unlike the algebraic
 multigrid method used by default in both the old and the new version.
-The advantage with this new method is that it can be much faster than
+The advantage with this new direct method is that it can be much faster than
 the iterative solution, within a particular problem size. 
 
 *Word of caution*: The cholesky decomposition is not practical
 to use beyond a certain problem size because of phenomenon called
-fill-in, which results in loss of sparsity and large memory consumption.
+[fill-in](https://algowiki-project.org/en/Cholesky_method#Reordering_to_reduce_the_number_of_fill-in_elements), which results in loss of sparsity and large memory consumption.
 
 ### Parallel, everywhere 
 
