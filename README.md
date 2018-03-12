@@ -58,11 +58,11 @@ solver = cholmod
 The cholesky decomposition is a direct solver method, unlike the algebraic
 multigrid method used by default in both the old and the new version.
 The advantage with this new method is that it can be much faster than
-the iterative solution, within a particular problem size. Unfortunately,
-direct solver methods do not scale well beyond a certain size, and the
-cholesky decomposition is no exception. In the case of the cholesky, a
-phenomenon called fill-in results in large memory consumption, which
-makes it impractical to use beyond a certain size. 
+the iterative solution, within a particular problem size. 
+
+*Word of caution*: The cholesky decomposition is not practical
+to use beyond a certain problem size because of phenomenon called
+fill-in, which results in loss of sparsity and large memory consumption.
 
 ### Parallel, everywhere 
 
@@ -72,6 +72,19 @@ Linux, but didn't work on Windows.
 Julia as a programming language is built from the ground up to be parallel,
 and as a result the new Circuitscape natively supports parallelism on all three
 platforms.
+
+### Single Precision (Experimental)
+
+The new Circuitscape introduces the ability to run problems in
+single precision as opposed to the standard double precision.
+
+Single precision usually takes much less memory, but trades off
+against solution accuracy. 
+
+Use this new feature by including a line in your config file:
+```
+precision = single
+```
 
 ## Installation 
 
