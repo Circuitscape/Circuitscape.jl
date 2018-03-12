@@ -27,7 +27,7 @@ following results. We started up Circuitscape with 16 parallel processes,
 and used benchmark problems from the standard Circuitscape 
 [benchmark suite.](https://github.com/Circuitscape/BigTests)
 
-<img src="/benchmark/benchmark.png" alt="benchmark" style="width: 300px; height: 300px;"/>
+<img src="/benchmark/benchmark.png" alt="benchmark" style="width: 200px; height: 200px;"/>
 
 These benchmarks were run on a Linux (Ubuntu) server machine with the following specs: 
 * Name: Intel(R) Xeon(R) Silver 4114 CPU 
