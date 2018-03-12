@@ -88,11 +88,7 @@ precision = single
 
 ## Installation 
 
-You will need to [install](https://julialang.org/downloads/) Julia on your system first. 
-
-## Installation
-
-1. First install Julia. 
+1. You will need to [install](https://julialang.org/downloads/) Julia on your system first.  
 
 2. Once you start Julia, install Circuitscape by: 
 
