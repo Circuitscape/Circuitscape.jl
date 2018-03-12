@@ -24,7 +24,7 @@ number of advantages over the previous version, and these are detailed below.
 
 We benchmarked `Circuitscape.jl` with the Python version to obtain the
 following results. We started up Circuitscape with 16 parallel processes,
-and used benchmark problems from the standar Circuitscape 
+and used benchmark problems from the standard Circuitscape 
 [benchmark suite.](https://github.com/Circuitscape/BigTests)
 
 ![benchmark](/benchmark/benchmark.png)
