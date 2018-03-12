@@ -22,7 +22,7 @@ ground up to be [fast, scalable and efficient](http://julialang.org/benchmarks).
 We benchmarked `Circuitscape.jl` with the Python version to obtain the
 following results. 
 
-![benchmark](http://raw.githubusercontent.com/Circuitscape/Circuitscape/readme/benchmark/benchmark.png)
+![benchmark](/benchmark/benchmark.png)
 
 These benchmarks were run on a Linux (Ubuntu) server machine with the following specs: 
 * Name: Intel(R) Xeon(R) Silver 4114 CPU 
