@@ -13,7 +13,42 @@ Circuitscape has now been rewritten in [Julia](https://julialang.org) for better
 This work is based on the original [Circuitscape](https://github.com/Circuitscape/Circuitscape) project by Brad McRae, Viral B. Shah 
 and Tanmay Mohapatra. 
 
-## Requirements
+## The New Circuitscape - Modern, Fast and Flexible 
+
+The new Circuitscape is built entirely in the Julia language, a new
+programming language for technical computing. Julia is built from the
+ground up to be [fast, scalable and efficient](http://julialang.org/benchmarks).
+
+We benchmarked `Circuitscape.jl` with the Python version to obtain the
+following results. We ran it on 
+
+These benchmarks were run on a Linux (Ubuntu) server machine with the following specs: 
+* Name: Intel(R) Xeon(R) Silver 4114 CPU 
+* Clock Speed: 2.20GHz
+* Number of cores: 20  
+* RAM: 384 GB
+
+The best performing of all modes is the new Julia-CHOLMOD solver mode. 
+
+### New Solver Mode - CHOLMOD
+
+Julia-CHOLMOD is a new solver mode used in the new Circuitscape. It performs a [cholesky
+decomposition]() on the graph constructed, and performs a batched back substitution
+to solve the system. It plugs into the [CHOLMOD]() library, which is part of the
+SuiteSparse collection of high performance sparse direct solver routines. 
+
+The cholesky decomposition is a direct solver method, unlike 
+
+### Parallel, everywhere 
+
+The old Circuitscape had limited support for parallelism, which worked on Mac and
+Linux, but didn't work on Windows. 
+
+Julia as a programming language is built from the ground up to be parallel,
+and as a result the new Circuitscape supports parallelism on all three
+platforms: Windows, Mac and Linux. 
+
+## Installation 
 
 You will need to [install](https://julialang.org/downloads/) Julia on your system first. 
 
