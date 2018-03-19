@@ -7,6 +7,7 @@ struct GraphData{T,V}
     nodemap::Matrix{V}
     polymap::Matrix{V}
     hbmeta::RasterMeta
+    cellmap::Matrix{T}
 end
 
 struct ComponentData{T,V}
@@ -14,6 +15,7 @@ struct ComponentData{T,V}
     matrix::SparseMatrixCSC{T,V}
     local_nodemap::Matrix{V}
     hbmeta::RasterMeta
+    cellmap::Matrix{T}
 end
 
 struct Output{T,V}
@@ -64,6 +66,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg)::Matrix{T} where {T,V
     orig_pts = data.user_points
     @show orig_pts
     hbmeta = data.hbmeta
+    cellmap = data.cellmap
 
     # Flags
     outputflags = flags.outputflags
@@ -120,7 +123,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg)::Matrix{T} where {T,V
         t2 = @elapsed local_nodemap = construct_local_node_map(nodemap, comp, polymap)
         csinfo("Time taken to construct local nodemap = $t2 seconds")
 
-        component_data = ComponentData(comp, matrix, local_nodemap, hbmeta)        
+        component_data = ComponentData(comp, matrix, local_nodemap, hbmeta, cellmap)        
 
         function f(i)
 

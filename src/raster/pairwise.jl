@@ -140,7 +140,7 @@ function compute_graph_data_polygons(rasterdata::RasData{T,V},
     exclude_pairs = Tuple{Int,Int}[]
     
     GraphData(G, cc, points, [pt1, pt2], 
-            exclude_pairs, nodemap, newpoly, hbmeta)
+            exclude_pairs, nodemap, newpoly, hbmeta, gmap)
 end
 
 #=function compute_graph_data(rasterdata, flags)
@@ -195,7 +195,7 @@ function compute_graph_data_no_polygons(data::RasData{T,V},
 
     @show eltype(G)
     GraphData(G, cc, points, points_rc[3], 
-                exclude_pairs, nodemap, polymap, hbmeta)
+                exclude_pairs, nodemap, polymap, hbmeta, cellmap)
 end
 Base.isempty(t::IncludeExcludePairs) = t.mode == :undef
 
