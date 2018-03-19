@@ -47,7 +47,7 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
        log_transform = flags.outputflags.log_transform_maps
        set_null_currents_to_nodata = 
             flags.outputflags.set_null_currents_to_nodata
-       write_aagrid(current_map, name, cfg, hbmeta, component_data; 
+       write_aagrid(current_map, name, cfg, hbmeta, component_data.cellmap; 
                         log_transform = log_transform, 
                         set_null_to_nodata = set_null_currents_to_nodata)
    end
@@ -261,11 +261,10 @@ function count_upper(G)
     n
 end
 
-function write_aagrid(cmap, name, cfg, hbmeta, component_data;
+function write_aagrid(cmap, name, cfg, hbmeta, cellmap;
                         voltage = false, cum = false, max = false,
                         log_transform = false, set_null_to_nodata = false)
 
-    cellmap = component_data.cellmap
     pref = split(cfg["output_file"], '.')[1]
 
     if log_transform
@@ -322,7 +321,7 @@ function write_volt_maps(name, output, component_data, flags, cfg)
         set_null_voltages_to_nodata = flags.outputflags.set_null_voltages_to_nodata
 
         vm = _create_voltage_map(voltages, nodemap, hbmeta)
-        write_aagrid(vm, name, cfg, hbmeta, component_data, voltage = true, 
+        write_aagrid(vm, name, cfg, hbmeta, component_data.cellmap, voltage = true, 
                         set_null_to_nodata = set_null_voltages_to_nodata)
     end
 end

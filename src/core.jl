@@ -259,6 +259,7 @@ function _cholmod_solver_path(data, flags, cfg)
     polymap = data.polymap
     orig_pts = data.user_points
     hbmeta = data.hbmeta
+    cellmap = data.cellmap
 
     # Flags
     outputflags = flags.outputflags
@@ -325,7 +326,7 @@ function _cholmod_solver_path(data, flags, cfg)
         t2 = @elapsed local_nodemap = construct_local_node_map(nodemap, comp, polymap)
         csinfo("Time taken to construct local nodemap = $t2 seconds")
 
-        component_data = ComponentData(comp, matrix, local_nodemap, hbmeta)
+        component_data = ComponentData(comp, matrix, local_nodemap, hbmeta, cellmap)
 
         ret = Vector{Tuple{Int,Int,Float64}}()
 
