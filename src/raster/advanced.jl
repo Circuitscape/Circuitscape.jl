@@ -10,6 +10,7 @@ struct AdvancedData{T,V}
     finite_grounds::Vector{T}
     check_node::V
     src::V
+    cellmap::Matrix{T}
 end
 
 function raster_advanced(T, cfg)::Matrix{T}
@@ -56,7 +57,8 @@ function compute_advanced_data(data::RasData{T,V},
             get_sources_and_grounds(data, flags, G, nodemap)
 
     AdvancedData(G, cc, nodemap, polymap, hbmeta,
-                sources, grounds, source_map, finite_grounds, -1, 0)
+                sources, grounds, source_map, 
+                finite_grounds, -1, 0, cellmap)
 end
 
 function get_sources_and_grounds(data, flags, G, nodemap)
@@ -152,6 +154,7 @@ function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Matrix{T} where {
     src = data.src
     check_node = data.check_node
     source_map = data.source_map # Need it for one to all mode
+    cellmap = data.cellmap
 
     # Flags
     is_raster = flags.is_raster
@@ -215,17 +218,17 @@ function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Matrix{T} where {
     name = src == 0 ? "" : "_$(Int(src))"
     if write_v_maps
         if !is_raster
-            write_volt_maps(name, voltages, FullGraph(G), flags, cfg)
+            write_volt_maps(name, voltages, FullGraph(G, cellmap), flags, cfg)
         else
-            write_aagrid(outvolt, name, cfg, hbmeta, voltage = true)
+            write_aagrid(outvolt, name, cfg, hbmeta, cellmap, voltage = true)
         end
     end
 
     if write_c_maps
         if !is_raster
-            write_cur_maps(name, voltages, FullGraph(G), finitegrounds, flags, cfg)
+            write_cur_maps(name, voltages, FullGraph(G, cellmap), finitegrounds, flags, cfg)
         else
-            write_aagrid(outcurr, name, cfg, hbmeta)
+            write_aagrid(outcurr, name, cfg, hbmeta, cellmap)
         end
     end
 
@@ -300,5 +303,7 @@ struct FullGraph{T,V}
     cc::Vector{V}
     local_nodemap::Matrix{V}
     hbmeta::RasterMeta
+    cellmap::Matrix{T}
 end
-FullGraph(G) = FullGraph(G, collect(1:size(G,1)), Matrix{Int}(0,0), RasterMeta())
+FullGraph(G, cellmap) = FullGraph(G, collect(1:size(G,1)), 
+                            Matrix{Int}(0,0), RasterMeta(), cellmap)

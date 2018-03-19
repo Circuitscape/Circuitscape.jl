@@ -8,6 +8,9 @@ function construct_local_node_map(nodemap, component, polymap)
     local_nodemap = zeros(eltype(nodemap), size(nodemap))
     idx = findin(nodemap, component)
     local_nodemap[idx] = nodemap[idx]
+    if nodemap == local_nodemap
+        return local_nodemap
+    end
     _construct_local_nodemap(local_nodemap, polymap, idx)
 end
 
@@ -19,6 +22,9 @@ function _construct_local_nodemap(local_nodemap, polymap, idx)
     else
         local_polymap = zeros(eltype(local_nodemap), size(local_nodemap))
         local_polymap[idx] = polymap[idx]
+        display("first local_polymap = ")
+        display(local_polymap)
+        println()
         return construct_node_map(local_nodemap, local_polymap)
     end
 end

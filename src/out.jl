@@ -34,6 +34,7 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
     cc = component_data.cc
     nodemap = component_data.local_nodemap
     hbmeta = component_data.hbmeta
+    cellmap = component_data.cellmap
 
     node_currents, branch_currents = _create_current_maps(G, voltages, finitegrounds, cfg, nodemap = nodemap, hbmeta = hbmeta)
 
@@ -43,9 +44,12 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
         write_currents(node_currents_array, branch_currents_array, name, cfg)
     else
        current_map = node_currents
-       # log_transform = cfg["log_transform_maps"] == "True"
        log_transform = flags.outputflags.log_transform_maps
-       write_aagrid(current_map, name, cfg, hbmeta; log_transform = log_transform)
+       set_null_currents_to_nodata = 
+            flags.outputflags.set_null_currents_to_nodata
+       write_aagrid(current_map, name, cfg, hbmeta, component_data.cellmap; 
+                        log_transform = log_transform, 
+                        set_null_to_nodata = set_null_currents_to_nodata)
    end
 end
 
@@ -257,14 +261,22 @@ function count_upper(G)
     n
 end
 
-function write_aagrid(cmap, name, cfg, hbmeta;
+function write_aagrid(cmap, name, cfg, hbmeta, cellmap;
                         voltage = false, cum = false, max = false,
-                        log_transform = false)
+                        log_transform = false, set_null_to_nodata = false)
 
     pref = split(cfg["output_file"], '.')[1]
 
     if log_transform
         map!(x -> x > 0 ? log10(x) : float(hbmeta.nodata), cmap, cmap)
+    end
+
+    if set_null_to_nodata
+        for i in eachindex(cmap)
+            if cellmap[i] == 0
+                cmap[i] = hbmeta.nodata
+            end
+        end
     end
 
     str = "curmap"
@@ -306,9 +318,11 @@ function write_volt_maps(name, output, component_data, flags, cfg)
         cc = component_data.cc
         hbmeta = component_data.hbmeta
         nodemap = component_data.local_nodemap
+        set_null_voltages_to_nodata = flags.outputflags.set_null_voltages_to_nodata
 
         vm = _create_voltage_map(voltages, nodemap, hbmeta)
-        write_aagrid(vm, name, cfg, hbmeta, voltage = true)
+        write_aagrid(vm, name, cfg, hbmeta, component_data.cellmap, voltage = true, 
+                        set_null_to_nodata = set_null_voltages_to_nodata)
     end
 end
 

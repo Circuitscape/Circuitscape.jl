@@ -111,7 +111,8 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
                             flags, G, nodemap, policy)
       
         advanced_data = AdvancedData(G, cc, nodemap, newpoly, hbmeta,
-                        sources, grounds, source_map, finite_grounds, check_node, n)
+                        sources, grounds, source_map, finite_grounds, 
+                        check_node, n, gmap)
 
         
         if one_to_all
