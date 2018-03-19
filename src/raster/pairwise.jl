@@ -114,6 +114,9 @@ function compute_graph_data_polygons(rasterdata::RasData{T,V},
 
     # Construct new polymap
     newpoly = create_new_polymap(gmap, polymap, points_rc, pt1, pt2)
+    display("newpoly = ")
+    display(newpoly)
+    println()
     nodemap = construct_node_map(gmap, newpoly)
 
     # Construct graph
@@ -132,7 +135,6 @@ function compute_graph_data_polygons(rasterdata::RasData{T,V},
     c1 = nodemap[points_rc[1][x], points_rc[2][x]]
     c2 = nodemap[points_rc[1][y], points_rc[2][y]]
     points = Int[c1, c2]
-    @show points
 
     # Exclude pairs array
     exclude_pairs = Tuple{Int,Int}[]

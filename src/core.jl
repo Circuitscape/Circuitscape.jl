@@ -57,10 +57,12 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg)::Matrix{T} where {T,V
     a = data.G
     cc = data.cc
     points = data.points
+    @show points
     exclude = data.exclude_pairs
     nodemap = data.nodemap
     polymap = data.polymap
     orig_pts = data.user_points
+    @show orig_pts
     hbmeta = data.hbmeta
 
     # Flags
@@ -172,6 +174,13 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg)::Matrix{T} where {T,V
                 # csinfo("Solving points $pi and $pj")
                 csinfo("Solving pair $(d[(pi,pj)]) of $num")
                 t2 = @elapsed v = solve_linear_system(cfg, matrix, current, P)
+                @show v
+                display("Nodemap: ")
+                display(nodemap)
+                println()
+                display("Local nodemap: ")
+                display(local_nodemap)
+                println()
                 csinfo("Time taken to solve linear system = $t2 seconds")
                 v .= v .- v[comp_i]
 
