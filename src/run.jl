@@ -15,7 +15,10 @@ function compute(path::String)
     cfg = parse_config(path)
     update_logging!(cfg)
     T = cfg["precision"] in SINGLE ? Float32 : Float64
-    _compute(T, cfg)
+    csinfo("Precision used: $(cfg["precision"])")
+    t = @elapsed r = _compute(T, cfg)
+    csinfo("Time taken to complete job = $t")
+    r
 end
 
 function _compute(T, cfg)
