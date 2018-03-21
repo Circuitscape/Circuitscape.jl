@@ -58,7 +58,7 @@ function compute_advanced_data(data::RasData{T,V},
 
     AdvancedData(G, cc, nodemap, polymap, hbmeta,
                 sources, grounds, source_map, 
-                finite_grounds, -1, 0, cellmap)
+                finite_grounds, INT(-1), INT(0), cellmap)
 end
 
 function get_sources_and_grounds(data, flags, G, nodemap)
@@ -85,13 +85,13 @@ function _get_sources_and_grounds(source_map, ground_map,
         (i1, j1, v1) = findnz(source_map)
         (i2, j2, v2) = findnz(ground_map)
         for i = 1:size(i1, 1)
-            v = Int(nodemap[i1[i], j1[i]])
+            v = INT(nodemap[i1[i], j1[i]])
             if v != 0
                 sources[v] += v1[i]
             end
         end
         for i = 1:size(i2, 1)
-            v = Int(nodemap[i2[i], j2[i]])
+            v = INT(nodemap[i2[i], j2[i]])
             if v != 0
                 grounds[v] += v2[i]
             end
@@ -100,8 +100,8 @@ function _get_sources_and_grounds(source_map, ground_map,
         if grnd_file_is_res
             ground_map[:,2] = 1 ./ ground_map[:,2]
         end
-        sources[Int.(source_map[:,1])] = source_map[:,2]
-        grounds[Int.(ground_map[:,1])] = ground_map[:,2]
+        sources[INT.(source_map[:,1])] = source_map[:,2]
+        grounds[INT.(ground_map[:,1])] = ground_map[:,2]
     end
     sources, grounds, finitegrounds = 
         resolve_conflicts(sources, grounds, policy)
@@ -206,7 +206,7 @@ function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Matrix{T} where {
 
         for i in eachindex(volt)
             if i in ind
-                val = Int(nodemap[i])
+                val = INT(nodemap[i])
                 if val in c
                     idx = findfirst(x -> x == val, c)
                     volt[i] = voltages[idx]
@@ -215,7 +215,7 @@ function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Matrix{T} where {
         end
     end
 
-    name = src == 0 ? "" : "_$(Int(src))"
+    name = src == 0 ? "" : "_$(INT(src))"
     if write_v_maps
         if !is_raster
             write_volt_maps(name, voltages, FullGraph(G, cellmap), flags, cfg)
@@ -274,11 +274,12 @@ function multiple_solver(cfg, a, sources, grounds, finitegrounds)
 
     infgrounds = find(x -> x == Inf, grounds)
     deleteat!(sources, infgrounds)
-    dst_del = Int[]
+    dst_del = INT[]
     append!(dst_del, infgrounds)
     r = collect(1:size(a, 1))
     deleteat!(r, dst_del)
     asolve = asolve[r, r]
+    save("test.jld", "G", asolve)
 
     M = aspreconditioner(smoothed_aggregation(asolve))
     volt = solve_linear_system(cfg, asolve, sources, M)
@@ -305,5 +306,5 @@ struct FullGraph{T,V}
     hbmeta::RasterMeta
     cellmap::Matrix{T}
 end
-FullGraph(G, cellmap) = FullGraph(G, collect(1:size(G,1)), 
-                            Matrix{Int}(0,0), RasterMeta(), cellmap)
+FullGraph(G, cellmap) = FullGraph(G, collect(INT, 1:size(G,1)), 
+                            Matrix{INT}(0,0), RasterMeta(), cellmap)

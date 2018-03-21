@@ -126,10 +126,11 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg)::Matrix{T} where {T,V
         function f(i)
 
             # Generate return type
-            ret = Vector{Tuple{Int,Int,T}}()
+            ret = Vector{Tuple{INT,INT,T}}()
 
             pi = csub[i]
             comp_i = findfirst(comp, pi)
+            comp_i = INT(comp_i)
             I = find(x -> x == pi, points)
             smash_repeats!(ret, I)
 
@@ -150,6 +151,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg)::Matrix{T} where {T,V
 
                 pj = csub[j]
                 comp_j = findfirst(comp, pj)
+                comp_j = INT(comp_j)
                 J = find(x -> x == pj, points)
 
                 # Forget excluded pairs
@@ -189,7 +191,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg)::Matrix{T} where {T,V
                         resistances[c_j, c_i] = r
                     end
                     output = Output(points, v, (orig_pts[c_i], orig_pts[c_j]),
-                                        (comp_i, comp_j), r, c_j)
+                                    (comp_i, comp_j), r, INT(c_j))
                     postprocess(output, component_data, flags, shortcut, cfg)
                 end
             end
@@ -319,7 +321,7 @@ function _cholmod_solver_path(data, flags, cfg)
 
         component_data = ComponentData(comp, matrix, local_nodemap, hbmeta, cellmap)
 
-        ret = Vector{Tuple{Int,Int,Float64}}()
+        ret = Vector{Tuple{INT,INT,Float64}}()
 
         cholmod_batch = CholmodNode[]
         
@@ -432,7 +434,7 @@ Output:
 function get_num_pairs(ccs, fp, exclude_pairs)
 
     num = 0
-    d = Dict{Tuple{Int,Int}, Int}()
+    d = Dict{Tuple{INT,INT}, INT}()
 
     for (i,cc) in enumerate(ccs)
         sub_fp = filter(x -> x in cc, fp) |> unique
@@ -486,7 +488,9 @@ function laplacian(G)
             end
         end
     end
-    G + spdiagm(s)
+    r = INT(1):INT(n)
+    S = sparse(r, r, s)
+    G + S
 end
 
 function sum_off_diag(G, i)

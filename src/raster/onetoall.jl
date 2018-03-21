@@ -38,7 +38,7 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
     end
 
     # Construct point map
-    point_map = zeros(Int, size(gmap))
+    point_map = zeros(INT, size(gmap))
     f(i, x) = points_rc[i][x]
     for x = 1:size(points_rc[1], 1)
         point_map[f(1,x), f(2,x)] = f(3, x)
@@ -64,7 +64,7 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
     res = zeros(eltype(a), size(points_unique, 1))
     num_points_to_solve = size(points_unique, 1)
     original_point_map = copy(point_map)
-    unique_point_map = zeros(Int, size(gmap))
+    unique_point_map = zeros(INT, size(gmap))
 
     for i in points_unique
         ind = findfirst(x -> x == i, points_rc[3])
@@ -130,7 +130,7 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
 end
 
 function prune_points!(points_rc, point_ids)
-    rmv = Int64[]
+    rmv = INT[]
     for (i,p) in enumerate(points_rc[3])
         if p in point_ids
             continue
@@ -145,7 +145,7 @@ end
 function prune_strengths!(strengths, point_ids)
     pts = strengths[:,1]
     l = length(pts)
-    rmv = Int[]
+    rmv = INT[]
     for (i,p) in enumerate(pts)
         if !(p in point_ids)
            push!(rmv, i)

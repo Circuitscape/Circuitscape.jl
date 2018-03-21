@@ -5,6 +5,7 @@ using LightGraphs
 using IterativeSolvers
 using Memento
 using GZip
+using JLD
 
 include("config.jl")
 include("logging.jl")
