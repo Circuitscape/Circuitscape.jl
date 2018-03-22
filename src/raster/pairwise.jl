@@ -218,13 +218,8 @@ function construct_node_map(gmap, polymap)
     nodemap[ind] = 1:sum(ind)
     
     if isempty(polymap)
-        #ind = gmap .> 0
-        #nodemap[ind] = 1:sum(ind)
         return nodemap
     end
-    display("polymap = ")
-    display(polymap)
-    println()
 
     #=d = Dict{Int, Vector{Int}}()
     #=for i in unique(polymap)
@@ -280,9 +275,6 @@ function construct_node_map(gmap, polymap)
     polymap_pruned[idx] = polymap[idx]
 
 
-    display("nodemap first = ")
-    display(nodemap)
-    println()
     polynums = unique(polymap)
     for i = 1:size(polynums, 1)
         polynum = polynums[i]
@@ -294,13 +286,8 @@ function construct_node_map(gmap, polymap)
             end
         end
     end
-    display("nodemap before = ")
-    display(nodemap)
-    println()
     relabel!(nodemap, 1)
-    display("nodemap after = ")
-    display(nodemap)
-    println()
+
     nodemap
 end
 
