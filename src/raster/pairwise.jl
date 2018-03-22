@@ -213,7 +213,7 @@ end
 
 function construct_node_map(gmap, polymap)
 
-    nodemap = zeros(Int, size(gmap))
+    nodemap = zeros(INT, size(gmap))
     ind = gmap .> 0
     nodemap[ind] = 1:sum(ind)
     
@@ -271,7 +271,7 @@ function construct_node_map(gmap, polymap)
     end=#
 
     idx = gmap .> 0 
-    polymap_pruned = zeros(Int, size(gmap))
+    polymap_pruned = zeros(INT, size(gmap))
     polymap_pruned[idx] = polymap[idx]
 
 
@@ -286,14 +286,14 @@ function construct_node_map(gmap, polymap)
             end
         end
     end
-    relabel!(nodemap, 1)
+    relabel!(nodemap, INT(1))
 
     nodemap
 end
 
-function relabel!(nodemap, offset = 0) 
+function relabel!(nodemap::Matrix{T}, offset = T(0)) where T
     oldlabels = nodemap[find(nodemap)]
-    newlabels = zeros(Int, size(oldlabels)) 
+    newlabels = zeros(INT, size(oldlabels)) 
     s = sort(oldlabels)
     #@show s
     perm = sortperm(oldlabels)
@@ -306,7 +306,7 @@ function relabel!(nodemap, offset = 0)
     newlabels[f] = 1
     newlabels = cumsum(newlabels)
     newlabels[perm] = copy(newlabels)
-    nodemap[find(nodemap)] = newlabels - 1  + offset
+    nodemap[find(nodemap)] = newlabels - T(1) + offset
 end
 
 function construct_graph(gmap, nodemap, avg_res, four_neighbors)
