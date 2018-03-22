@@ -1,12 +1,12 @@
-import Circuitscape: construct_node_map, Raster, OneToAll
-import Circuitscape: NoPoly, Polymap
+import Circuitscape: construct_node_map
+using Circuitscape
 
 # Construct nodemap tests
 let
         gmap = [0 1 2
                 2 0 0
                 2 0 2]
-        nodemap = construct_node_map(gmap, NoPoly())
+        nodemap = construct_node_map(gmap, Matrix{Int}(0,0))
         @test nodemap == [0 3 4
                           1 0 0
                           2 0 5]
@@ -66,11 +66,10 @@ end
 let
 
     cfg = Circuitscape.parse_config("input/raster/one_to_all/11/oneToAllVerify11.ini")
-    flags = Circuitscape.inputflags(Raster{OneToAll}(), cfg)
-    r, hbmeta = Circuitscape.grab_input(Raster{OneToAll}(), flags)
+    r = Circuitscape.load_raster_data(Float64, cfg)
 
     cellmap = r.cellmap
-    polymap = r.polymap.polymap
+    polymap = r.polymap
     points_rc = r.points_rc
     point_map = [ 1.0  2.0  0.0  0.0  0.0
                   0.0  0.0  0.0  0.0  0.0
@@ -78,7 +77,7 @@ let
                   4.0  0.0  0.0  0.0  0.0
                   1.0  0.0  0.0  0.0  2.0 ]
 
-    r = Circuitscape.create_new_polymap(cellmap, Polymap(polymap), points_rc, point_map = point_map)
+    r = Circuitscape.create_new_polymap(cellmap, polymap, points_rc, 0, 0, point_map)
 
     @test r == [ 1.0  2.0  0.0  0.0  0.0
                  0.0  0.0  0.0  0.0  0.0
@@ -89,15 +88,15 @@ end
 
 import Circuitscape: resolve_conflicts
 
-@test resolve_conflicts([1,0,0], [1,0,0], :rmvgnd) == ([1, 0, 0], [0, 0, 0], [1, 0, 0])
-@test resolve_conflicts([1,0,0], [1,0,0], :rmvsrc) == ([0, 0, 0], [1, 0, 0], [1, 0, 0])
-@test resolve_conflicts([1,0,0], [1,0,0], :keepall) == ([1, 0, 0], [1, 0, 0], [1, 0, 0])
-@test resolve_conflicts([1,0,0], [1,0,0], :rmvall) == ([0, 0, 0], [1, 0, 0], [1, 0, 0])
+@test resolve_conflicts([1.,0.,0.], [1.,0.,0.], :rmvgnd) == ([1, 0, 0], [0, 0, 0], [1, 0, 0])
+@test resolve_conflicts([1.,0.,0.], [1.,0.,0.], :rmvsrc) == ([0, 0, 0], [1, 0, 0], [1, 0, 0])
+@test resolve_conflicts([1.,0.,0.], [1.,0.,0.], :keepall) == ([1, 0, 0], [1, 0, 0], [1, 0, 0])
+@test resolve_conflicts([1.,0.,0.], [1.,0.,0.], :rmvall) == ([0, 0, 0], [1, 0, 0], [1, 0, 0])
 
 # Construct graph
 import Circuitscape: construct_graph
 let
-        gmap = [0 1 2
+        gmap = Float64[0 1 2
                 2 0 0
                 2 0 2]
         nodemap = [0 3 4
