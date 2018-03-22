@@ -329,7 +329,7 @@ function _cholmod_solver_path(data, flags, cfg)
         for i = 1:size(csub,1)
 
             pi = csub[i]
-            comp_i = findfirst(comp, pi)
+            comp_i = INT(findfirst(comp, pi))
             I = find(x -> x == pi, points)
             # smash_repeats!(ret, I)
             smash_repeats!(resistances, I)
@@ -341,7 +341,7 @@ function _cholmod_solver_path(data, flags, cfg)
             for j in rng
 
                 pj = csub[j]
-                comp_j = findfirst(comp, pj)
+                comp_j = INT(findfirst(comp, pj))
                 J = find(x -> x == pj, points)
 
                 # Forget excluded pairs
@@ -360,7 +360,7 @@ function _cholmod_solver_path(data, flags, cfg)
 
                 for c_i in I, c_j in J
                     push!(cholmod_batch, 
-                        CholmodNode((comp_i, comp_j), (c_i, c_j)))
+                      CholmodNode((comp_i, comp_j), (INT(c_i), INT(c_j))))
                 end
             end
         end
@@ -388,7 +388,7 @@ function _cholmod_solver_path(data, flags, cfg)
                 orig_pts[cholmod_batch[i].points_idx[2]]), 
                 cholmod_batch[i].cc_idx, 
                 lhs[cholmod_batch[i].cc_idx[2], i] - lhs[cholmod_batch[i].cc_idx[1], i],
-                cholmod_batch[i].points_idx[2])
+                INT(cholmod_batch[i].points_idx[2]))
             postprocess(output, component_data, flags, shortcut, cfg)
         end
 

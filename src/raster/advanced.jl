@@ -279,7 +279,6 @@ function multiple_solver(cfg, a, sources, grounds, finitegrounds)
     r = collect(1:size(a, 1))
     deleteat!(r, dst_del)
     asolve = asolve[r, r]
-    save("test.jld", "G", asolve)
 
     M = aspreconditioner(smoothed_aggregation(asolve))
     volt = solve_linear_system(cfg, asolve, sources, M)
