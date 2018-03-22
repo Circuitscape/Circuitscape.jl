@@ -2,15 +2,22 @@ using Circuitscape
 using Base.Test
 import Circuitscape: compute_single, compute_cholmod
 
-# include("internal.jl")
+# Utility to compare output files
 include("compare_output.jl")
+
+# Unit tests for internals
+@testset "Unit tests" begin 
+include("internal.jl")
+end
+
 
 function f()
 for f in (compute, compute_single, compute_cholmod)
 str =  f == compute ? "Double" : "Single"
 
-info("$str Precision Tests")
+@testset "$str Precision Tests" begin 
 
+@testset "Network Pairwise" begin 
 # Network pairwise tests
 for i = 1:3
     info("Testing sgNetworkVerify$i")
@@ -25,7 +32,9 @@ for i = 1:3
     compare_all_output("sgNetworkVerify$(i)")
     info("Test sgNetworkVerify$i passed")
 end
+end
 
+@testset "Network Advanced" begin
 # Network advanced tests
 for i = 1:3
     info("Testing mgNetworkVerify$i")
@@ -36,8 +45,10 @@ for i = 1:3
     compare_all_output("mgNetworkVerify$(i)")
     info("Test mgNetworkVerify$i passed")
 end
+end
 
 
+@testset "Raster Pairwise" begin 
 # Raster pairwise tests
 for i = 1:15
     info("Testing sgVerify$i")
@@ -48,7 +59,9 @@ for i = 1:15
     compare_all_output("sgVerify$(i)")
     info("Test sgVerify$i passed")
 end
+end
 
+@testset "Raster Advanced" begin 
 # Raster advanced tests
 for i in 1:5
     info("Testing mgVerify$i")
@@ -58,7 +71,9 @@ for i in 1:5
     # compare_all_output("mgVerify$(i)")
     info("Test mgVerify$i passed")
 end
+end
 
+@testset "Raster One to All" begin 
 # Raster one to all test
 for i in 1:13
     info("Testing oneToAllVerify$i")
@@ -69,7 +84,9 @@ for i in 1:13
     compare_all_output("oneToAllVerify$(i)")
     info("Test oneToAllVerify$i passed")
 end
+end
 
+@testset "Raster ALl to One" begin
 # Raster all to one test
 for i in 1:12
     info("Testing allToOneVerify$i")
@@ -81,13 +98,17 @@ for i in 1:12
     info("Test allToOneVerify$i passed")
 end
 end
+
+end
+end
 end
 
 f()
 
-info("Parallel Tests")
+@testset "Parallel Tests" begin 
 addprocs(2)
 
 @everywhere using Circuitscape
 @everywhere import Circuitscape: compute_cholmod, compute_single
 f()
+end

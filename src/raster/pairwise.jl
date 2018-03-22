@@ -214,14 +214,14 @@ end
 function construct_node_map(gmap, polymap)
 
     nodemap = zeros(Int, size(gmap))
+    ind = gmap .> 0
+    nodemap[ind] = 1:sum(ind)
     
     if isempty(polymap)
-        ind = gmap .> 0
-        nodemap[ind] = 1:sum(ind)
         return nodemap
     end
 
-    d = Dict{Int, Vector{Int}}()
+    #=d = Dict{Int, Vector{Int}}()
     #=for i in unique(polymap)
         d[i] = find(x -> x == i, polymap)
     end=#
@@ -268,9 +268,45 @@ function construct_node_map(gmap, polymap)
             index::Int64 = findfirst(x -> x == val, polymap)
             nodemap[i] = nodemap[index]
         end
+    end=#
+
+    idx = gmap .> 0 
+    polymap_pruned = zeros(Int, size(gmap))
+    polymap_pruned[idx] = polymap[idx]
+
+
+    polynums = unique(polymap)
+    for i = 1:size(polynums, 1)
+        polynum = polynums[i]
+        if polynums[i] != 0
+            idx1 = find(x -> x == polynum, polymap_pruned)
+            idx2 = find(x -> x == polynum, polymap)
+            if length(idx1) > 0
+                nodemap[idx2] = nodemap[idx1[1]]
+            end
+        end
     end
+    relabel!(nodemap, 1)
 
     nodemap
+end
+
+function relabel!(nodemap, offset = 0) 
+    oldlabels = nodemap[find(nodemap)]
+    newlabels = zeros(Int, size(oldlabels)) 
+    s = sort(oldlabels)
+    #@show s
+    perm = sortperm(oldlabels)
+    #@show perm
+    prepend!(s, s[1] - 1)
+    #@show s
+    #@show diff(s)
+    f = find(diff(s))
+    #@show f
+    newlabels[f] = 1
+    newlabels = cumsum(newlabels)
+    newlabels[perm] = copy(newlabels)
+    nodemap[find(nodemap)] = newlabels - 1  + offset
 end
 
 function construct_graph(gmap, nodemap, avg_res, four_neighbors)

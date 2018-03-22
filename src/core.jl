@@ -112,7 +112,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg)::Matrix{T} where {T,V
 
         # Conductance matrix corresponding to CC
         matrix = comps[cid]
-    
+
         # Construct preconditioner *once* for every CC
         t1 = @elapsed P = aspreconditioner(smoothed_aggregation(matrix))
         csinfo("Time taken to construct preconditioner = $t1 seconds")
