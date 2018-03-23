@@ -131,10 +131,10 @@ function compute_graph_data_polygons(rasterdata::RasData{T,V},
     y = findfirst(points_rc[3], pt2)
     c1 = nodemap[points_rc[1][x], points_rc[2][x]]
     c2 = nodemap[points_rc[1][y], points_rc[2][y]]
-    points = Int[c1, c2]
+    points = INT[c1, c2]
 
     # Exclude pairs array
-    exclude_pairs = Tuple{Int,Int}[]
+    exclude_pairs = Tuple{INT,INT}[]
     
     GraphData(G, cc, points, [pt1, pt2], 
             exclude_pairs, nodemap, newpoly, hbmeta, gmap)
@@ -180,10 +180,10 @@ function compute_graph_data_no_polygons(data::RasData{T,V},
     if !isempty(included_pairs)
         exclude_pairs = generate_exclude_pairs(points_rc, included_pairs)
     else
-        exclude_pairs = Tuple{Int,Int}[]
+        exclude_pairs = Tuple{INT,INT}[]
     end
 
-    points = zeros(Int, length(points_rc[3]))
+    points = zeros(INT, length(points_rc[3]))
     for (i,v) in enumerate(zip(points_rc[1], points_rc[2]))
         points[i] = nodemap[v...]
     end
@@ -195,7 +195,7 @@ Base.isempty(t::IncludeExcludePairs) = t.mode == :undef
 
 function generate_exclude_pairs(points_rc, included_pairs)
 
-    exclude_pairs_array = Tuple{Int,Int}[]
+    exclude_pairs_array = Tuple{INT,INT}[]
     mat = included_pairs.include_pairs
     mode = included_pairs.mode == :include ? 0 : 1    
 
@@ -213,7 +213,7 @@ end
 
 function construct_node_map(gmap, polymap)
 
-    nodemap = zeros(Int, size(gmap))
+    nodemap = zeros(INT, size(gmap))
     ind = gmap .> 0
     nodemap[ind] = 1:sum(ind)
     
@@ -265,13 +265,13 @@ function construct_node_map(gmap, polymap)
     for i in eachindex(polymap)
         if polymap[i] != 0 && nodemap[i] == 0
             val::Float64 = polymap[i]
-            index::Int64 = findfirst(x -> x == val, polymap)
+            index::INT = findfirst(x -> x == val, polymap)
             nodemap[i] = nodemap[index]
         end
     end=#
 
     idx = gmap .> 0 
-    polymap_pruned = zeros(Int, size(gmap))
+    polymap_pruned = zeros(INT, size(gmap))
     polymap_pruned[idx] = polymap[idx]
 
 
@@ -286,14 +286,14 @@ function construct_node_map(gmap, polymap)
             end
         end
     end
-    relabel!(nodemap, 1)
+    relabel!(nodemap, INT(1))
 
     nodemap
 end
 
-function relabel!(nodemap, offset = 0) 
+function relabel!(nodemap::Matrix{T}, offset = T(0)) where T
     oldlabels = nodemap[find(nodemap)]
-    newlabels = zeros(Int, size(oldlabels)) 
+    newlabels = zeros(INT, size(oldlabels)) 
     s = sort(oldlabels)
     #@show s
     perm = sortperm(oldlabels)
@@ -306,14 +306,14 @@ function relabel!(nodemap, offset = 0)
     newlabels[f] = 1
     newlabels = cumsum(newlabels)
     newlabels[perm] = copy(newlabels)
-    nodemap[find(nodemap)] = newlabels - 1  + offset
+    nodemap[find(nodemap)] = newlabels - T(1) + offset
 end
 
 function construct_graph(gmap, nodemap, avg_res, four_neighbors)
     f1 = avg_res ? res_avg : cond_avg
     f2 = avg_res ? weirder_avg : weird_avg
-    I = Vector{Int}()
-    J = Vector{Int}()
+    I = Vector{INT}()
+    J = Vector{INT}()
     V = Vector{eltype(gmap)}()
     for j = 1:size(gmap, 2)
         for i = 1:size(gmap, 1)
@@ -363,7 +363,7 @@ weird_avg(x,y) = (x + y) / (2*√2)
 weirder_avg(x, y) = 1 / (√2 * (1/x + 1/y) / 2)
 
 function create_new_polymap(gmap, polymap, points_rc, 
-                pt1 = 0, pt2 = 0, point_map = Matrix{Int64}(0,0))
+                pt1 = 0, pt2 = 0, point_map = Matrix{INT}(0,0))
     
     f(x) = (points_rc[1][x], points_rc[2][x])
 
@@ -400,7 +400,7 @@ function create_new_polymap(gmap, polymap, points_rc,
     end
 
     if isempty(polymap)
-        newpoly = zeros(Int, size(gmap)...)
+        newpoly = zeros(INT, size(gmap)...)
         id1 = find(x -> x == pt1, points_rc[3])
         id2 = find(x -> x == pt2, points_rc[3])
         map(x -> newpoly[f(x)...] = pt1, id1)

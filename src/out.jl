@@ -162,8 +162,8 @@ function _get_branch_currents(G, voltages, pos)
     # Make sparse matrix with branch_currents as right upper triangle
     N = size(G, 1)
     n = size(branch_currents, 1)
-    I = zeros(Int, n)
-    J = zeros(Int, n)
+    I = zeros(INT, n)
+    J = zeros(INT, n)
     k = 1
     for i = 1:N
         for j in nzrange(G, i)
