@@ -22,7 +22,7 @@ number of advantages over the previous version, and these are detailed below.
 
 ### Faster and More Scalable
 
-We benchmarked `Circuitscape.jl` with the Python version to obtain the
+We benchmarked `Circuitscape.jl` (v0.1.0) with the Python version (v4.0.5) to obtain the
 following results. We started up Circuitscape with 16 parallel processes,
 and used benchmark problems from the standard Circuitscape 
 [benchmark suite.](https://github.com/Circuitscape/BigTests)
