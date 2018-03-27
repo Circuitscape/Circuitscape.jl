@@ -4,6 +4,9 @@ using Tachyons
 using CSSUtil
 using JSExpr
 
+include("networkui.jl")
+include("rasterui.jl")
+
 w = Window()
 
 function generate_ui(w)
@@ -17,7 +20,7 @@ function generate_ui(w)
     data_type = vbox(Node(:div, "Select Data Type: "),
                  Node(:select, "Select Data Type", 
                  Node(:option, "Raster"), 
-                 Node(:option, "Network"), id = "dt", attributes = Dict(:style => "margin: 12px")))
+                 Node(:option, "Network"), id = "dt", attributes = Dict(:style => "margin-top: 12px; margin-bottom: 12px")))
 
     s = get_data_type!(data_type)
     ui1 = network_ui()
@@ -39,7 +42,6 @@ function generate_ui(w)
 
     body!(w, page)
 
-    dt
 end
 
 function get_data_type!(data_type)
