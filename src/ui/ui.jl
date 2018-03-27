@@ -4,8 +4,8 @@ using Tachyons
 using CSSUtil
 using JSExpr
 
-include("networkui.jl")
-include("rasterui.jl")
+include("pairwise_ui.jl")
+include("advanced_ui.jl")
 
 w = Window()
 
@@ -23,20 +23,39 @@ function generate_ui(w)
     mod_mode_raster = get_mod_mode_raster()
 
     # Next drop down
-    nextui = map(dt["value"]) do v
+    mod_mode = map(dt["value"]) do v
         if v == "Network"
             mod_mode_network
         else
             mod_mode_raster
         end
     end
+
+    input_section = Node(:div, tachyons_css, "Input Resistance Data") |> 
+                    class"f3 lh-title"
     
-    
+    #=input_data = map(mod_mVode["value"]) do v
+        if v == "Pairwise"
+            pairwise_input_ui()
+        elseif v == "Advanced"
+            advanced_input_ui()
+        elseif v == "One To All"
+            onetoall_input_ui()
+        elseif v == "All To One"
+            alltoone_inputui()
+        end
+    end=#
+
+    input = input_ui()
 
     page = vbox(heading, 
                 hline(style = :solid, w=5px)(style = Dict(:margin => 20px)), 
                 section1,
-                dt, nextui) |> class"pa3 system-sans-serif"
+                dt, 
+                mod_mode, 
+                hline(style = :solid, w=3px)(style = Dict(:margin => 10px)),
+                input_section,
+                input)|> class"pa3 system-sans-serif"
 
     body!(w, page)
 

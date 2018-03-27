@@ -1,8 +1,9 @@
 
-function network_ui()
+function input_ui()
     
     # First Node
-    graph = vbox(Node(:div, "Select pair list from file: "),
+    graph = vbox(Node(:div, "Raster resistance map or network/graph: ", 
+                      attributes = Dict(:style => "margin-top: 12px")) |> class"b",
                  Node(:input, attributes = Dict(:type => :file, 
                                                 :style => "margin-top: 12px")))
 
@@ -12,17 +13,24 @@ function network_ui()
                         Node(:div, "Data represents resistances instead of conductances", 
                              attributes = Dict(:style => "margin-top: 12px")))
 
+    vbox(graph,
+         graph_is_res)
+end
+
+function focal_nodes()
     focal = vbox(Node(:div, "Select focal node locations from file: ", 
                       attributes = Dict(:style => "margin-top: 12px")),
                  Node(:input,  attributes = Dict(:type => :file, 
                                                  :style => "margin-top: 12px")))
+end
 
+function output_nodes()
     output = vbox(Node(:div, "Enter base name for output file: ",
                        attributes = Dict(:style => "margin-top: 12px")),
                   Node(:input, attributes = Dict(:type => :text, 
                                                  :style => "margin-top: 12px")))
 
-    el = vbox(graph, 
+    el = vbox(graph,
               graph_is_res, 
               focal, 
               output)
