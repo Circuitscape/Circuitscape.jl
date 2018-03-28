@@ -17,7 +17,7 @@ function input_ui()
          graph_is_res)
 end
 
-function focal_nodes()
+function pairwise_input_ui()
     focal = vbox(Node(:div, "Select focal node locations from file: ", 
                       attributes = Dict(:style => "margin-top: 12px")),
                  Node(:input,  attributes = Dict(:type => :file, 

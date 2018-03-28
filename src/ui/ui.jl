@@ -15,7 +15,7 @@ function generate_ui(w)
                     class"f-subheadline lh-title tc red"
 
     section1 = Node(:div, tachyons_css, "Data Type and Modelling Mode") |> 
-                    class"f3 lh-title"
+                    class"f4 lh-title"
 
     dt = get_data_type()
 
@@ -30,21 +30,22 @@ function generate_ui(w)
             mod_mode_raster
         end
     end
+    @show mod_mode
 
     input_section = Node(:div, tachyons_css, "Input Resistance Data") |> 
-                    class"f3 lh-title"
+                    class"f4 lh-title"
     
-    #=input_data = map(mod_mVode["value"]) do v
+    points_input = map(mod_mode["value"]) do v
         if v == "Pairwise"
             pairwise_input_ui()
         elseif v == "Advanced"
             advanced_input_ui()
         elseif v == "One To All"
-            onetoall_input_ui()
+            pairwise_input_ui()
         elseif v == "All To One"
-            alltoone_inputui()
+            pairwise_input_ui()
         end
-    end=#
+    end
 
     input = input_ui()
 
@@ -55,7 +56,9 @@ function generate_ui(w)
                 mod_mode, 
                 hline(style = :solid, w=3px)(style = Dict(:margin => 10px)),
                 input_section,
-                input)|> class"pa3 system-sans-serif"
+                input, 
+                hline(style = :solid, w=3px)(style = Dict(:margin => 10px)),
+                )|> class"pa3 system-sans-serif"
 
     body!(w, page)
 
@@ -103,6 +106,7 @@ function get_mod_mode_network()
                         $(s["value"])[] = el.value
                     end)
              end)
+
     s
 end
 
