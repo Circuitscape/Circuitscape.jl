@@ -6,6 +6,7 @@ using JSExpr
 
 include("pairwise_ui.jl")
 include("advanced_ui.jl")
+include("output_ui.jl")
 
 w = Window()
 
@@ -30,24 +31,38 @@ function generate_ui(w)
             mod_mode_raster
         end
     end
-    @show mod_mode
 
+    # Get the input raster/graph 
     input_section = Node(:div, tachyons_css, "Input Resistance Data") |> 
                     class"f4 lh-title"
+    input = input_ui()
     
-    points_input = map(mod_mode["value"]) do v
-        if v == "Pairwise"
-            pairwise_input_ui()
-        elseif v == "Advanced"
-            advanced_input_ui()
-        elseif v == "One To All"
-            pairwise_input_ui()
-        elseif v == "All To One"
-            pairwise_input_ui()
+    # Focal points or advanced mode
+    pair = pairwise_input_ui()
+    adv = advanced_input_ui()
+    #=points_input = Observable{Any}(Node(:div))
+    map!(points_input, mod_mode) do s
+        v = s["value"]
+        tmp = Observable{Any}(Node(:div))
+        map!(tmp, v) do x 
+            @show x
+            if x == "Pairwise"
+                pair
+            elseif x == "Advanced"
+                adv
+            elseif x == "One To All"
+                pair
+            elseif x == "All To One"
+                pair
+            end
         end
+        tmp
     end
 
-    input = input_ui()
+    @show points_input=#
+    
+    # Output options
+    output = output_ui()
 
     page = vbox(heading, 
                 hline(style = :solid, w=5px)(style = Dict(:margin => 20px)), 
@@ -58,7 +73,11 @@ function generate_ui(w)
                 input_section,
                 input, 
                 hline(style = :solid, w=3px)(style = Dict(:margin => 10px)),
-                )|> class"pa3 system-sans-serif"
+                pair, 
+                hline(style = :solid, w=3px)(style = Dict(:margin => 10px)),
+                adv,
+                hline(style = :solid, w=3px)(style = Dict(:margin => 10px)),
+                output)|> class"pa3 system-sans-serif"
 
     body!(w, page)
 
@@ -95,13 +114,13 @@ function get_mod_mode_network()
                           attributes = Dict(:style => "margin-top: 12px")) |> class"b",
                  Node(:select, "Select Modelling Mode", 
                  Node(:option, "Pairwise"), 
-                 Node(:option, "Advanced"), id = "mod", 
+                 Node(:option, "Advanced"), id = "modelling", 
                  attributes = Dict(:style => "margin-top: 12px; margin-bottom: 12px")))
 
     s = Scope()
     s.dom = mod_mode
     onimport(s, JSExpr.@js function ()
-                 @var el = this.dom.querySelector("#mod")
+                 @var el = this.dom.querySelector("#modelling")
                  el.onchange = (function ()
                         $(s["value"])[] = el.value
                     end)
@@ -119,13 +138,13 @@ function get_mod_mode_raster()
                  Node(:option, "Pairwise"), 
                  Node(:option, "Advanced"), 
                  Node(:option, "One To All "), 
-                 Node(:option, "All To One"), id = "mod", 
+                 Node(:option, "All To One"), id = "modelling", 
                  attributes = Dict(:style => "margin-top: 12px; margin-bottom: 12px")))
 
     s = Scope()
     s.dom = mod_mode
     onimport(s, JSExpr.@js function ()
-                 @var el = this.dom.querySelector("#mod")
+                 @var el = this.dom.querySelector("#modelling")
                  el.onchange = (function ()
                         $(s["value"])[] = el.value
                     end)
