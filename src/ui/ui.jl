@@ -10,6 +10,24 @@ include("output_ui.jl")
 
 w = Window()
 
+function showsome(uis, which)
+    s = Scope()
+    s["visible"] = which
+    s.dom = Node(:div, id="cont", uis...)
+    onjs(s["visible"], JSExpr.@js function (visbl)
+                 @var cont = this.dom.querySelector("cont")
+                 @var cs = cont.children
+                 for i = 1:cs.length
+                     if visbl.indexOf(i) >= 0
+                         cs[i].style.display = "block"
+                     else          
+                         cs[i].style.display = "none"
+                     end
+                 end
+             end)
+    s
+end
+
 function generate_ui(w)
 
     heading = Node(:div, tachyons_css, "Circuitscape 5.0") |> 
@@ -23,12 +41,15 @@ function generate_ui(w)
     mod_mode_network = get_mod_mode_network()
     mod_mode_raster = get_mod_mode_raster()
 
+    mod_mode = Observable{Any}(Node(:div))
+    points_input = Observable{Any}(Node(:div))
+
     # Next drop down
     mod_mode = map(dt["value"]) do v
         if v == "Network"
-            mod_mode_network
+            get_mod_mode_network()
         else
-            mod_mode_raster
+            get_mod_mode_raster()
         end
     end
 
@@ -40,6 +61,21 @@ function generate_ui(w)
     # Focal points or advanced mode
     pair = pairwise_input_ui()
     adv = advanced_input_ui()
+
+    # str = Observable(mod_mode[]["value"][])
+    # str = Observable("Pairwise")
+    on(mod_mode) do x
+        v = x["value"]
+        on(v) do s
+            @show s
+            if s == "Advanced"
+                points_input[] = adv
+            else
+                points_input[] = pair
+            end
+        end
+    end
+    # @show str[]
     #=points_input = Observable{Any}(Node(:div))
     map!(points_input, mod_mode) do s
         v = s["value"]
@@ -60,6 +96,7 @@ function generate_ui(w)
     end
 
     @show points_input=#
+    dt["value"][] = "Raster"
     
     # Output options
     output = output_ui()
@@ -73,9 +110,10 @@ function generate_ui(w)
                 input_section,
                 input, 
                 hline(style = :solid, w=3px)(style = Dict(:margin => 10px)),
-                pair, 
+                #=pair, 
                 hline(style = :solid, w=3px)(style = Dict(:margin => 10px)),
-                adv,
+                adv,=#
+                points_input,
                 hline(style = :solid, w=3px)(style = Dict(:margin => 10px)),
                 output)|> class"pa3 system-sans-serif"
 
@@ -97,6 +135,7 @@ function get_data_type()
 
     s = Scope()
     s.dom = data_type
+    s["value"] = Observable("Raster")
     onimport(s, JSExpr.@js function ()
                  @var el = this.dom.querySelector("#dt")
                  el.onchange = (function ()
@@ -119,6 +158,7 @@ function get_mod_mode_network()
 
     s = Scope()
     s.dom = mod_mode
+    s["value"] = Observable("Pairwise")
     onimport(s, JSExpr.@js function ()
                  @var el = this.dom.querySelector("#modelling")
                  el.onchange = (function ()
@@ -143,6 +183,7 @@ function get_mod_mode_raster()
 
     s = Scope()
     s.dom = mod_mode
+    s["value"] = Observable("Pairwise")
     onimport(s, JSExpr.@js function ()
                  @var el = this.dom.querySelector("#modelling")
                  el.onchange = (function ()
