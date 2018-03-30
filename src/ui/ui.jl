@@ -38,14 +38,12 @@ function generate_ui(w)
 
     dt = get_data_type()
 
-    mod_mode_network = get_mod_mode_network()
-    mod_mode_raster = get_mod_mode_raster()
-
     mod_mode = Observable{Any}(Node(:div))
     points_input = Observable{Any}(Node(:div))
 
     # Next drop down
     mod_mode = map(dt["value"]) do v
+        points_input[] = pairwise_input_ui()
         if v == "Network"
             get_mod_mode_network()
         else
@@ -97,6 +95,7 @@ function generate_ui(w)
 
     @show points_input=#
     dt["value"][] = "Raster"
+    # points_input[] = pairwise_input_ui()
     
     # Output options
     output = output_ui()
