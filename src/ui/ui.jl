@@ -37,12 +37,14 @@ function generate_ui(w)
                     class"f4 lh-title"
 
     dt = get_data_type()
+    # dt["value"][] = "Raster"
 
-    mod_mode = Observable{Any}(Node(:div))
+    mode = Observable{Any}("")
     points_input = Observable{Any}(Node(:div))
 
     # Next drop down
     mod_mode = map(dt["value"]) do v
+        @show v
         points_input[] = pairwise_input_ui()
         if v == "Network"
             get_mod_mode_network()
@@ -54,18 +56,26 @@ function generate_ui(w)
     # Get the input raster/graph 
     input_section = Node(:div, tachyons_css, "Input Resistance Data") |> 
                     class"f4 lh-title"
-    input = input_ui()
+    input1, input2 = input_ui()
+    input = vbox(input1, 
+                 input2)
+    
+    input_graph = Observable("")
+    is_res = Observable(false)
+    on(input1["filepath"]) do x
+        input_graph[] = x
+    end
+    on(input2["check"]) do x
+           is_res[] = x
+    end
     
     # Focal points or advanced mode
     pair = pairwise_input_ui()
     adv = advanced_input_ui()
-
-    # str = Observable(mod_mode[]["value"][])
-    # str = Observable("Pairwise")
+    
     on(mod_mode) do x
         v = x["value"]
         on(v) do s
-            @show s
             if s == "Advanced"
                 points_input[] = adv
             else
@@ -73,32 +83,41 @@ function generate_ui(w)
             end
         end
     end
-    # @show str[]
-    #=points_input = Observable{Any}(Node(:div))
-    map!(points_input, mod_mode) do s
-        v = s["value"]
-        tmp = Observable{Any}(Node(:div))
-        map!(tmp, v) do x 
-            @show x
-            if x == "Pairwise"
-                pair
-            elseif x == "Advanced"
-                adv
-            elseif x == "One To All"
-                pair
-            elseif x == "All To One"
-                pair
-            end
-        end
-        tmp
-    end
-
-    @show points_input=#
     dt["value"][] = "Raster"
-    # points_input[] = pairwise_input_ui()
+
+    #=focal = Observable("")
+    source = Observable("")
+    ground = Observable("")
+    on(points_input) do x
+        on(x["focal"]) do y
+            focal[] = y
+            @show focal[]
+        end
+        on(x["source"]) do z
+            source[] = z
+            @show source[]
+        end
+        on(x["ground"]) do v
+            ground[] = v
+            @show ground[]
+        end
+    end=#
     
     # Output options
+    write_cur_maps = Observable(false)
+    write_volt_maps = Observable(false)
+    out = Observable("")
     output = output_ui()
+
+    on(output["cur"]) do x
+        write_cur_maps[] = x
+    end
+    on(output["volt"]) do x
+        write_volt_maps[] = x
+    end
+    on(output["out"]) do x
+        out[] = x
+    end
 
     page = vbox(heading, 
                 hline(style = :solid, w=5px)(style = Dict(:margin => 20px)), 
@@ -109,9 +128,6 @@ function generate_ui(w)
                 input_section,
                 input, 
                 hline(style = :solid, w=3px)(style = Dict(:margin => 10px)),
-                #=pair, 
-                hline(style = :solid, w=3px)(style = Dict(:margin => 10px)),
-                adv,=#
                 points_input,
                 hline(style = :solid, w=3px)(style = Dict(:margin => 10px)),
                 output)|> class"pa3 system-sans-serif"
