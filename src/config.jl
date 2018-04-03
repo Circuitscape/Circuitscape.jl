@@ -69,3 +69,10 @@ function init_config()
 
     a
 end
+
+function update!(cfg, new)
+    for (key,val) in new
+        cfg[key] = val
+    end
+end
+    
