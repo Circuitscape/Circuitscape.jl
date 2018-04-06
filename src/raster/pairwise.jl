@@ -38,11 +38,11 @@ function get_raster_flags(cfg)
     is_advanced = cfg["scenario"] in ADVANCED
     is_onetoall = cfg["scenario"] in ONETOALL
     is_alltoone = cfg["scenario"] in ALLTOONE
-    four_neighbors = cfg["connect_four_neighbors_only"] in truelist
-    avg_res = cfg["connect_using_avg_resistances"] in truelist
+    four_neighbors = cfg["connect_four_neighbors_only"] in TRUELIST
+    avg_res = cfg["connect_using_avg_resistances"] in TRUELIST
     solver = cfg["solver"]
     ground_file_is_resistances = 
-        cfg["ground_file_is_resistances"] in truelist
+        cfg["ground_file_is_resistances"] in TRUELIST
     policy = Symbol(cfg["remove_src_or_gnd"])
 
     # Output Flags
