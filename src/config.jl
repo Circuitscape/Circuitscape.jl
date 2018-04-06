@@ -69,3 +69,70 @@ function init_config()
 
     a
 end
+
+function update!(cfg, new)
+    for (key,val) in new
+        cfg[key] = val
+    end
+end
+
+function write_config(cfg)
+    open(cfg["output_file"], "w") do f
+        write(f, """
+        [Circuitscape Mode]
+        data_type = $(cfg["data_type"])
+        scenario = $(cfg["scenario"])
+
+        [Version]
+        version = 5.0.0
+
+        [Habitat raster or graph]
+        habitat_file = $(cfg["habitat_file"])
+        habitat_map_is_resistances = $(cfg["habitat_map_is_resistances"])
+
+        [Connection Scheme for raster habitat data]
+        connect_four_neighbors_only = $(cfg["connect_four_neighbors_only"] in TRUELIST)
+        connect_using_avg_resistances = $(cfg["connect_using_avg_resistances"] in TRUELIST)
+
+        [Short circuit regions (aka polygons)]
+        use_polygons = $(cfg["use_polygons"] in TRUELIST)
+        polygon_file = $(cfg["use_polygons"])
+
+        [Options for advanced mode]
+        ground_file_is_resistances = $(cfg["ground_file_is_resistances"] in TRUELIST)
+        source_file = $(cfg["source_file"])
+        remove_src_or_gnd = $(cfg["remove_src_or_gnd"])
+        ground_file = $(cfg["ground_file"])
+        use_unit_currents = $(cfg["use_unit_currents"] in TRUELIST)
+        use_direct_grounds = $(cfg["use_direct_grounds"] in TRUELIST)
+
+        [Mask file]
+        use_mask = $(cfg["use_mask"] in TRUELIST)
+        mask_file = $(cfg["mask_file"])
+
+        [Options for one-to-all and all-to-one modes]
+        use_variable_source_strengths = $(cfg["use_variable_source_strengths"] in TRUELIST)
+        variable_source_file = $(cfg["variable_source_file"])
+
+        [Options for pairwise and one-to-all and all-to-one modes]
+        included_pairs_file = $(cfg["included_pairs_file"])
+        use_included_pairs = $(cfg["use_included_pairs"] in TRUELIST)
+        point_file = $(cfg["point_file"])
+
+        [Calculation options]
+        solver = cg+amg
+
+        [Output options]
+        write_cum_cur_map_only = $(cfg["write_cum_cur_map_only"] in TRUELIST)
+        log_transform_maps = $(cfg["log_transform_maps"] in TRUELIST)
+        output_file = $(cfg["output_file"])
+        write_max_cur_maps = $(cfg["write_max_cur_maps"] in TRUELIST)
+        write_volt_maps = $(cfg["write_volt_maps"] in TRUELIST)
+        set_null_currents_to_nodata = $(cfg["set_null_currents_to_nodata"] in TRUELIST)
+        set_null_voltages_to_nodata = $(cfg["set_null_voltages_to_nodata"] in TRUELIST)
+        compress_grids = $(cfg["compress_grids"] in TRUELIST)
+        write_cur_maps = $(cfg["write_cur_maps"] in TRUELIST)
+        """)
+    end
+end
+    

@@ -6,9 +6,9 @@ using IterativeSolvers
 using Memento
 using GZip
 
+include("consts.jl")
 include("config.jl")
 include("logging.jl")
-include("consts.jl")
 include("utils.jl")
 include("io.jl")
 include("out.jl")

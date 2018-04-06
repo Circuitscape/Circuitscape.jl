@@ -311,7 +311,7 @@ end
 
 function get_network_data(T, cfg)::NetworkData{T,INT}
     
-    hab_is_res = cfg["habitat_map_is_resistances"] in truelist
+    hab_is_res = cfg["habitat_map_is_resistances"] in TRUELIST
     hab_file = cfg["habitat_file"]
     fp_file = cfg["point_file"]
     source_file = cfg["source_file"]
@@ -345,25 +345,25 @@ function load_raster_data(T, cfg)::RasData{T,INT}
 
     # Habitat file
     hab_file = cfg["habitat_file"]
-    hab_is_res = cfg["habitat_map_is_resistances"] in truelist
+    hab_is_res = cfg["habitat_map_is_resistances"] in TRUELIST
 
     # Polygons
-    use_polygons = cfg["use_polygons"] in truelist
+    use_polygons = cfg["use_polygons"] in TRUELIST
     polygon_file = cfg["polygon_file"]
 
     # Mask file
-    use_mask = cfg["use_mask"] in truelist 
+    use_mask = cfg["use_mask"] in TRUELIST 
     mask_file = cfg["mask_file"]
 
     # Point file
     point_file = cfg["point_file"]
 
     # Variable source strengths
-    use_var_source = cfg["use_variable_source_strengths"] in truelist 
+    use_var_source = cfg["use_variable_source_strengths"] in TRUELIST 
     var_source_file = cfg["variable_source_file"]
 
     # Included Pairs
-    use_inc_pairs = cfg["use_included_pairs"] in truelist 
+    use_inc_pairs = cfg["use_included_pairs"] in TRUELIST 
     inc_pairs_file = cfg["included_pairs_file"]
 
     # Advanced mode
@@ -371,7 +371,7 @@ function load_raster_data(T, cfg)::RasData{T,INT}
     is_advanced = cfg["scenario"] in ADVANCED
     source_file = cfg["source_file"]
     ground_file = cfg["ground_file"]
-    ground_is_res = cfg["ground_file_is_resistances"] in truelist
+    ground_is_res = cfg["ground_file_is_resistances"] in TRUELIST
     
     csinfo("Reading maps")
 

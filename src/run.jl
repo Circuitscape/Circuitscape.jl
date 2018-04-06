@@ -14,6 +14,7 @@ Inputs:
 function compute(path::String)
     cfg = parse_config(path)
     update_logging!(cfg)
+    write_config(cfg)
     T = cfg["precision"] in SINGLE ? Float32 : Float64
     csinfo("Precision used: $(cfg["precision"])")
     t = @elapsed r = _compute(T, cfg)
@@ -41,4 +42,15 @@ function _compute(T, cfg)
             network_advanced(T, cfg)
         end
     end
+end
+
+function compute(dict)
+    cfg = init_config()
+    update!(cfg, dict)
+    update_logging!(cfg)
+    T = cfg["precision"] in SINGLE ? Float32 : Float64
+    csinfo("Precision used: $(cfg["precision"])")
+    t = @elapsed r = _compute(T, cfg)
+    csinfo("Time taken to complete job = $t")
+    r
 end
