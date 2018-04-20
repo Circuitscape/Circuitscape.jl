@@ -17,8 +17,14 @@ function compute(path::String)
     write_config(cfg)
     T = cfg["precision"] in SINGLE ? Float32 : Float64
     csinfo("Precision used: $(cfg["precision"])")
+    if cfg["parallelize"] in TRUELIST
+        n = parse(Int, cfg["max_parallel"])
+        csinfo("Starting up Circuitscape to use $n processes in parallel")
+        myaddprocs(n)
+    end
     t = @elapsed r = _compute(T, cfg)
     csinfo("Time taken to complete job = $t")
+    rmprocs(workers())
     r
 end
 
@@ -50,7 +56,13 @@ function compute(dict)
     update_logging!(cfg)
     T = cfg["precision"] in SINGLE ? Float32 : Float64
     csinfo("Precision used: $(cfg["precision"])")
+    if cfg["parallelize"] in TRUELIST
+        n = parse(Int, cfg["max_parallel"])
+        csinfo("Starting up Circuitscape to use $n processes in parallel")
+        myaddprocs(n)
+    end
     t = @elapsed r = _compute(T, cfg)
     csinfo("Time taken to complete job = $t")
+    rmprocs(workers())
     r
 end
