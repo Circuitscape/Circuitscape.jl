@@ -99,3 +99,8 @@ function get_output_flags(cfg)
                     set_null_currents_to_nodata, set_null_voltages_to_nodata,
                     compress_grids, log_transform_maps)
 end
+
+function myaddprocs(n)
+    addprocs(n)
+    @everywhere eval(:(using Circuitscape))
+end
