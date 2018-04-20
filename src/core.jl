@@ -92,11 +92,9 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg)::Matrix{T} where {T,V
     get_shortcut_resistances = false
     if is_raster && !write_volt_maps && !write_cur_maps
         get_shortcut_resistances = true
-        # shortcut_res = -1 * ones(eltype(a), size(resistances))
-        # covered = Dict{Int, Bool}()
-        # for i = 1:size(cc, 1)
-        #     covered[i] = false
-        # end
+        csinfo("Triggering resistance calculation shortcut")
+        num, d = get_num_pairs_shortcut(cc, points, exclude)
+        csinfo("Total number of pair solves has been reduced to $num ")
     end
     shortcut = Shortcut(get_shortcut_resistances, voltmatrix, shortcut_res)    
   
@@ -146,6 +144,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg)::Matrix{T} where {T,V
                 end
             end
 
+            k = 1 
             # Loop through all possible pairs
             for j in rng
 
@@ -176,6 +175,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg)::Matrix{T} where {T,V
                 # Solve system
                 # csinfo("Solving points $pi and $pj")
                 csinfo("Solving pair $(d[(pi,pj)]) of $num")
+                k += 1
                 t2 = @elapsed v = solve_linear_system(cfg, matrix, current, P)
                 csinfo("Time taken to solve linear system = $t2 seconds")
                 v .= v .- v[comp_i]
@@ -285,6 +285,9 @@ function _cholmod_solver_path(data, flags, cfg)
     get_shortcut_resistances = false
     if is_raster && !write_volt_maps && !write_cur_maps
         get_shortcut_resistances = true
+        csinfo("Triggering resistance calculation shortcut")
+        num, d = get_num_pairs_shortcut(cc, points, exclude)
+        csinfo("Total number of pair solves has been reduced to $num ")
     end
     shortcut = Shortcut(get_shortcut_resistances, voltmatrix, shortcut_res)
     
@@ -455,6 +458,30 @@ function get_num_pairs(ccs, fp, exclude_pairs)
     num, d
 end
 
+function get_num_pairs_shortcut(ccs, fp, exclude_pairs)
+
+    num = 0
+    d = Dict{Tuple{INT,INT}, INT}()
+
+    for (i,cc) in enumerate(ccs)
+        sub_fp = filter(x -> x in cc, fp) |> unique
+        l = endof(sub_fp)
+        l == 0 && continue
+        for ii = 1:1
+            pt1 = sub_fp[ii]
+            for jj = ii+1:l
+                pt2 = sub_fp[jj]
+                if (pt1, pt2) in exclude_pairs
+                    continue
+                else
+                    num += 1
+                    d[(pt1, pt2)] = num
+                end
+            end
+        end
+    end
+    num, d
+end
 function smash_repeats!(ret, I)
     for i = 1:size(I,1)
         for j = i+1:size(I,1)
