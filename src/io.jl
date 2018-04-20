@@ -187,7 +187,7 @@ function read_point_map(file, habitatmeta)
 
     f = endswith(file, ".gz") ? GZip.open(file, "r") : open(file, "r")
     filetype = _guess_file_type(file, f)
-    _points_rc = filetype == TXTLIST ? readdlm(file, INT) :
+    _points_rc = filetype == TXTLIST ? readdlm(file) :
                         read_polymap(INT, file, habitatmeta)
 
     i = INT[]
