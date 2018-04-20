@@ -16,7 +16,7 @@ const AAGRID = 2
 const TXTLIST = 3
 const PAIRS_AAGRID = 4
 const PAIRS_LIST = 5
-const TRUELIST = ["True", "true"]
+const TRUELIST = ["True", "true", "1"]
 
 # Constants for logging
 const NONE = ["NONE", "None", "none"]
