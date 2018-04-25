@@ -1,8 +1,8 @@
 export  model_problem,
         test_problem, 
         accumulate_current_maps,
-        calculate_cum_current_maps,
-        calculate_max_current_maps
+        calculate_cum_current_map,
+        calculate_max_current_map
 
  """
  Construct nodemap specific to a connected component
@@ -179,5 +179,5 @@ function f_in_place!(accum, cmap, f)
     accum .= f.(accum, cmap)
 end
 
-calculate_cum_current_maps(path) = accumulate_current_maps(path, +)
-calculate_max_current_maps(path) = accumulate_current_maps(path, max)
+calculate_cum_current_map(path) = accumulate_current_maps(path, +)
+calculate_max_current_map(path) = accumulate_current_maps(path, max)
