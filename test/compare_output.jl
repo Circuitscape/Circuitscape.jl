@@ -37,7 +37,7 @@ function compare_all_output(str)
             
 end
 
-list_of_files(str, pref) = readdir(pref) |> y -> filter(x -> startswith(x, str), y)
+list_of_files(str, pref) = readdir(pref) |> y -> filter(x -> startswith(x, "$(str)_"), y)
 generate_lists(str) = list_of_files(str, "output/"), list_of_files(str, "output_verify/")
 read_branch_currents(str) = readdlm(str)
 read_node_currents(str) = readdlm(str)

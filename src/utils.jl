@@ -1,5 +1,8 @@
 export  model_problem,
-        test_problem
+        test_problem, 
+        accumulate_current_maps,
+        calculate_cum_current_maps,
+        calculate_max_current_maps
 
  """
  Construct nodemap specific to a connected component
@@ -100,7 +103,81 @@ function get_output_flags(cfg)
                     compress_grids, log_transform_maps)
 end
 
+# Helps start new processes from the INI file
 function myaddprocs(n)
     addprocs(n)
     @everywhere eval(:(using Circuitscape))
 end
+
+# Reads the directory with the current maps 
+# and accumulates all current maps
+function accumulate_current_maps(path, f)
+    dir = dirname(path)
+    base = basename(path)
+    
+    # If base file has a dot 
+    name = split(base, '.')[1]
+
+    cmap_list = readdir(dir) |> 
+                    x -> filter(y -> startswith(y, "$(name)_"), x) |>
+                    x -> filter(y -> contains(y, "_curmap_"), x)
+    isempty(cmap_list) && return
+
+    headers = ""
+    first_file = joinpath(dir, cmap_list[1])
+    nrow = 0
+    ncol = 0
+
+    # Read the headers from the first file
+    open(first_file, "r") do f
+
+        # Get num cols 
+        str = readline(f)
+        headers = headers * str * "\n"
+        ncol = split(str)[2] |> x -> parse(Int, x)
+
+        # Get num rows
+        str = readline(f)
+        headers = headers * str * "\n"
+        nrow = split(str)[2] |> x -> parse(Int, x)
+
+        # Just append the rest
+        for i = 3:6
+            headers = headers * readline(f) * "\n"
+        end
+    end
+
+    accum = zeros(nrow, ncol)
+    for file in cmap_list
+        csinfo("Accumulating $file")
+        cmap_path = joinpath(dir, file)
+        cmap = readdlm(cmap_path, skipstart = 6)
+        f_in_place!(accum, cmap, f) 
+    end
+    for i in eachindex(accum)
+        if accum[i] < -9999
+            accum[i] = -9999
+        end
+    end
+
+    name =  if isequal(f, +) 
+                "cum" 
+            elseif isequal(f, max)
+                "max"
+            end
+
+    accum_path = joinpath(dir, name * "_$(name)_curmap.asc")
+    csinfo("Writing to $accum_path")
+    open(accum_path, "w") do f
+        write(f, headers)
+        writedlm(f, round.(accum, 8), ' ')
+    end
+
+end
+
+function f_in_place!(accum, cmap, f)
+    accum .= f.(accum, cmap)
+end
+
+calculate_cum_current_maps(path) = accumulate_current_maps(path, +)
+calculate_max_current_maps(path) = accumulate_current_maps(path, max)
