@@ -22,6 +22,7 @@ str =  f == compute ? "Double" : "Single"
 for i = 1:3
     info("Testing sgNetworkVerify$i")
     r = f("input/network/sgNetworkVerify$(i).ini")
+    calculate_cum_current_maps("output/sgNetworkVerify$(i).out")
     x = readdlm("output_verify/sgNetworkVerify$(i)_resistances.out")
     valx = x[2:end, 2:end]
     valr = r[2:end, 2:end]
@@ -39,6 +40,7 @@ end
 for i = 1:3
     info("Testing mgNetworkVerify$i")
     r = f("input/network/mgNetworkVerify$(i).ini")
+    calculate_cum_current_maps("output/mgNetworkVerify$(i).out")
     x = readdlm("output_verify/mgNetworkVerify$(i)_voltages.txt")
     x[:,1] = x[:,1] + 1
     @test sum(abs2, x - r) < 1e-6
@@ -53,6 +55,7 @@ end
 for i = 1:15
     info("Testing sgVerify$i")
     r = f("input/raster/pairwise/$i/sgVerify$(i).ini")
+    calculate_cum_current_maps("output/sgVerify$(i).out")
     x = readdlm("output_verify/sgVerify$(i)_resistances.out")
     # x = x[2:end, 2:end]
     @test sum(abs2, x - r) < 1e-6
@@ -66,6 +69,7 @@ end
 for i in 1:5
     info("Testing mgVerify$i")
     r = f("input/raster/advanced/$i/mgVerify$(i).ini")
+    calculate_cum_current_maps("output/mgVerify$(i).out")
     x = readdlm("output_verify/mgVerify$(i)_voltmap.asc"; skipstart = 6)
     @test sum(abs2, x - r) < 1e-5
     # compare_all_output("mgVerify$(i)")
@@ -78,6 +82,7 @@ end
 for i in 1:13
     info("Testing oneToAllVerify$i")
     r = f("input/raster/one_to_all/$i/oneToAllVerify$(i).ini")
+    calculate_cum_current_maps("output/oneToAllVerify$(i).out")
     x = readdlm("output_verify/oneToAllVerify$(i)_resistances.out")
     # x = x[:,2]
     @test sum(abs2, x - r) < 1e-6
@@ -91,6 +96,7 @@ end
 for i in 1:12
     info("Testing allToOneVerify$i")
     r = f("input/raster/all_to_one/$i/allToOneVerify$(i).ini")
+    calculate_cum_current_maps("output/allToOneVerify$(i).out")
     x = readdlm("output_verify/allToOneVerify$(i)_resistances.out")
     # x = x[:,2]
 

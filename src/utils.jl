@@ -1,6 +1,8 @@
 export  model_problem,
         test_problem, 
-        accumulate_current_maps
+        accumulate_current_maps,
+        calculate_cum_current_maps,
+        calculate_max_current_maps
 
  """
  Construct nodemap specific to a connected component
@@ -109,7 +111,7 @@ end
 
 # Reads the directory with the current maps 
 # and accumulates all current maps
-function accumulate_current_maps(path)
+function accumulate_current_maps(path, f)
     dir = dirname(path)
     base = basename(path)
     
@@ -119,6 +121,7 @@ function accumulate_current_maps(path)
     cmap_list = readdir(dir) |> 
                     x -> filter(y -> startswith(y, "$(name)_"), x) |>
                     x -> filter(y -> contains(y, "_curmap_"), x)
+    isempty(cmap_list) && return
 
     headers = ""
     first_file = joinpath(dir, cmap_list[1])
@@ -149,10 +152,21 @@ function accumulate_current_maps(path)
         csinfo("Accumulating $file")
         cmap_path = joinpath(dir, file)
         cmap = readdlm(cmap_path, skipstart = 6)
-        accum .+= cmap
+        f_in_place!(accum, cmap, f) 
+    end
+    for i in eachindex(accum)
+        if accum[i] < -9999
+            accum[i] = -9999
+        end
     end
 
-    accum_path = joinpath(dir, name * "_cum_curmap.asc")
+    name =  if isequal(f, +) 
+                "cum" 
+            elseif isequal(f, max)
+                "max"
+            end
+
+    accum_path = joinpath(dir, name * "_$(name)_curmap.asc")
     csinfo("Writing to $accum_path")
     open(accum_path, "w") do f
         write(f, headers)
@@ -161,3 +175,9 @@ function accumulate_current_maps(path)
 
 end
 
+function f_in_place!(accum, cmap, f)
+    accum .= f.(accum, cmap)
+end
+
+calculate_cum_current_maps(path) = accumulate_current_maps(path, +)
+calculate_max_current_maps(path) = accumulate_current_maps(path, max)
