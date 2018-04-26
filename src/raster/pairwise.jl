@@ -82,12 +82,18 @@ function _pt_file_polygons_path(rasterdata::RasData{T,V},
     pts = unique(points_rc[3])
     resistances = -1 * ones(length(pts), length(pts))
 
+    n = calc_num_pairs(pts)
+    csinfo("Total number of pair solves = $n")
+
+    k = 1
     for i = 1:size(pts, 1)
         pt1 = pts[i]
         for j = i+1:size(pts, 1)
             pt2 = pts[j]
+            csinfo("Solving pair $k of $n")
+            k += 1
             graphdata = compute_graph_data_polygons(rasterdata, flags, pt1, pt2)
-            pairwise_resistance = single_ground_all_pairs(graphdata, flags, cfg)
+            pairwise_resistance = single_ground_all_pairs(graphdata, flags, cfg, false)
             resistances[i,j] = resistances[j,i] = pairwise_resistance[2,3]
         end
     end
@@ -97,6 +103,16 @@ function _pt_file_polygons_path(rasterdata::RasData{T,V},
     P = [0, pts...]
     hcat(P, vcat(pts', resistances))
     # resistances
+end
+
+function calc_num_pairs(pts)
+    n = 0 
+    for i = 1:size(pts, 1)
+        for j = i+1:size(pts, 1)
+            n += 1
+        end
+    end
+    n
 end
 
 function compute_graph_data_polygons(rasterdata::RasData{T,V}, 

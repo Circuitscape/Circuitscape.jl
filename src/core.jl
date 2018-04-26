@@ -39,21 +39,21 @@ Core kernel of Circuitscape - used to solve several pairs
 Input:
 * data::GraphData
 """
-function single_ground_all_pairs(data::GraphData{T,V}, flags, cfg) where {T,V}
+function single_ground_all_pairs(data::GraphData{T,V}, flags, cfg, log = true) where {T,V}
 
     if flags.solver in AMG
         csinfo("Solver used: AMG accelerated by CG")
-        amg_solver_path(data, flags, cfg)
+        amg_solver_path(data, flags, cfg, log)
     else
         csinfo("Solver used: CHOLMOD")
         if eltype(data.G) == Float32
             cswarn("CHOLMOD solver mode works only in double precision")
         end
-        _cholmod_solver_path(data, flags, cfg)
+        _cholmod_solver_path(data, flags, cfg, log)
     end
 end
 
-function amg_solver_path(data::GraphData{T,V}, flags, cfg)::Matrix{T} where {T,V}
+function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where {T,V}
 
     # Data
     a = data.G
@@ -78,7 +78,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg)::Matrix{T} where {T,V
     csinfo("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
 
     num, d = get_num_pairs(cc, points, exclude)
-    csinfo("Total number of pair solves = $num")
+    log && csinfo("Total number of pair solves = $num")
     
     # Initialize pairwise resistance
     resistances = -1 * ones(T, numpoints, numpoints)::Matrix{T}
@@ -174,7 +174,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg)::Matrix{T} where {T,V
 
                 # Solve system
                 # csinfo("Solving points $pi and $pj")
-                csinfo("Solving pair $(d[(pi,pj)]) of $num")
+                log && csinfo("Solving pair $(d[(pi,pj)]) of $num")
                 k += 1
                 t2 = @elapsed v = solve_linear_system(cfg, matrix, current, P)
                 csinfo("Time taken to solve linear system = $t2 seconds")
@@ -241,7 +241,7 @@ struct CholmodNode{T}
     points_idx::Tuple{T,T}
 end
 
-function _cholmod_solver_path(data, flags, cfg)
+function _cholmod_solver_path(data, flags, cfg, log)
     
     # Data
     a = data.G
@@ -272,7 +272,7 @@ function _cholmod_solver_path(data, flags, cfg)
     csinfo("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
 
     num, d = get_num_pairs(cc, points, exclude)
-    csinfo("Total number of pair solves = $num")
+    log && csinfo("Total number of pair solves = $num")
     
     # Initialize pairwise resistance
     resistances = -1 * ones(eltype(a), numpoints, numpoints)
