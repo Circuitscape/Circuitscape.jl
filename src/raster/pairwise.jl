@@ -58,7 +58,16 @@ function _pt_file_no_polygons_path(rasterdata::RasData{T,V},
                     flags, cfg)::Matrix{T} where {T,V}
 
     graphdata = compute_graph_data_no_polygons(rasterdata, flags)
-    single_ground_all_pairs(graphdata, flags, cfg)
+    r = single_ground_all_pairs(graphdata, flags, cfg)
+    
+    cum_curr = zeros(T, size(rasterdata.cellmap)...)
+    for i = 1:nprocs()
+        cum_curr .+= graphdata.cum_curr[i]
+    end 
+
+    write_aagrid(cmap, "buzz", cfg, rasterdata.hbmeta)
+
+    r
 end
 
 function _pt_file_polygons_path(rasterdata::RasData{T,V}, 
@@ -151,6 +160,9 @@ function compute_graph_data_polygons(rasterdata::RasData{T,V},
 
     # Exclude pairs array
     exclude_pairs = Tuple{INT,INT}[]
+
+    # Cumulative current maps
+    cum_curr = SharedVector{Matrix{eltype(cellmap)}}(nprocs())
     
     GraphData(G, cc, points, [pt1, pt2], 
             exclude_pairs, nodemap, newpoly, hbmeta, gmap)
@@ -204,8 +216,15 @@ function compute_graph_data_no_polygons(data::RasData{T,V},
         points[i] = nodemap[v...]
     end
 
+    # Cumulative current maps
+    cum_curr = SharedVector{Matrix{T}}(nprocs())
+    for i = 1:nprocs()
+        cum_curr[i] = zeros(T, size(cellmap)...)
+    end
+
     GraphData(G, cc, points, points_rc[3], 
-                exclude_pairs, nodemap, polymap, hbmeta, cellmap)
+                exclude_pairs, nodemap, polymap, 
+                hbmeta, cellmap, cum_curr)
 end
 Base.isempty(t::IncludeExcludePairs) = t.mode == :undef
 

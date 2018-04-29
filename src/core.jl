@@ -8,6 +8,7 @@ struct GraphData{T,V}
     polymap::Matrix{V}
     hbmeta::RasterMeta
     cellmap::Matrix{T}
+    cum_curmap::SharedVector{Matrix{T}}
 end
 
 struct ComponentData{T,V}
@@ -25,6 +26,7 @@ struct Output{T,V}
     comp_idx::Tuple{V,V}
     resistance::T
     col::V
+    cum_curr::SharedVector{Matrix{T}}
 end
 
 struct Shortcut{T}
@@ -74,6 +76,9 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
 
     # Get number of focal points
     numpoints = size(points, 1)
+
+    # Cumulative current map
+    cum_curr = data.cum_curr
     
     csinfo("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
 
@@ -83,7 +88,6 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
     # Initialize pairwise resistance
     resistances = -1 * ones(T, numpoints, numpoints)::Matrix{T}
     voltmatrix = zeros(T, size(resistances))::Matrix{T}
-    # shortcut_res = -1 * ones(eltype(a), size(resistances))
     shortcut_res = deepcopy(resistances)::Matrix{T}
     
     # Get a vector of connected components
@@ -191,7 +195,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
                         resistances[c_j, c_i] = r
                     end
                     output = Output(points, v, (orig_pts[c_i], orig_pts[c_j]),
-                                    (comp_i, comp_j), r, INT(c_j))
+                                    (comp_i, comp_j), r, INT(c_j), cum_curr)
                     postprocess(output, component_data, flags, shortcut, cfg)
                 end
             end
@@ -549,17 +553,12 @@ function postprocess(output, component_data, flags, shortcut, cfg)
     get_shortcut_resistances = shortcut.get_shortcut_resistances
 
     if get_shortcut_resistances
-        # update_voltmatrix!(voltmatrix, local_nodemap, voltages, hbmeta, points, r, j, cc)
         update_voltmatrix!(shortcut, output, component_data)
         return nothing
     end
 
-    # name = "_$(points[i])_$(points[j])"
 
-    #if flags.is_raster
-        # name = "_$(Int(orig_pts[i]))_$(Int(orig_pts[j]))"
     name = "_$(orig_pts[1])_$(orig_pts[2])"
-    #end
 
     if flags.outputflags.write_volt_maps
         t = @elapsed write_volt_maps(name, output, component_data, flags, cfg)

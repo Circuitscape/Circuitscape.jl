@@ -43,13 +43,19 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
         node_currents_array = _append_name_to_node_currents(node_currents, cc)
         write_currents(node_currents_array, branch_currents_array, name, cfg)
     else
-       current_map = node_currents
-       log_transform = flags.outputflags.log_transform_maps
-       set_null_currents_to_nodata = 
+        current_map = node_currents
+        log_transform = flags.outputflags.log_transform_maps
+        set_null_currents_to_nodata = 
             flags.outputflags.set_null_currents_to_nodata
-       write_aagrid(current_map, name, cfg, hbmeta, component_data.cellmap; 
+
+        process_grid!(cmap, log_transform = log_transform, 
+                            set_null_to_nodata = set_null_currents_to_nodata)
+        output.cum_curr[myid()] .+= cmap
+        write_aagrid(cmap, name, cfg, hbmeta)
+
+       #=write_aagrid(current_map, name, cfg, hbmeta, component_data.cellmap; 
                         log_transform = log_transform, 
-                        set_null_to_nodata = set_null_currents_to_nodata)
+                        set_null_to_nodata = set_null_currents_to_nodata)=#
    end
 end
 
@@ -260,6 +266,52 @@ function count_upper(G)
     end
     n
 end
+
+function process_grid!(cmap, cellmap, hbmeta; log_transform = false, 
+                                set_null_to_nodata = false)
+    if log_transform
+        map!(x -> x > 0 ? log10(x) : float(hbmeta.nodata), cmap, cmap)
+    end
+
+    if set_null_to_nodata
+        for i in eachindex(cmap)
+            if cellmap[i] == 0
+                cmap[i] = hbmeta.nodata
+            end
+        end
+    end
+
+end
+        
+function write_aagrid(cmap, name, cfg, hbmeta; 
+                        voltage = false, cum = false, 
+                        max = false)
+
+
+    str = "curmap"
+    if cum
+        str = "cum_$(str)"
+    elseif max
+        str = "max_$(str)"
+    elseif voltage
+        str = "voltmap"
+    end
+
+    pref = split(cfg["output_file"], '.')[1]
+    filename = "$(pref)_$(str)$(name).asc"
+    f = open(filename, "w")
+
+    write(f, "ncols         $(hbmeta.ncols)\n")
+    write(f, "nrows         $(hbmeta.nrows)\n")
+    write(f, "xllcorner     $(hbmeta.xllcorner)\n")
+    write(f, "yllcorner     $(hbmeta.yllcorner)\n")
+    write(f, "cellsize      $(hbmeta.cellsize)\n")
+    write(f, "NODATA_value  $(hbmeta.nodata)\n")
+
+    writedlm(f, round.(cmap, 8), ' ')
+    close(f)
+end
+
 
 function write_aagrid(cmap, name, cfg, hbmeta, cellmap;
                         voltage = false, cum = false, max = false,
