@@ -65,7 +65,7 @@ function _pt_file_no_polygons_path(rasterdata::RasData{T,V},
         cum_curr .+= graphdata.cum_curr[i]
     end 
 
-    write_aagrid(cum_curr, "buzz", cfg, rasterdata.hbmeta)
+    write_aagrid(cum_curr, "", cfg, rasterdata.hbmeta, cum = true)
 
     r
 end
@@ -90,7 +90,7 @@ function _pt_file_polygons_path(rasterdata::RasData{T,V},
 
     cum_curr = Vector{SharedMatrix{Float64}}(nprocs())
     for i = 1:nprocs()
-        cum_curr[i] = SharedArray(zeros(T, size(cellmap)...))
+        cum_curr[i] = SharedArray(zeros(T, size(gmap)...))
     end
 
     pts = unique(points_rc[3])
@@ -106,7 +106,7 @@ function _pt_file_polygons_path(rasterdata::RasData{T,V},
             pt2 = pts[j]
             csinfo("Solving pair $k of $n")
             k += 1
-            graphdata = compute_graph_data_polygons(rasterdata, flags, pt1, pt2)
+            graphdata = compute_graph_data_polygons(rasterdata, flags, pt1, pt2, cum_curr)
             pairwise_resistance = single_ground_all_pairs(graphdata, flags, cfg, false)
             resistances[i,j] = resistances[j,i] = pairwise_resistance[2,3]
         end
@@ -115,8 +115,16 @@ function _pt_file_polygons_path(rasterdata::RasData{T,V},
         resistances[i,i] = 0
     end
     P = [0, pts...]
-    hcat(P, vcat(pts', resistances))
+    r = hcat(P, vcat(pts', resistances))
+
+    cum_curmap = zeros(T, size(rasterdata.cellmap)...)
+    for i = 1:nprocs()
+        cum_curmap .+= cum_curr[i]
+    end 
+
+    write_aagrid(cum_curmap, "", cfg, rasterdata.hbmeta, cum = true)
     # resistances
+    resistances
 end
 
 function calc_num_pairs(pts)
@@ -167,7 +175,7 @@ function compute_graph_data_polygons(rasterdata::RasData{T,V},
     exclude_pairs = Tuple{INT,INT}[]
     
     GraphData(G, cc, points, [pt1, pt2], 
-            exclude_pairs, nodemap, newpoly, hbmeta, gmap)
+            exclude_pairs, nodemap, newpoly, hbmeta, gmap, cum_curr)
 end
 
 #=function compute_graph_data(rasterdata, flags)
