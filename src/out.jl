@@ -44,11 +44,12 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
         write_currents(node_currents_array, branch_currents_array, name, cfg)
     else
         current_map = node_currents
+        cmap = current_map
         log_transform = flags.outputflags.log_transform_maps
         set_null_currents_to_nodata = 
             flags.outputflags.set_null_currents_to_nodata
 
-        process_grid!(cmap, log_transform = log_transform, 
+        process_grid!(cmap, cellmap, hbmeta, log_transform = log_transform, 
                             set_null_to_nodata = set_null_currents_to_nodata)
         output.cum_curr[myid()] .+= cmap
         write_aagrid(cmap, name, cfg, hbmeta)

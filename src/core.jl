@@ -8,7 +8,7 @@ struct GraphData{T,V}
     polymap::Matrix{V}
     hbmeta::RasterMeta
     cellmap::Matrix{T}
-    cum_curmap::SharedVector{Matrix{T}}
+    cum_curr::Vector{SharedMatrix{T}}
 end
 
 struct ComponentData{T,V}
@@ -26,7 +26,7 @@ struct Output{T,V}
     comp_idx::Tuple{V,V}
     resistance::T
     col::V
-    cum_curr::SharedVector{Matrix{T}}
+    cum_curr::Vector{SharedMatrix{T}}
 end
 
 struct Shortcut{T}
@@ -210,7 +210,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
             f(1)
             update_shortcut_resistances!(idx, shortcut, resistances, points, comp)
         else
-            X = pmap(x ->f(x), 1:size(csub,1))
+            X = map(x ->f(x), 1:size(csub,1))
 
             # Set all resistances
             for x in X

@@ -65,7 +65,7 @@ function _pt_file_no_polygons_path(rasterdata::RasData{T,V},
         cum_curr .+= graphdata.cum_curr[i]
     end 
 
-    write_aagrid(cmap, "buzz", cfg, rasterdata.hbmeta)
+    write_aagrid(cum_curr, "buzz", cfg, rasterdata.hbmeta)
 
     r
 end
@@ -87,6 +87,11 @@ function _pt_file_polygons_path(rasterdata::RasData{T,V},
     points_rc = rasterdata.points_rc
     avg_res = flags.avg_res
     four_neighbors = flags.four_neighbors
+
+    cum_curr = Vector{SharedMatrix{Float64}}(nprocs())
+    for i = 1:nprocs()
+        cum_curr[i] = SharedArray(zeros(T, size(cellmap)...))
+    end
 
     pts = unique(points_rc[3])
     resistances = -1 * ones(length(pts), length(pts))
@@ -125,7 +130,7 @@ function calc_num_pairs(pts)
 end
 
 function compute_graph_data_polygons(rasterdata::RasData{T,V}, 
-                            flags, pt1, pt2)::GraphData{T,V} where {T,V}
+                            flags, pt1, pt2, cum_curr)::GraphData{T,V} where {T,V}
 
     # Data
     gmap = rasterdata.cellmap
@@ -160,9 +165,6 @@ function compute_graph_data_polygons(rasterdata::RasData{T,V},
 
     # Exclude pairs array
     exclude_pairs = Tuple{INT,INT}[]
-
-    # Cumulative current maps
-    cum_curr = SharedVector{Matrix{eltype(cellmap)}}(nprocs())
     
     GraphData(G, cc, points, [pt1, pt2], 
             exclude_pairs, nodemap, newpoly, hbmeta, gmap)
@@ -217,9 +219,9 @@ function compute_graph_data_no_polygons(data::RasData{T,V},
     end
 
     # Cumulative current maps
-    cum_curr = SharedVector{Matrix{T}}(nprocs())
+    cum_curr = Vector{SharedMatrix{T}}(nprocs())
     for i = 1:nprocs()
-        cum_curr[i] = zeros(T, size(cellmap)...)
+        cum_curr[i] = SharedArray(zeros(T, size(cellmap)...))
     end
 
     GraphData(G, cc, points, points_rc[3], 
