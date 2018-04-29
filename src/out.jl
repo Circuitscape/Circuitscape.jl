@@ -18,7 +18,7 @@ function compute_3col(resistances::Matrix{T}) where {T}
         for j = i+1:l
             r3col[k,1] = fp[i]
             r3col[k,2] = fp[j]
-            r3col[k,3] = resistances[j,i]
+            r3col[k,3] = resistances[j+1,i+1]
             k += 1
         end
     end
