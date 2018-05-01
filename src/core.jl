@@ -264,6 +264,9 @@ function _cholmod_solver_path(data, flags, cfg, log)
     write_volt_maps = outputflags.write_volt_maps
     write_cur_maps = outputflags.write_cur_maps
 
+    # Cumulative current map
+    cum_curr = data.cum_curr
+
     # CHOLMOD solver mode works only in double precision
     if eltype(a) == Float32
         cswarn("Converting single precision matrix to double")
@@ -395,7 +398,8 @@ function _cholmod_solver_path(data, flags, cfg, log)
                 orig_pts[cholmod_batch[i].points_idx[2]]), 
                 cholmod_batch[i].cc_idx, 
                 lhs[cholmod_batch[i].cc_idx[2], i] - lhs[cholmod_batch[i].cc_idx[1], i],
-                INT(cholmod_batch[i].points_idx[2]))
+                INT(cholmod_batch[i].points_idx[2]), 
+                cum_curr)
             postprocess(output, component_data, flags, shortcut, cfg)
         end
 
