@@ -51,7 +51,7 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
 
         process_grid!(cmap, cellmap, hbmeta, log_transform = log_transform, 
                             set_null_to_nodata = set_null_currents_to_nodata)
-        output.cum_curr[myid()] .+= cmap
+        output.cum_curr[mycsid()] .+= cmap
         write_aagrid(cmap, name, cfg, hbmeta)
 
        #=write_aagrid(current_map, name, cfg, hbmeta, component_data.cellmap; 

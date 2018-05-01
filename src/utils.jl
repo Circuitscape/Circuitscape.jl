@@ -190,3 +190,5 @@ function postprocess_cum_curmap!(accum)
     end
 end
 
+mycsid() = myid() - minimum(workers()) + 1
+
