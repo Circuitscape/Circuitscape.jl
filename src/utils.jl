@@ -181,3 +181,12 @@ end
 
 calculate_cum_current_map(path) = accumulate_current_maps(path, +)
 calculate_max_current_map(path) = accumulate_current_maps(path, max)
+
+function postprocess_cum_curmap!(accum)
+    for i in eachindex(accum)
+        if accum[i] < -9999
+            accum[i] = -9999
+        end
+    end
+end
+

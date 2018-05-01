@@ -64,6 +64,7 @@ function _pt_file_no_polygons_path(rasterdata::RasData{T,V},
     for i = 1:nprocs()
         cum_curr .+= graphdata.cum_curr[i]
     end 
+    postprocess_cum_curmap!(cum_curr)
 
     write_aagrid(cum_curr, "", cfg, rasterdata.hbmeta, cum = true)
 
@@ -121,10 +122,11 @@ function _pt_file_polygons_path(rasterdata::RasData{T,V},
     for i = 1:nprocs()
         cum_curmap .+= cum_curr[i]
     end 
+    postprocess_cum_curmap!(cum_curmap)
 
     write_aagrid(cum_curmap, "", cfg, rasterdata.hbmeta, cum = true)
     # resistances
-    resistances
+    r
 end
 
 function calc_num_pairs(pts)
