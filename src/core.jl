@@ -440,7 +440,7 @@ function get_num_pairs(ccs, fp, exclude_pairs)
     d = Dict{Tuple{INT,INT}, INT}()
 
     for (i,cc) in enumerate(ccs)
-        sub_fp = filter(x -> x in cc, fp) |> unique
+        sub_fp = filter(x -> x in cc, fp)
         l = endof(sub_fp)
         for ii = 1:l
             pt1 = sub_fp[ii]
