@@ -90,7 +90,7 @@ function get_output_flags(cfg)
     # Output flags
     write_volt_maps = cfg["write_volt_maps"] in TRUELIST
     write_cur_maps = cfg["write_cur_maps"] in TRUELIST
-    write_cum_cur_maps_only = cfg["write_cum_cur_map_only"] in TRUELIST
+    write_cum_cur_map_only = cfg["write_cum_cur_map_only"] in TRUELIST
     write_max_cur_maps = cfg["write_max_cur_maps"] in TRUELIST
     set_null_currents_to_nodata = cfg["set_null_currents_to_nodata"] in TRUELIST
     set_null_voltages_to_nodata = cfg["set_null_voltages_to_nodata"] in TRUELIST
@@ -98,7 +98,7 @@ function get_output_flags(cfg)
     log_transform_maps = cfg["log_transform_maps"] in TRUELIST
 
     o = OutputFlags(write_volt_maps, write_cur_maps,
-                    write_cum_cur_maps_only, write_max_cur_maps,
+                    write_cum_cur_map_only, write_max_cur_maps,
                     set_null_currents_to_nodata, set_null_voltages_to_nodata,
                     compress_grids, log_transform_maps)
 end
@@ -191,4 +191,37 @@ function postprocess_cum_curmap!(accum)
 end
 
 mycsid() = myid() - minimum(workers()) + 1
+
+function initialize_cum_maps(cellmap::Matrix{T}, max = false) where T
+    cum_curr = Vector{SharedMatrix{T}}(nprocs())
+    for i = 1:nprocs()
+        cum_curr[i] = SharedArray(zeros(T, size(cellmap)...))
+    end
+    max_curr = Vector{SharedMatrix{T}}()
+    if max
+        max_curr = Vector{SharedMatrix{T}}(nprocs())
+        for i = 1:nprocs()
+            max_curr[i] = SharedArray(zeros(T, size(cellmap)...))
+        end
+    end
+    cum_branch_curr = Vector{SharedVector{T}}()
+    cum_node_curr = Vector{SharedVector{T}}()
+
+    Cumulative(cum_curr, max_curr, 
+        cum_branch_curr, cum_node_curr)
+end
+
+function initialize_cum_vectors(v::Vector{T}) where T
+    cum_curr = Vector{SharedMatrix{T}}(nprocs())
+    max_curr = Vector{SharedMatrix{T}}()
+    cum_branch_curr = Vector{SharedVector{T}}()
+    cum_node_curr = Vector{SharedVector{T}}()
+    for i = 1:nprocs()
+        cum_branch_curr[i] = SharedArray(zeros(T, size(v)...))
+        cum_node_curr[i] = SharedArray(zeros(T, size(v)...))
+    end
+
+    Cumulative(cum_curr, max_curr, 
+        cum_branch_curr, cum_node_curr)
+end
 

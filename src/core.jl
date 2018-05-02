@@ -1,3 +1,10 @@
+struct Cumulative{T}
+    cum_curr::Vector{SharedMatrix{T}}
+    max_curr::Vector{SharedMatrix{T}}
+    cum_branch_curr::Vector{SharedVector{T}}
+    cum_node_curr::Vector{SharedVector{T}}
+end
+
 struct GraphData{T,V}
     G::SparseMatrixCSC{T,V}
     cc::Vector{Vector{V}}
@@ -8,7 +15,7 @@ struct GraphData{T,V}
     polymap::Matrix{V}
     hbmeta::RasterMeta
     cellmap::Matrix{T}
-    cum_curr::Vector{SharedMatrix{T}}
+    cum::Cumulative{T}
 end
 
 struct ComponentData{T,V}
@@ -26,7 +33,7 @@ struct Output{T,V}
     comp_idx::Tuple{V,V}
     resistance::T
     col::V
-    cum_curr::Vector{SharedMatrix{T}}
+    cum::Cumulative{T}
 end
 
 struct Shortcut{T}
@@ -77,8 +84,8 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
     # Get number of focal points
     numpoints = size(points, 1)
 
-    # Cumulative current map
-    cum_curr = data.cum_curr
+    # Cumulative currents
+    cum = data.cum
     
     csinfo("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
 
@@ -195,7 +202,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
                         resistances[c_j, c_i] = r
                     end
                     output = Output(points, v, (orig_pts[c_i], orig_pts[c_j]),
-                                    (comp_i, comp_j), r, INT(c_j), cum_curr)
+                                    (comp_i, comp_j), r, INT(c_j), cum)
                     postprocess(output, component_data, flags, shortcut, cfg)
                 end
             end
@@ -265,7 +272,7 @@ function _cholmod_solver_path(data, flags, cfg, log)
     write_cur_maps = outputflags.write_cur_maps
 
     # Cumulative current map
-    cum_curr = data.cum_curr
+    cum = data.cum
 
     # CHOLMOD solver mode works only in double precision
     if eltype(a) == Float32
@@ -398,8 +405,7 @@ function _cholmod_solver_path(data, flags, cfg, log)
                 orig_pts[cholmod_batch[i].points_idx[2]]), 
                 cholmod_batch[i].cc_idx, 
                 lhs[cholmod_batch[i].cc_idx[2], i] - lhs[cholmod_batch[i].cc_idx[1], i],
-                INT(cholmod_batch[i].points_idx[2]), 
-                cum_curr)
+                INT(cholmod_batch[i].points_idx[2]), cum)
             postprocess(output, component_data, flags, shortcut, cfg)
         end
 
