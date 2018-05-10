@@ -201,7 +201,7 @@ function initialize_cum_maps(cellmap::Matrix{T}, max = false) where T
     if max
         max_curr = Vector{SharedMatrix{T}}(nprocs())
         for i = 1:nprocs()
-            max_curr[i] = SharedArray(zeros(T, size(cellmap)...))
+            max_curr[i] = SharedArray(fill(T(-9999), size(cellmap)...))
         end
     end
     cum_branch_curr = Vector{SharedVector{T}}()
@@ -212,10 +212,10 @@ function initialize_cum_maps(cellmap::Matrix{T}, max = false) where T
 end
 
 function initialize_cum_vectors(v::Vector{T}) where T
-    cum_curr = Vector{SharedMatrix{T}}(nprocs())
+    cum_curr = Vector{SharedMatrix{T}}()
     max_curr = Vector{SharedMatrix{T}}()
-    cum_branch_curr = Vector{SharedVector{T}}()
-    cum_node_curr = Vector{SharedVector{T}}()
+    cum_branch_curr = Vector{SharedVector{T}}(nprocs())
+    cum_node_curr = Vector{SharedVector{T}}(nprocs())
     for i = 1:nprocs()
         cum_branch_curr[i] = SharedArray(zeros(T, size(v)...))
         cum_node_curr[i] = SharedArray(zeros(T, size(v)...))
