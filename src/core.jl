@@ -101,7 +101,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
     for (cid, comp) in enumerate(cc)
     
         # Subset of points relevant to CC
-        csub = filter(x -> x in comp, points) |> unique
+        csub = filter(x -> x in comp, points)
         #idx = findin(c, csub)
     
         if isempty(csub)
