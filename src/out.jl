@@ -35,10 +35,6 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
     nodemap = component_data.local_nodemap
     hbmeta = component_data.hbmeta
     cellmap = component_data.cellmap
-    cum_curr = output.cum.cum_curr
-    max_curr = output.cum.max_curr
-    cum_branch_curr = output.cum.cum_branch_curr
-    cum_node_curr = output.cum.cum_node_curr
 
     # Flags
     log_transform = flags.outputflags.log_transform_maps
@@ -54,20 +50,24 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
         # Branch currents
         branch_currents_array = _convert_to_3col(branch_currents, cc)
 
+        # TODO: implement cumulative maps for netowrk mode 
+
         # Accumulate branch currents
-        cum_branch_curr[mycsid()] .+= branch_currents_array[:,3]
+        # cum_branch_curr[mycsid()] .+= branch_currents_array[:,3]
 
         # Node currents
         node_currents_array = _append_name_to_node_currents(node_currents, cc)
 
         # Accumulate node currents
-        cum_node_curr[mycsid()] .+= node_currents_array[:,2]
+        # cum_node_curr[mycsid()] .+= node_currents_array[:,2]
 
-        !write_cum_cur_map_only && 
-            write_currents(node_currents_array, branch_currents_array, name, cfg)
+        # !write_cum_cur_map_only && 
+        write_currents(node_currents_array, branch_currents_array, name, cfg)
     else
 
         cmap = node_currents
+        cum_curr = output.cum.cum_curr
+        max_curr = output.cum.max_curr
 
         # Process the current map
         process_grid!(cmap, cellmap, hbmeta, log_transform = log_transform, 
