@@ -42,8 +42,10 @@ function compute_graph_data(data::NetworkData{T,V})::GraphData{T,V} where {T,V}
     hbmeta = RasterMeta()
     cellmap = Matrix{T}(0,0)
 
+    cum = initialize_cum_vectors(v)
+
     GraphData(G, cc, data.fp, data.fp, 
-                exclude_pairs, nodemap, polymap, hbmeta, cellmap)
+                exclude_pairs, nodemap, polymap, hbmeta, cellmap, cum)
 end
 
 function get_network_flags(cfg)

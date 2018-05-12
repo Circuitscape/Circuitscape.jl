@@ -1,3 +1,10 @@
+struct Cumulative{T}
+    cum_curr::Vector{SharedMatrix{T}}
+    max_curr::Vector{SharedMatrix{T}}
+    cum_branch_curr::Vector{SharedVector{T}}
+    cum_node_curr::Vector{SharedVector{T}}
+end
+
 struct GraphData{T,V}
     G::SparseMatrixCSC{T,V}
     cc::Vector{Vector{V}}
@@ -8,6 +15,7 @@ struct GraphData{T,V}
     polymap::Matrix{V}
     hbmeta::RasterMeta
     cellmap::Matrix{T}
+    cum::Cumulative{T}
 end
 
 struct ComponentData{T,V}
@@ -25,6 +33,7 @@ struct Output{T,V}
     comp_idx::Tuple{V,V}
     resistance::T
     col::V
+    cum::Cumulative{T}
 end
 
 struct Shortcut{T}
@@ -74,6 +83,9 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
 
     # Get number of focal points
     numpoints = size(points, 1)
+
+    # Cumulative currents
+    cum = data.cum
     
     csinfo("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
 
@@ -83,7 +95,6 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
     # Initialize pairwise resistance
     resistances = -1 * ones(T, numpoints, numpoints)::Matrix{T}
     voltmatrix = zeros(T, size(resistances))::Matrix{T}
-    # shortcut_res = -1 * ones(eltype(a), size(resistances))
     shortcut_res = deepcopy(resistances)::Matrix{T}
     
     # Get a vector of connected components
@@ -144,7 +155,6 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
                 end
             end
 
-            k = 1 
             # Loop through all possible pairs
             for j in rng
 
@@ -175,7 +185,6 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
                 # Solve system
                 # csinfo("Solving points $pi and $pj")
                 log && csinfo("Solving pair $(d[(pi,pj)]) of $num")
-                k += 1
                 t2 = @elapsed v = solve_linear_system(cfg, matrix, current, P)
                 csinfo("Time taken to solve linear system = $t2 seconds")
                 v .= v .- v[comp_i]
@@ -191,7 +200,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
                         resistances[c_j, c_i] = r
                     end
                     output = Output(points, v, (orig_pts[c_i], orig_pts[c_j]),
-                                    (comp_i, comp_j), r, INT(c_j))
+                                    (comp_i, comp_j), r, INT(c_j), cum)
                     postprocess(output, component_data, flags, shortcut, cfg)
                 end
             end
@@ -259,6 +268,9 @@ function _cholmod_solver_path(data, flags, cfg, log)
     is_raster = flags.is_raster
     write_volt_maps = outputflags.write_volt_maps
     write_cur_maps = outputflags.write_cur_maps
+
+    # Cumulative current map
+    cum = data.cum
 
     # CHOLMOD solver mode works only in double precision
     if eltype(a) == Float32
@@ -391,7 +403,7 @@ function _cholmod_solver_path(data, flags, cfg, log)
                 orig_pts[cholmod_batch[i].points_idx[2]]), 
                 cholmod_batch[i].cc_idx, 
                 lhs[cholmod_batch[i].cc_idx[2], i] - lhs[cholmod_batch[i].cc_idx[1], i],
-                INT(cholmod_batch[i].points_idx[2]))
+                INT(cholmod_batch[i].points_idx[2]), cum)
             postprocess(output, component_data, flags, shortcut, cfg)
         end
 
@@ -549,17 +561,12 @@ function postprocess(output, component_data, flags, shortcut, cfg)
     get_shortcut_resistances = shortcut.get_shortcut_resistances
 
     if get_shortcut_resistances
-        # update_voltmatrix!(voltmatrix, local_nodemap, voltages, hbmeta, points, r, j, cc)
         update_voltmatrix!(shortcut, output, component_data)
         return nothing
     end
 
-    # name = "_$(points[i])_$(points[j])"
 
-    #if flags.is_raster
-        # name = "_$(Int(orig_pts[i]))_$(Int(orig_pts[j]))"
     name = "_$(orig_pts[1])_$(orig_pts[2])"
-    #end
 
     if flags.outputflags.write_volt_maps
         t = @elapsed write_volt_maps(name, output, component_data, flags, cfg)

@@ -22,7 +22,7 @@ function raster_pairwise(T, cfg)::Matrix{T}
 
     pt_file_contains_polygons = length(rasterdata.points_rc[1]) != 
                                 length(unique(rasterdata.points_rc[3]))
-    
+
     if pt_file_contains_polygons
         _pt_file_polygons_path(rasterdata, flags, cfg)
     else
@@ -58,7 +58,12 @@ function _pt_file_no_polygons_path(rasterdata::RasData{T,V},
                     flags, cfg)::Matrix{T} where {T,V}
 
     graphdata = compute_graph_data_no_polygons(rasterdata, flags)
-    single_ground_all_pairs(graphdata, flags, cfg)
+    r = single_ground_all_pairs(graphdata, flags, cfg)
+
+    write_cum_maps(graphdata.cum, rasterdata.cellmap, cfg, rasterdata.hbmeta, 
+                    flags.outputflags.write_max_cur_maps)
+
+    r
 end
 
 function _pt_file_polygons_path(rasterdata::RasData{T,V}, 
@@ -79,6 +84,9 @@ function _pt_file_polygons_path(rasterdata::RasData{T,V},
     avg_res = flags.avg_res
     four_neighbors = flags.four_neighbors
 
+    # Cumulative maps
+    cum = initialize_cum_maps(gmap)
+
     pts = unique(points_rc[3])
     resistances = -1 * ones(length(pts), length(pts))
 
@@ -92,7 +100,7 @@ function _pt_file_polygons_path(rasterdata::RasData{T,V},
             pt2 = pts[j]
             csinfo("Solving pair $k of $n")
             k += 1
-            graphdata = compute_graph_data_polygons(rasterdata, flags, pt1, pt2)
+            graphdata = compute_graph_data_polygons(rasterdata, flags, pt1, pt2, cum)
             pairwise_resistance = single_ground_all_pairs(graphdata, flags, cfg, false)
             resistances[i,j] = resistances[j,i] = pairwise_resistance[2,3]
         end
@@ -101,8 +109,13 @@ function _pt_file_polygons_path(rasterdata::RasData{T,V},
         resistances[i,i] = 0
     end
     P = [0, pts...]
-    hcat(P, vcat(pts', resistances))
+    r = hcat(P, vcat(pts', resistances))
+
+    write_cum_maps(cum, gmap, cfg, rasterdata.hbmeta, 
+                    flags.outputflags.write_max_cur_maps)
+
     # resistances
+    r
 end
 
 function calc_num_pairs(pts)
@@ -116,7 +129,7 @@ function calc_num_pairs(pts)
 end
 
 function compute_graph_data_polygons(rasterdata::RasData{T,V}, 
-                            flags, pt1, pt2)::GraphData{T,V} where {T,V}
+                            flags, pt1, pt2, cum)::GraphData{T,V} where {T,V}
 
     # Data
     gmap = rasterdata.cellmap
@@ -153,7 +166,7 @@ function compute_graph_data_polygons(rasterdata::RasData{T,V},
     exclude_pairs = Tuple{INT,INT}[]
     
     GraphData(G, cc, points, [pt1, pt2], 
-            exclude_pairs, nodemap, newpoly, hbmeta, gmap)
+            exclude_pairs, nodemap, newpoly, hbmeta, gmap, cum)
 end
 
 #=function compute_graph_data(rasterdata, flags)
@@ -183,6 +196,7 @@ function compute_graph_data_no_polygons(data::RasData{T,V},
     # Flags
     avg_res = flags.avg_res
     four_neighbors = flags.four_neighbors
+    write_max_cur_maps = flags.outputflags.write_max_cur_maps
 
     # Nodemap and graph construction
     nodemap = construct_node_map(cellmap, polymap)
@@ -204,8 +218,12 @@ function compute_graph_data_no_polygons(data::RasData{T,V},
         points[i] = nodemap[v...]
     end
 
+    # Cumulative current maps
+    cum = initialize_cum_maps(cellmap, write_max_cur_maps)
+
     GraphData(G, cc, points, points_rc[3], 
-                exclude_pairs, nodemap, polymap, hbmeta, cellmap)
+                exclude_pairs, nodemap, polymap, 
+                hbmeta, cellmap, cum)
 end
 Base.isempty(t::IncludeExcludePairs) = t.mode == :undef
 
@@ -311,14 +329,9 @@ function relabel!(nodemap::Matrix{T}, offset = T(0)) where T
     oldlabels = nodemap[find(nodemap)]
     newlabels = zeros(INT, size(oldlabels)) 
     s = sort(oldlabels)
-    #@show s
     perm = sortperm(oldlabels)
-    #@show perm
     prepend!(s, s[1] - 1)
-    #@show s
-    #@show diff(s)
     f = find(diff(s))
-    #@show f
     newlabels[f] = 1
     newlabels = cumsum(newlabels)
     newlabels[perm] = copy(newlabels)

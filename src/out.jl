@@ -1,7 +1,7 @@
 struct OutputFlags
     write_volt_maps::Bool
     write_cur_maps::Bool
-    write_cum_cur_maps_only::Bool
+    write_cum_cur_map_only::Bool
     write_max_cur_maps::Bool
     set_null_currents_to_nodata::Bool
     set_null_voltages_to_nodata::Bool
@@ -36,20 +36,55 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
     hbmeta = component_data.hbmeta
     cellmap = component_data.cellmap
 
+    # Flags
+    log_transform = flags.outputflags.log_transform_maps
+    set_null_currents_to_nodata = 
+        flags.outputflags.set_null_currents_to_nodata
+    write_max_cur_maps = flags.outputflags.write_max_cur_maps
+    write_cum_cur_map_only = flags.outputflags.write_cum_cur_map_only
+
     node_currents, branch_currents = _create_current_maps(G, voltages, finitegrounds, cfg, nodemap = nodemap, hbmeta = hbmeta)
 
     if !flags.is_raster
+
+        # Branch currents
         branch_currents_array = _convert_to_3col(branch_currents, cc)
+
+        # TODO: implement cumulative maps for netowrk mode 
+
+        # Accumulate branch currents
+        # cum_branch_curr[mycsid()] .+= branch_currents_array[:,3]
+
+        # Node currents
         node_currents_array = _append_name_to_node_currents(node_currents, cc)
+
+        # Accumulate node currents
+        # cum_node_curr[mycsid()] .+= node_currents_array[:,2]
+
+        # !write_cum_cur_map_only && 
         write_currents(node_currents_array, branch_currents_array, name, cfg)
     else
-       current_map = node_currents
-       log_transform = flags.outputflags.log_transform_maps
-       set_null_currents_to_nodata = 
-            flags.outputflags.set_null_currents_to_nodata
-       write_aagrid(current_map, name, cfg, hbmeta, component_data.cellmap; 
-                        log_transform = log_transform, 
-                        set_null_to_nodata = set_null_currents_to_nodata)
+
+        cmap = node_currents
+        cum_curr = output.cum.cum_curr
+        max_curr = output.cum.max_curr
+
+        # Process the current map
+        process_grid!(cmap, cellmap, hbmeta, log_transform = log_transform, 
+                            set_null_to_nodata = set_null_currents_to_nodata)
+
+        # Accumulate by default
+        cum_curr[mycsid()] .+= cmap
+
+        # Max current if user asks for it
+        if write_max_cur_maps 
+            max_curr[mycsid()] .= max.(max_curr[mycsid()], cmap)
+        end
+
+        # Write current maps
+        !write_cum_cur_map_only &&
+                        write_aagrid(cmap, name, cfg, hbmeta)
+
    end
 end
 
@@ -261,6 +296,52 @@ function count_upper(G)
     n
 end
 
+function process_grid!(cmap, cellmap, hbmeta; log_transform = false, 
+                                set_null_to_nodata = false)
+    if log_transform
+        map!(x -> x > 0 ? log10(x) : float(hbmeta.nodata), cmap, cmap)
+    end
+
+    if set_null_to_nodata
+        for i in eachindex(cmap)
+            if cellmap[i] == 0
+                cmap[i] = hbmeta.nodata
+            end
+        end
+    end
+
+end
+        
+function write_aagrid(cmap, name, cfg, hbmeta; 
+                        voltage = false, cum = false, 
+                        max = false)
+
+
+    str = "curmap"
+    if cum
+        str = "cum_$(str)"
+    elseif max
+        str = "max_$(str)"
+    elseif voltage
+        str = "voltmap"
+    end
+
+    pref = split(cfg["output_file"], '.')[1]
+    filename = "$(pref)_$(str)$(name).asc"
+    f = open(filename, "w")
+
+    write(f, "ncols         $(hbmeta.ncols)\n")
+    write(f, "nrows         $(hbmeta.nrows)\n")
+    write(f, "xllcorner     $(hbmeta.xllcorner)\n")
+    write(f, "yllcorner     $(hbmeta.yllcorner)\n")
+    write(f, "cellsize      $(hbmeta.cellsize)\n")
+    write(f, "NODATA_value  $(hbmeta.nodata)\n")
+
+    writedlm(f, round.(cmap, 8), ' ')
+    close(f)
+end
+
+
 function write_aagrid(cmap, name, cfg, hbmeta, cellmap;
                         voltage = false, cum = false, max = false,
                         log_transform = false, set_null_to_nodata = false)
@@ -381,4 +462,23 @@ function save_resistances(r, cfg)
     open(filename_3col, "w") do f
         writedlm(f, rcol, ' ')
     end
+end
+
+function write_cum_maps(cum, cellmap::Matrix{T}, cfg, hbmeta, write_max = false) where T
+    cum_curr = zeros(T, size(cellmap)...)
+    for i = 1:nprocs()
+        cum_curr .+= cum.cum_curr[i]
+    end 
+    postprocess_cum_curmap!(cum_curr)
+    write_aagrid(cum_curr, "", cfg, hbmeta, cum = true)
+
+    if write_max
+        max_curr = fill(T(-9999), size(cellmap)...)
+        for i = 1:nprocs()
+            max_curr .= max.(cum.max_curr[i], max_curr)
+        end
+        postprocess_cum_curmap!(max_curr)
+        write_aagrid(max_curr, "", cfg, hbmeta, max = true)
+    end
+
 end
