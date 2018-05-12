@@ -22,7 +22,7 @@ function raster_pairwise(T, cfg)::Matrix{T}
 
     pt_file_contains_polygons = length(rasterdata.points_rc[1]) != 
                                 length(unique(rasterdata.points_rc[3]))
-    
+
     if pt_file_contains_polygons
         _pt_file_polygons_path(rasterdata, flags, cfg)
     else
@@ -329,14 +329,9 @@ function relabel!(nodemap::Matrix{T}, offset = T(0)) where T
     oldlabels = nodemap[find(nodemap)]
     newlabels = zeros(INT, size(oldlabels)) 
     s = sort(oldlabels)
-    #@show s
     perm = sortperm(oldlabels)
-    #@show perm
     prepend!(s, s[1] - 1)
-    #@show s
-    #@show diff(s)
     f = find(diff(s))
-    #@show f
     newlabels[f] = 1
     newlabels = cumsum(newlabels)
     newlabels[perm] = copy(newlabels)

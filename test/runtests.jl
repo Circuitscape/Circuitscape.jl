@@ -1,6 +1,6 @@
 using Circuitscape
 using Base.Test
-import Circuitscape: compute_single, compute_cholmod
+import Circuitscape: compute_single, compute_cholmod, compute_parallel
 
 # Utility to compare output files
 include("compare_output.jl")
@@ -11,9 +11,13 @@ include("internal.jl")
 end
 
 
-function f()
-for f in (compute, compute_single, compute_cholmod)
-str =  f == compute ? "Double" : "Single"
+function runtests()
+for f in (compute, compute_single, compute_cholmod, compute_parallel)
+str = if f == compute_single
+        "Single"
+      else
+        "Double"
+      end
 
 @testset "$str Precision Tests" begin 
 
@@ -50,7 +54,7 @@ end
 
 @testset "Raster Pairwise" begin 
 # Raster pairwise tests
-for i = 1:15
+for i = 1:2
     info("Testing sgVerify$i")
     r = f("input/raster/pairwise/$i/sgVerify$(i).ini")
     x = readdlm("output_verify/sgVerify$(i)_resistances.out")
@@ -103,12 +107,5 @@ end
 end
 end
 
-f()
 
-@testset "Parallel Tests" begin 
-addprocs(2)
-
-@everywhere using Circuitscape
-@everywhere import Circuitscape: compute_cholmod, compute_single
-f()
-end
+runtests()

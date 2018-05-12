@@ -85,6 +85,13 @@ function compute_single(str)
     _compute(Float32, cfg)
 end
 
+function compute_parallel(str, n_processes = 2)
+    cfg = parse_config(str)
+    cfg["parallelize"] = "true"
+    cfg["max_parallel"] = "$(n_processes)"
+    compute(cfg)
+end
+
 function get_output_flags(cfg)
 
     # Output flags

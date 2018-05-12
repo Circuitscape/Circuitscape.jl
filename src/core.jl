@@ -155,7 +155,6 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
                 end
             end
 
-            k = 1 
             # Loop through all possible pairs
             for j in rng
 
@@ -186,7 +185,6 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
                 # Solve system
                 # csinfo("Solving points $pi and $pj")
                 log && csinfo("Solving pair $(d[(pi,pj)]) of $num")
-                k += 1
                 t2 = @elapsed v = solve_linear_system(cfg, matrix, current, P)
                 csinfo("Time taken to solve linear system = $t2 seconds")
                 v .= v .- v[comp_i]
