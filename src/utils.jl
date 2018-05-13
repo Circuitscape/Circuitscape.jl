@@ -69,13 +69,14 @@ function test_problem(str)
 end    
 
 # Utility funciton for calling Circuitscape with Cholmod
-function compute_cholmod(str)
+function compute_cholmod(str, batch_size = 5)
     cfg = parse_config(str)
     T = cfg["precision"] in SINGLE ? Float32 : Float64
     if T == Float32
         cswarn("Cholmod supports only double precision. Implicit conversion may occur")
     end
     cfg["solver"] = "cholmod"
+    cfg["cholmod_batch_size"] = string(batch_size)
     _compute(T, cfg)
 end
 

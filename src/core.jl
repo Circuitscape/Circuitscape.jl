@@ -58,7 +58,8 @@ function single_ground_all_pairs(data::GraphData{T,V}, flags, cfg, log = true) w
         if eltype(data.G) == Float32
             cswarn("CHOLMOD solver mode works only in double precision")
         end
-        _cholmod_solver_path(data, flags, cfg, log)
+        bs = parse(Int, cfg["cholmod_batch_size"])
+        _cholmod_solver_path(data, flags, cfg, log, bs)
     end
 end
 
@@ -250,7 +251,7 @@ struct CholmodNode{T}
     points_idx::Tuple{T,T}
 end
 
-function _cholmod_solver_path(data, flags, cfg, log)
+function _cholmod_solver_path(data, flags, cfg, log, batch_size = 1000)
     
     # Data
     a = data.G
@@ -316,17 +317,6 @@ function _cholmod_solver_path(data, flags, cfg, log)
         # Conductance matrix corresponding to CC
         matrix = comps[cid]
 
-        # Check if positive definite (laplacians may be semi definite too)
-        # posdef = isposdef(matrix)
-
-        # If positive definite, will work directly 
-        #=t = @elapsed begin 
-        try 
-            factor = cholfact(matrix)
-        catch
-            factor = cholfact(matrix + sparse(10eps()*I,size(matrix,1)))
-        end
-        end=#
         t = @elapsed factor = construct_cholesky_factor(matrix)
         csinfo("Time taken to construct cholesky factor = $t")
 
@@ -380,42 +370,55 @@ function _cholmod_solver_path(data, flags, cfg, log)
             end
         end
 
-        l = length(cholmod_batch)
-        rhs = zeros(eltype(matrix), size(matrix, 1), l)
-        for (i,node) in enumerate(cholmod_batch)
-            rhs[node.cc_idx[1], i] = -1
-            rhs[node.cc_idx[2], i] = 1 
-        end
-        lhs = factor \ rhs
-
-        # Normalisation step
-        for i = 1:l
-            n = cholmod_batch[i].cc_idx[1]
-            v = lhs[n,i]
-            for j = 1:size(matrix, 1)
-                lhs[j,i] = lhs[j,i] - v
-            end
-        end
-
-        function f(i)
+        function f(i, rng, lhs)
+            v = rng[i]
             output = Output(points, lhs[:,i], 
-                (orig_pts[cholmod_batch[i].points_idx[1]], 
-                orig_pts[cholmod_batch[i].points_idx[2]]), 
-                cholmod_batch[i].cc_idx, 
-                lhs[cholmod_batch[i].cc_idx[2], i] - lhs[cholmod_batch[i].cc_idx[1], i],
-                INT(cholmod_batch[i].points_idx[2]), cum)
+                (orig_pts[cholmod_batch[v].points_idx[1]], 
+                orig_pts[cholmod_batch[v].points_idx[2]]), 
+                cholmod_batch[v].cc_idx, 
+                lhs[cholmod_batch[v].cc_idx[2], i] - lhs[cholmod_batch[v].cc_idx[1], i],
+                INT(cholmod_batch[v].points_idx[2]), cum)
             postprocess(output, component_data, flags, shortcut, cfg)
         end
 
-        pmap(x -> f(x), 1:l)
-        for i = 1:l
-            coords = cholmod_batch[i].points_idx
-            r = lhs[cholmod_batch[i].cc_idx[2], i] - 
-                        lhs[cholmod_batch[i].cc_idx[1], i]
-            resistances[coords...] = r
-            resistances[reverse(coords)...] = r
-        end
+        l = length(cholmod_batch)
 
+        for st in 1:batch_size:l
+
+            rng = st + batch_size < l ?
+                            (st:(st+batch_size-1)) : (st:l)
+
+            csinfo("Solving points $(rng.start) to $(rng.stop)")
+
+            rhs = zeros(eltype(matrix), size(matrix, 1), length(rng))
+
+
+            for (i,v) in enumerate(rng)
+                node = cholmod_batch[v]
+                rhs[node.cc_idx[1], i] = -1
+                rhs[node.cc_idx[2], i] = 1 
+            end
+            lhs = factor \ rhs
+
+            # Normalisation step
+            for (i,val) in enumerate(rng)
+                n = cholmod_batch[val].cc_idx[1]
+                v = lhs[n,i]
+                for j = 1:size(matrix, 1)
+                    lhs[j,i] = lhs[j,i] - v
+                end
+            end
+
+
+            pmap(x -> f(x, rng, lhs), 1:length(rng))
+            for (i,v) in enumerate(rng)
+                coords = cholmod_batch[v].points_idx
+                r = lhs[cholmod_batch[v].cc_idx[2], i] - 
+                            lhs[cholmod_batch[v].cc_idx[1], i]
+                resistances[coords...] = r
+                resistances[reverse(coords)...] = r
+            end
+        end
     end
 
     for i = 1:size(resistances,1)
