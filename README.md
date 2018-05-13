@@ -1,7 +1,7 @@
 # Circuitscape
 
 Linux: [![Build Status](https://travis-ci.org/Circuitscape/Circuitscape.jl.svg?branch=master)](https://travis-ci.org/Circuitscape/Circuitscape.jl)
-[![Coverage Status](https://coveralls.io/repos/Circuitscape/Circuitscape.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/Circuitscape/Circuitscape.jl?branch=master)
+[![Coverage Status](https://coveralls.io/repos/github/Circuitscape/Circuitscape.jl/badge.svg?branch=master)](https://coveralls.io/github/Circuitscape/Circuitscape.jl?branch=master)
 [![codecov.io](http://codecov.io/github/Circuitscape/Circuitscape.jl/coverage.svg?branch=master)](http://codecov.io/github/Circuitscape/Circuitscape.jl?branch=master)
 
 Circuitscape is an open-source program that uses circuit theory to model connectivity 
