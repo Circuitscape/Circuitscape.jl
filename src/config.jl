@@ -66,6 +66,7 @@ function init_config()
     a["precision"] = "Double"
     a["log_file"] = "None"
     a["log_level"] = "INFO"
+    a["cholmod_batch_size"] = "1000"
 
     a
 end

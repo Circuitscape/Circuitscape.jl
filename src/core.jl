@@ -58,7 +58,8 @@ function single_ground_all_pairs(data::GraphData{T,V}, flags, cfg, log = true) w
         if eltype(data.G) == Float32
             cswarn("CHOLMOD solver mode works only in double precision")
         end
-        _cholmod_solver_path(data, flags, cfg, log)
+        bs = parse(Int, cfg["cholmod_batch_size"])
+        _cholmod_solver_path(data, flags, cfg, log, bs)
     end
 end
 
@@ -250,7 +251,7 @@ struct CholmodNode{T}
     points_idx::Tuple{T,T}
 end
 
-function _cholmod_solver_path(data, flags, cfg, log)
+function _cholmod_solver_path(data, flags, cfg, log, batch_size = 1000)
     
     # Data
     a = data.G
@@ -382,12 +383,12 @@ function _cholmod_solver_path(data, flags, cfg, log)
 
         l = length(cholmod_batch)
 
-        batch_size = 5
-
         for st in 1:batch_size:l
 
             rng = st + batch_size < l ?
                             (st:(st+batch_size-1)) : (st:l)
+
+            csinfo("Solving points $(rng.start) to $(rng.stop)")
 
             rhs = zeros(eltype(matrix), size(matrix, 1), length(rng))
 
