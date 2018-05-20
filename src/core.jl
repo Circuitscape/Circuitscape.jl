@@ -82,6 +82,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
     write_volt_maps = outputflags.write_volt_maps
     write_cur_maps = outputflags.write_cur_maps
     write_cum_cur_map_only = outputflags.write_cum_cur_map_only
+    write_max_cur_maps = outputflags.write_max_cur_maps
 
     # Get number of focal points
     numpoints = size(points, 1)
@@ -103,7 +104,8 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
     comps = getindex.([a], cc, cc)
     
     get_shortcut_resistances = false
-    if is_raster && !write_volt_maps && !write_cur_maps && !write_cum_cur_map_only
+    if is_raster && !write_volt_maps && !write_cur_maps && 
+            !write_cum_cur_map_only && !write_max_cur_maps
         get_shortcut_resistances = true
         csinfo("Triggering resistance calculation shortcut")
         num, d = get_num_pairs_shortcut(cc, points, exclude)
@@ -271,6 +273,7 @@ function _cholmod_solver_path(data, flags, cfg, log, batch_size = 1000)
     write_volt_maps = outputflags.write_volt_maps
     write_cur_maps = outputflags.write_cur_maps
     write_cum_cur_map_only = outputflags.write_cum_cur_map_only
+    write_max_cur_maps = outputflags.write_max_cur_maps
 
     # Cumulative current map
     cum = data.cum
@@ -298,7 +301,8 @@ function _cholmod_solver_path(data, flags, cfg, log, batch_size = 1000)
     comps = getindex.([a], cc, cc)
     
     get_shortcut_resistances = false
-    if is_raster && !write_volt_maps && !write_cur_maps && !write_cum_cur_map_only
+    if is_raster && !write_volt_maps && !write_cur_maps && 
+            !write_cum_cur_map_only  && !write_max_cur_maps
         get_shortcut_resistances = true
         csinfo("Triggering resistance calculation shortcut")
         num, d = get_num_pairs_shortcut(cc, points, exclude)
