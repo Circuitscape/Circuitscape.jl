@@ -1,7 +1,7 @@
 const fmt = "[{date} | {level} | {name}]: {msg}"
 const ui_interface = Ref{Function}((x,y) -> nothing)
 
-const logger = Memento.config("info", 
+const logger = Memento.config!("info", 
                         fmt = fmt)
 csinfo(msg) = (info(logger, msg); ui_interface[](msg, :info))
 cswarn(msg) = (warn(logger, msg); ui_interace[](msg, :warn))
