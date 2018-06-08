@@ -4,6 +4,8 @@ export  model_problem,
         calculate_cum_current_map,
         calculate_max_current_map
 
+using Base.Test
+
  """
  Construct nodemap specific to a connected component
  """
@@ -233,3 +235,177 @@ function initialize_cum_vectors(v::Vector{T}) where T
         cum_branch_curr, cum_node_curr)
 end
 
+function runtests(which = :compute)
+
+    str = if which == :compute_single
+            "Single"
+          else
+            "Double"
+          end
+
+    f = eval(which)
+
+    @testset "$str Precision Tests" begin 
+
+    @testset "Network Pairwise" begin 
+    # Network pairwise tests
+    for i = 1:3
+        info("Testing sgNetworkVerify$i")
+        r = f("input/network/sgNetworkVerify$(i).ini")
+        x = readdlm("output_verify/sgNetworkVerify$(i)_resistances.out")
+        valx = x[2:end, 2:end]
+        valr = r[2:end, 2:end]
+        @test sum(abs2, valx - valr) < 1e-6
+        pts_x = x[2:end,1]
+        pts_r = r[2:end,1]
+        @test pts_x + 1 == pts_r
+        compare_all_output("sgNetworkVerify$(i)")
+        info("Test sgNetworkVerify$i passed")
+    end
+    end
+
+    @testset "Network Advanced" begin
+    # Network advanced tests
+    for i = 1:3
+        info("Testing mgNetworkVerify$i")
+        r = f("input/network/mgNetworkVerify$(i).ini")
+        x = readdlm("output_verify/mgNetworkVerify$(i)_voltages.txt")
+        x[:,1] = x[:,1] + 1
+        @test sum(abs2, x - r) < 1e-6
+        compare_all_output("mgNetworkVerify$(i)")
+        info("Test mgNetworkVerify$i passed")
+    end
+    end
+
+
+    @testset "Raster Pairwise" begin 
+    # Raster pairwise tests
+    for i = 1:2
+        info("Testing sgVerify$i")
+        r = f("input/raster/pairwise/$i/sgVerify$(i).ini")
+        x = readdlm("output_verify/sgVerify$(i)_resistances.out")
+        # x = x[2:end, 2:end]
+        @test sum(abs2, x - r) < 1e-6
+        compare_all_output("sgVerify$(i)")
+        info("Test sgVerify$i passed")
+    end
+    end
+
+    @testset "Raster Advanced" begin 
+    # Raster advanced tests
+    for i in 1:5
+        info("Testing mgVerify$i")
+        r = f("input/raster/advanced/$i/mgVerify$(i).ini")
+        x = readdlm("output_verify/mgVerify$(i)_voltmap.asc"; skipstart = 6)
+        @test sum(abs2, x - r) < 1e-4
+        # compare_all_output("mgVerify$(i)")
+        info("Test mgVerify$i passed")
+    end
+    end
+
+    @testset "Raster One to All" begin 
+    # Raster one to all test
+    for i in 1:13
+        info("Testing oneToAllVerify$i")
+        r = f("input/raster/one_to_all/$i/oneToAllVerify$(i).ini")
+        x = readdlm("output_verify/oneToAllVerify$(i)_resistances.out")
+        # x = x[:,2]
+        @test sum(abs2, x - r) < 1e-6
+        compare_all_output("oneToAllVerify$(i)")
+        info("Test oneToAllVerify$i passed")
+    end
+    end
+
+    @testset "Raster ALl to One" begin
+    # Raster all to one test
+    for i in 1:12
+        info("Testing allToOneVerify$i")
+        r = f("input/raster/all_to_one/$i/allToOneVerify$(i).ini")
+        x = readdlm("output_verify/allToOneVerify$(i)_resistances.out")
+        # x = x[:,2]
+
+        @test sum(abs2, x - r) < 1e-6
+        info("Test allToOneVerify$i passed")
+    end
+    end
+
+    end
+end
+
+function compare_all_output(str)
+
+    gen_list, list_to_comp = generate_lists(str)
+
+    for f in gen_list
+        !contains(f, "_") && continue
+        contains(f, "resistances") && continue
+
+        info("Testing $f")
+
+        # Raster output files
+        if endswith(f, "asc")
+            r = read_aagrid("output/$f")
+            x = get_comp(list_to_comp, f)
+            @test compare_aagrid(r, x)
+            info("Test $f passed")
+
+        # Network output files
+        elseif contains(f, "Network")
+
+            # Branch currents
+            if contains(f, "branch")
+                r = read_branch_currents("output/$f")
+                x = !startswith(f, "mg") ? get_network_comp(list_to_comp, f) : readdlm("output_verify/$f")
+                @test compare_branch(r, x)
+                info("Test $f passed")
+
+            # Node currents
+            else
+                r = read_node_currents("output/$f")
+                x = !startswith(f, "mg") ? get_network_comp(list_to_comp, f) : readdlm("output_verify/$f")
+                @test compare_node(r, x)
+                info("Test $f passed")
+            end
+        end
+    end
+            
+end
+
+list_of_files(str, pref) = readdir(pref) |> y -> filter(x -> startswith(x, "$(str)_"), y)
+generate_lists(str) = list_of_files(str, "output/"), list_of_files(str, "output_verify/")
+read_branch_currents(str) = readdlm(str)
+read_node_currents(str) = readdlm(str)
+
+read_aagrid(file) = readdlm(file, skipstart = 6) # Will change to 6 
+
+compare_aagrid{T}(r::Matrix{T}, x::Matrix{T}) = sum(abs2, x - r) < 1e-6
+
+function get_comp(list_to_comp, f)
+    outfile = ""
+    if f in list_to_comp
+        outfile = "output_verify/$f"
+    end
+    readdlm(outfile; skipstart = 6)
+end
+
+function get_network_comp(list_to_comp, f)
+    s = split(f, ['_', '.'])
+    for i = 1:size(s, 1)
+        if all(isnumber, s[i])
+            f = replace(f, "_$(s[i])", "_$(parse(Int, s[i]) - 1 |> string)", 1)
+        end
+    end
+    @assert isfile("output_verify/$f")
+    readdlm("output_verify/$f")
+end
+
+function compare_branch(r, x)
+    x[:,1] = x[:,1] + 1
+    x[:,2] = x[:,2] + 1
+    sum(abs2, sortrows(r) - sortrows(x)) < 1e-6
+end
+
+function compare_node(r, x)
+    x[:,1] = x[:,1] + 1
+    sum(abs2, sortrows(r) - sortrows(x)) < 1e-6
+end
