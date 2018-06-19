@@ -30,20 +30,20 @@ function compute(path::String)
 end
 
 function _compute(T, cfg)
-    is_raster = cfg["data_type"] == "raster"
+    is_raster = cfg["data_type"] in RASTER
     scenario = cfg["scenario"]
     if is_raster
-        if scenario == "pairwise"
+        if scenario in PAIRWISE
             raster_pairwise(T, cfg)
-        elseif scenario == "advanced"
+        elseif scenario in ADVANCED
             raster_advanced(T, cfg)
-        elseif scenario == "one-to-all"
+        elseif scenario in ONETOALL
             raster_one_to_all(T, cfg)
         else
             raster_one_to_all(T, cfg)
         end
     else
-        if scenario == "pairwise"
+        if scenario in PAIRWISE
             network_pairwise(T, cfg)
         else
             network_advanced(T, cfg)
