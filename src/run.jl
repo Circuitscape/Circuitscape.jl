@@ -16,7 +16,7 @@ function compute(path::String)
     update_logging!(cfg)
     write_config(cfg)
     T = cfg["precision"] in SINGLE ? Float32 : Float64
-    csinfo("Precision used: $(cfg["precision"])")
+    csinfo("Precision used: $(precision(T))")
     is_parallel = cfg["parallelize"] in TRUELIST
     if is_parallel
         n = parse(Int, cfg["max_parallel"])
@@ -57,7 +57,7 @@ function compute(dict)
     update_logging!(cfg)
     write_config(cfg)
     T = cfg["precision"] in SINGLE ? Float32 : Float64
-    csinfo("Precision used: $(cfg["precision"])")
+    csinfo("Precision used: $(precision(T))")
     is_parallel = cfg["parallelize"] in TRUELIST
     if is_parallel 
         n = parse(Int, cfg["max_parallel"])
@@ -69,3 +69,5 @@ function compute(dict)
     is_parallel && rmprocs(workers())
     r
 end
+precision(::Type{Float64}) = "Double"
+precision(::Type{Float32}) = "Single"
