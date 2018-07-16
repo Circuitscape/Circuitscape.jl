@@ -383,7 +383,7 @@ read_node_currents(str) = readdlm(str)
 
 read_aagrid(file) = readdlm(file, skipstart = 6) # Will change to 6 
 
-compare_aagrid{T}(r::Matrix{T}, x::Matrix{T}, tol = 1e-6) = (@show sum(abs2, x - r)) < tol
+compare_aagrid{T}(r::Matrix{T}, x::Matrix{T}, tol = 1e-6) = sum(abs2, x - r) < tol
 
 function get_comp(list_to_comp, f)
     outfile = ""
@@ -407,10 +407,10 @@ end
 function compare_branch(r, x, tol = 1e-6)
     x[:,1] = x[:,1] + 1
     x[:,2] = x[:,2] + 1
-    (@show sum(abs2, sortrows(r) - sortrows(x))) < tol
+    sum(abs2, sortrows(r) - sortrows(x)) < tol
 end
 
 function compare_node(r, x, tol = 1e-6)
     x[:,1] = x[:,1] + 1
-    (@show sum(abs2, sortrows(r) - sortrows(x))) < tol
+    sum(abs2, sortrows(r) - sortrows(x)) < tol
 end
