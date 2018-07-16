@@ -205,13 +205,8 @@ function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Matrix{T} where {
         end
 
         for i in eachindex(volt)
-            if i in ind
-                val = INT(nodemap[i])
-                if val in c
-                    idx = findfirst(x -> x == val, c)
-                    volt[i] = voltages[idx]
-                end
-            end
+            _i = Int(local_nodemap[i])
+            _i != 0 && (volt[i] = voltages[_i])
         end
     end
 
