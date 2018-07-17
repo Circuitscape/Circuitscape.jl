@@ -275,8 +275,10 @@ function multiple_solver(cfg, a, sources, grounds, finitegrounds)
     deleteat!(r, dst_del)
     asolve = asolve[r, r]
 
-    M = aspreconditioner(smoothed_aggregation(asolve))
-    volt = solve_linear_system(cfg, asolve, sources, M)
+    t1 = @elapsed M = aspreconditioner(smoothed_aggregation(asolve))
+    csinfo("Time taken to construct preconditioner = $t1 seconds")
+    t1 = @elapsed volt = solve_linear_system(cfg, asolve, sources, M)
+    csinfo("Time taken to solve linear system = $t1 seconds")
 
     # Replace the inf with 0
     voltages = zeros(eltype(a), length(volt) + length(infgrounds))
