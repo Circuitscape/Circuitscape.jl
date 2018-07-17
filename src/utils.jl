@@ -243,6 +243,10 @@ function runtests(which = :compute)
             "Double"
           end
 
+    is_single = false
+    tol = 1e-6
+    str == "Single" && (is_single = true; tol = 1e-4)
+
     f = eval(which)
 
     @testset "$str Precision Tests" begin 
@@ -255,11 +259,11 @@ function runtests(which = :compute)
         x = readdlm("output_verify/sgNetworkVerify$(i)_resistances.out")
         valx = x[2:end, 2:end]
         valr = r[2:end, 2:end]
-        @test sum(abs2, valx - valr) < 1e-6
+        @test sum(abs2, valx - valr) < tol
         pts_x = x[2:end,1]
         pts_r = r[2:end,1]
         @test pts_x + 1 == pts_r
-        compare_all_output("sgNetworkVerify$(i)")
+        compare_all_output("sgNetworkVerify$(i)", is_single)
         info("Test sgNetworkVerify$i passed")
     end
     end
@@ -271,8 +275,8 @@ function runtests(which = :compute)
         r = f("input/network/mgNetworkVerify$(i).ini")
         x = readdlm("output_verify/mgNetworkVerify$(i)_voltages.txt")
         x[:,1] = x[:,1] + 1
-        @test sum(abs2, x - r) < 1e-6
-        compare_all_output("mgNetworkVerify$(i)")
+        @test sum(abs2, x - r) < tol
+        compare_all_output("mgNetworkVerify$(i)", is_single)
         info("Test mgNetworkVerify$i passed")
     end
     end
@@ -285,8 +289,8 @@ function runtests(which = :compute)
         r = f("input/raster/pairwise/$i/sgVerify$(i).ini")
         x = readdlm("output_verify/sgVerify$(i)_resistances.out")
         # x = x[2:end, 2:end]
-        @test sum(abs2, x - r) < 1e-6
-        compare_all_output("sgVerify$(i)")
+        @test sum(abs2, x - r) < tol
+        compare_all_output("sgVerify$(i)", is_single)
         info("Test sgVerify$i passed")
     end
     end
@@ -310,8 +314,8 @@ function runtests(which = :compute)
         r = f("input/raster/one_to_all/$i/oneToAllVerify$(i).ini")
         x = readdlm("output_verify/oneToAllVerify$(i)_resistances.out")
         # x = x[:,2]
-        @test sum(abs2, x - r) < 1e-6
-        compare_all_output("oneToAllVerify$(i)")
+        @test sum(abs2, x - r) < tol
+        compare_all_output("oneToAllVerify$(i)", is_single)
         info("Test oneToAllVerify$i passed")
     end
     end
@@ -324,7 +328,7 @@ function runtests(which = :compute)
         x = readdlm("output_verify/allToOneVerify$(i)_resistances.out")
         # x = x[:,2]
 
-        @test sum(abs2, x - r) < 1e-6
+        @test sum(abs2, x - r) < tol
         info("Test allToOneVerify$i passed")
     end
     end
@@ -332,9 +336,10 @@ function runtests(which = :compute)
     end
 end
 
-function compare_all_output(str)
+function compare_all_output(str, is_single = false)
 
     gen_list, list_to_comp = generate_lists(str)
+    tol = is_single ?  1e-4 : 1e-6
 
     for f in gen_list
         !contains(f, "_") && continue
@@ -346,7 +351,7 @@ function compare_all_output(str)
         if endswith(f, "asc")
             r = read_aagrid("output/$f")
             x = get_comp(list_to_comp, f)
-            @test compare_aagrid(r, x)
+            @test compare_aagrid(r, x, tol)
             info("Test $f passed")
 
         # Network output files
@@ -356,14 +361,14 @@ function compare_all_output(str)
             if contains(f, "branch")
                 r = read_branch_currents("output/$f")
                 x = !startswith(f, "mg") ? get_network_comp(list_to_comp, f) : readdlm("output_verify/$f")
-                @test compare_branch(r, x)
+                @test compare_branch(r, x, tol)
                 info("Test $f passed")
 
             # Node currents
             else
                 r = read_node_currents("output/$f")
                 x = !startswith(f, "mg") ? get_network_comp(list_to_comp, f) : readdlm("output_verify/$f")
-                @test compare_node(r, x)
+                @test compare_node(r, x, tol)
                 info("Test $f passed")
             end
         end
@@ -378,7 +383,7 @@ read_node_currents(str) = readdlm(str)
 
 read_aagrid(file) = readdlm(file, skipstart = 6) # Will change to 6 
 
-compare_aagrid{T}(r::Matrix{T}, x::Matrix{T}) = sum(abs2, x - r) < 1e-6
+compare_aagrid{T}(r::Matrix{T}, x::Matrix{T}, tol = 1e-6) = sum(abs2, x - r) < tol
 
 function get_comp(list_to_comp, f)
     outfile = ""
@@ -399,13 +404,13 @@ function get_network_comp(list_to_comp, f)
     readdlm("output_verify/$f")
 end
 
-function compare_branch(r, x)
+function compare_branch(r, x, tol = 1e-6)
     x[:,1] = x[:,1] + 1
     x[:,2] = x[:,2] + 1
-    sum(abs2, sortrows(r) - sortrows(x)) < 1e-6
+    sum(abs2, sortrows(r) - sortrows(x)) < tol
 end
 
-function compare_node(r, x)
+function compare_node(r, x, tol = 1e-6)
     x[:,1] = x[:,1] + 1
-    sum(abs2, sortrows(r) - sortrows(x)) < 1e-6
+    sum(abs2, sortrows(r) - sortrows(x)) < tol
 end
