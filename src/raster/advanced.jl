@@ -193,14 +193,13 @@ function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Matrix{T} where {
         end
 
         voltages = multiple_solver(cfg, a_local, s_local, g_local, f_local)
+        local_nodemap = construct_local_node_map(nodemap, c, polymap)
         solver_called = true
 
         if write_v_maps && is_raster
-            local_nodemap = construct_local_node_map(nodemap, c, polymap)
             accum_voltages!(outvolt, voltages, local_nodemap, hbmeta)
         end
         if write_c_maps && is_raster
-            local_nodemap = construct_local_node_map(nodemap, c, polymap)
             accum_currents!(outcurr, voltages, cfg, a_local, voltages, f_local, local_nodemap, hbmeta)
         end
 
