@@ -193,25 +193,19 @@ function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Matrix{T} where {
         end
 
         voltages = multiple_solver(cfg, a_local, s_local, g_local, f_local)
+        local_nodemap = construct_local_node_map(nodemap, c, polymap)
         solver_called = true
 
         if write_v_maps && is_raster
-            local_nodemap = construct_local_node_map(nodemap, c, polymap)
             accum_voltages!(outvolt, voltages, local_nodemap, hbmeta)
         end
         if write_c_maps && is_raster
-            local_nodemap = construct_local_node_map(nodemap, c, polymap)
             accum_currents!(outcurr, voltages, cfg, a_local, voltages, f_local, local_nodemap, hbmeta)
         end
 
         for i in eachindex(volt)
-            if i in ind
-                val = INT(nodemap[i])
-                if val in c
-                    idx = findfirst(x -> x == val, c)
-                    volt[i] = voltages[idx]
-                end
-            end
+            _i = Int(local_nodemap[i])
+            _i != 0 && (volt[i] = voltages[_i])
         end
     end
 
@@ -280,8 +274,10 @@ function multiple_solver(cfg, a, sources, grounds, finitegrounds)
     deleteat!(r, dst_del)
     asolve = asolve[r, r]
 
-    M = aspreconditioner(smoothed_aggregation(asolve))
-    volt = solve_linear_system(cfg, asolve, sources, M)
+    t1 = @elapsed M = aspreconditioner(smoothed_aggregation(asolve))
+    csinfo("Time taken to construct preconditioner = $t1 seconds")
+    t1 = @elapsed volt = solve_linear_system(cfg, asolve, sources, M)
+    csinfo("Time taken to solve linear system = $t1 seconds")
 
     # Replace the inf with 0
     voltages = zeros(eltype(a), length(volt) + length(infgrounds))
