@@ -390,7 +390,7 @@ function _cholmod_solver_path(data, flags, cfg, log, batch_size = 1000)
             postprocess(output, component_data, flags, shortcut, cfg)
         end
 
-        l = length(cholmod_batch)
+        l = min(num, length(cholmod_batch))
 
         for st in 1:batch_size:l
 
