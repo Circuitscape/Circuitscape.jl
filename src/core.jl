@@ -340,7 +340,7 @@ function _cholmod_solver_path(data, flags, cfg, log, batch_size = 1000)
         cholmod_batch = CholmodNode[]
         
         # Batched backsubstitution
-        for i = 1:size(csub,1)
+        function g(i)
 
             pi = csub[i]
             comp_i = INT(findfirst(comp, pi))
@@ -389,8 +389,15 @@ function _cholmod_solver_path(data, flags, cfg, log, batch_size = 1000)
                 INT(cholmod_batch[v].points_idx[2]), cum)
             postprocess(output, component_data, flags, shortcut, cfg)
         end
+        if get_shortcut_resistances
+            idx = findfirst(points, csub[1])
+            g(1)
+        else 
+            g.(1:size(csub, 1))
+        end
 
-        l = min(num, length(cholmod_batch))
+        # l = min(num, length(cholmod_batch))
+        l = length(cholmod_batch)
 
         for st in 1:batch_size:l
 
@@ -400,7 +407,6 @@ function _cholmod_solver_path(data, flags, cfg, log, batch_size = 1000)
             csinfo("Solving points $(rng.start) to $(rng.stop)")
 
             rhs = zeros(eltype(matrix), size(matrix, 1), length(rng))
-
 
             for (i,v) in enumerate(rng)
                 node = cholmod_batch[v]
@@ -428,6 +434,14 @@ function _cholmod_solver_path(data, flags, cfg, log, batch_size = 1000)
                 resistances[reverse(coords)...] = r
             end
         end
+
+        if get_shortcut_resistances
+            update_shortcut_resistances!(idx, shortcut, resistances, points, comp)
+        end
+    end
+
+    if get_shortcut_resistances
+        resistances = shortcut.shortcut_res
     end
 
     for i = 1:size(resistances,1)
