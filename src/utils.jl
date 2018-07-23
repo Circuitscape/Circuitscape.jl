@@ -284,7 +284,7 @@ function runtests(which = :compute)
 
     @testset "Raster Pairwise" begin 
     # Raster pairwise tests
-    for i = 1:2
+    for i = 1:16
         info("Testing sgVerify$i")
         r = f("input/raster/pairwise/$i/sgVerify$(i).ini")
         x = readdlm("output_verify/sgVerify$(i)_resistances.out")
