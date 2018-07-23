@@ -14,6 +14,9 @@ Inputs:
 function compute(path::String)
     cfg = parse_config(path)
     update_logging!(cfg)
+    if cfg["index_precision"] in DOUBLE
+        INT = Int64
+    end
     write_config(cfg)
     T = cfg["precision"] in SINGLE ? Float32 : Float64
     csinfo("Precision used: $(cfg["precision"])")
