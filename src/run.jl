@@ -14,7 +14,7 @@ Inputs:
 function compute(path::String)
     cfg = parse_config(path)
     update_logging!(cfg)
-    if cfg["index_precision"] in DOUBLE
+    if cfg["use_64bit_indexing"] in TRUELIST
         INT = Int64
     end
     write_config(cfg)
