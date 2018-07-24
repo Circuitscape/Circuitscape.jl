@@ -401,7 +401,7 @@ function _cholmod_solver_path(data, flags, cfg, log, batch_size = 1000)
 
         for st in 1:batch_size:l
 
-            rng = st + batch_size < l ?
+            rng = st + batch_size <= l ?
                             (st:(st+batch_size-1)) : (st:l)
 
             csinfo("Solving points $(rng.start) to $(rng.stop)")
