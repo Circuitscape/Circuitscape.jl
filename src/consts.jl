@@ -6,6 +6,7 @@ const ADVANCED = ["advanced", "Advanced"]
 const ONETOALL = ["one-to-all", "one_to_all"]
 const ALLTOONE = ["all-to-one", "all_to_one"]
 const SINGLE = ["single", "Single"]
+const DOUBLE = ["double", "Double"]
 
 # Solver constants
 const AMG = ["cg+amg", "amg+cg"]
