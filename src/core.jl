@@ -257,7 +257,8 @@ struct CholmodNode{T}
     points_idx::Tuple{T,T}
 end
 
-function _cholmod_solver_path(data, flags, cfg, log, batch_size = 1000)
+function _cholmod_solver_path(data::GraphData{T,V}, flags, 
+                                  cfg, log, batch_size = 1000) where {T,V}
     
     # Data
     a = data.G
