@@ -68,7 +68,7 @@ function compute(dict)
         csinfo("Starting up Circuitscape to use $n processes in parallel")
         myaddprocs(n)
     end
-    t = @elapsed r = _compute(T, cfg)
+    t = @elapsed r = _compute(T, V, cfg)
     csinfo("Time taken to complete job = $t")
     is_parallel && rmprocs(workers())
     r
