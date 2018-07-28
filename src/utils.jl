@@ -80,7 +80,7 @@ function compute_cholmod(str, batch_size = 5)
     end
     cfg["solver"] = "cholmod"
     cfg["cholmod_batch_size"] = string(batch_size)
-    _compute(T, cfg)
+    _compute(T, V, cfg)
 end
 
 function compute_single(str)
