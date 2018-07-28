@@ -1,10 +1,10 @@
 """
 Primary driver for network pairwise. 
 """
-function network_pairwise(T, cfg)::Matrix{T}
+function network_pairwise(T, V, cfg)::Matrix{T}
     
     # Get input
-    networkdata = get_network_data(T, cfg)
+    networkdata = get_network_data(T, V, cfg)
 
     # Get compute flags
     flags = get_network_flags(cfg)

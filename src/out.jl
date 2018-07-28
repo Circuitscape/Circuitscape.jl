@@ -190,15 +190,15 @@ function dropnonzeros!(G)
     dropzeros!(G)
 end
 
-function _get_branch_currents(G, voltages, pos)
+function _get_branch_currents(G::SparseMatrixCSC{T,V}, voltages, pos) where {T,V}
 
     branch_currents = _get_branch_currents_posneg(G, voltages, pos)
     
     # Make sparse matrix with branch_currents as right upper triangle
     N = size(G, 1)
     n = size(branch_currents, 1)
-    I = zeros(INT, n)
-    J = zeros(INT, n)
+    I = zeros(V, n)
+    J = zeros(V, n)
     k = 1
     for i = 1:N
         for j in nzrange(G, i)

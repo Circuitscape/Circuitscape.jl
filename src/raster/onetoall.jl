@@ -1,7 +1,7 @@
-function raster_one_to_all(T, cfg)::Matrix{T}
+function raster_one_to_all(T, V, cfg)::Matrix{T}
 
     # Load the data
-    rasterdata = load_raster_data(T, cfg)
+    rasterdata = load_raster_data(T, V, cfg)
 
     # Get flags
     flags = get_raster_flags(cfg)
@@ -38,7 +38,7 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
     end
 
     # Construct point map
-    point_map = zeros(INT, size(gmap))
+    point_map = zeros(V, size(gmap))
     f(i, x) = points_rc[i][x]
     for x = 1:size(points_rc[1], 1)
         point_map[f(1,x), f(2,x)] = f(3, x)
@@ -64,7 +64,7 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
     res = zeros(eltype(a), size(points_unique, 1))
     num_points_to_solve = size(points_unique, 1)
     original_point_map = copy(point_map)
-    unique_point_map = zeros(INT, size(gmap))
+    unique_point_map = zeros(V, size(gmap))
 
     for i in points_unique
         ind = findfirst(x -> x == i, points_rc[3])
@@ -129,8 +129,8 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
     hcat(points_unique, res)
 end
 
-function prune_points!(points_rc, point_ids)
-    rmv = INT[]
+function prune_points!(points_rc, point_ids::Vector{V}) where V
+    rmv = V[]
     for (i,p) in enumerate(points_rc[3])
         if p in point_ids
             continue
@@ -142,10 +142,10 @@ function prune_points!(points_rc, point_ids)
     for i in 1:3 deleteat!(points_rc[i], rmv) end
 end
 
-function prune_strengths!(strengths, point_ids)
+function prune_strengths!(strengths, point_ids::Vector{V}) where V
     pts = strengths[:,1]
     l = length(pts)
-    rmv = INT[]
+    rmv = V[]
     for (i,p) in enumerate(pts)
         if !(p in point_ids)
            push!(rmv, i)

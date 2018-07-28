@@ -142,11 +142,11 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
         function f(i)
 
             # Generate return type
-            ret = Vector{Tuple{INT,INT,T}}()
+            ret = Vector{Tuple{V,V,T}}()
 
             pi = csub[i]
             comp_i = findfirst(comp, pi)
-            comp_i = INT(comp_i)
+            comp_i = V(comp_i)
             I = find(x -> x == pi, points)
             smash_repeats!(ret, I)
 
@@ -167,7 +167,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
 
                 pj = csub[j]
                 comp_j = findfirst(comp, pj)
-                comp_j = INT(comp_j)
+                comp_j = V(comp_j)
                 J = find(x -> x == pj, points)
 
                 # Forget excluded pairs
@@ -207,7 +207,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
                         resistances[c_j, c_i] = r
                     end
                     output = Output(points, v, (orig_pts[c_i], orig_pts[c_j]),
-                                    (comp_i, comp_j), r, INT(c_j), cum)
+                                    (comp_i, comp_j), r, V(c_j), cum)
                     postprocess(output, component_data, flags, shortcut, cfg)
                 end
             end
@@ -335,7 +335,7 @@ function _cholmod_solver_path(data, flags, cfg, log, batch_size = 1000)
 
         component_data = ComponentData(comp, matrix, local_nodemap, hbmeta, cellmap)
 
-        ret = Vector{Tuple{INT,INT,Float64}}()
+        ret = Vector{Tuple{V,V,Float64}}()
 
         cholmod_batch = CholmodNode[]
         
@@ -343,7 +343,7 @@ function _cholmod_solver_path(data, flags, cfg, log, batch_size = 1000)
         function g(i)
 
             pi = csub[i]
-            comp_i = INT(findfirst(comp, pi))
+            comp_i = V(findfirst(comp, pi))
             I = find(x -> x == pi, points)
             # smash_repeats!(ret, I)
             smash_repeats!(resistances, I)
@@ -355,7 +355,7 @@ function _cholmod_solver_path(data, flags, cfg, log, batch_size = 1000)
             for j in rng
 
                 pj = csub[j]
-                comp_j = INT(findfirst(comp, pj))
+                comp_j = V(findfirst(comp, pj))
                 J = find(x -> x == pj, points)
 
                 # Forget excluded pairs
@@ -374,7 +374,7 @@ function _cholmod_solver_path(data, flags, cfg, log, batch_size = 1000)
 
                 for c_i in I, c_j in J
                     push!(cholmod_batch, 
-                      CholmodNode((comp_i, comp_j), (INT(c_i), INT(c_j))))
+                      CholmodNode((comp_i, comp_j), (V(c_i), V(c_j))))
                 end
             end
         end
@@ -386,7 +386,7 @@ function _cholmod_solver_path(data, flags, cfg, log, batch_size = 1000)
                 orig_pts[cholmod_batch[v].points_idx[2]]), 
                 cholmod_batch[v].cc_idx, 
                 lhs[cholmod_batch[v].cc_idx[2], i] - lhs[cholmod_batch[v].cc_idx[1], i],
-                INT(cholmod_batch[v].points_idx[2]), cum)
+                V(cholmod_batch[v].points_idx[2]), cum)
             postprocess(output, component_data, flags, shortcut, cfg)
         end
         if get_shortcut_resistances
@@ -472,10 +472,10 @@ Input:
 Output: 
 * n - total number of pairs
 """
-function get_num_pairs(ccs, fp, exclude_pairs)
+function get_num_pairs(ccs, fp::Vector{V}, exclude_pairs) where V
 
     num = 0
-    d = Dict{Tuple{INT,INT}, INT}()
+    d = Dict{Tuple{V,V}, V}()
 
     for (i,cc) in enumerate(ccs)
         sub_fp = filter(x -> x in cc, fp) |> unique
@@ -496,10 +496,10 @@ function get_num_pairs(ccs, fp, exclude_pairs)
     num, d
 end
 
-function get_num_pairs_shortcut(ccs, fp, exclude_pairs)
+function get_num_pairs_shortcut(ccs, fp::Vector{V}, exclude_pairs) where V
 
     num = 0
-    d = Dict{Tuple{INT,INT}, INT}()
+    d = Dict{Tuple{V,V}, V}()
 
     for (i,cc) in enumerate(ccs)
         sub_fp = filter(x -> x in cc, fp) |> unique
@@ -540,7 +540,7 @@ end
 """
 Calculate laplacian of the adjacency matrix of a graph
 """
-function laplacian(G)
+function laplacian(G::SparseMatrixCSC{T,V}) where {T,V}
     n = size(G, 1)
     s = Vector{eltype(G)}(n)
     for i = 1:n
@@ -553,7 +553,7 @@ function laplacian(G)
             end
         end
     end
-    r = INT(1):INT(n)
+    r = V(1):V(n)
     S = sparse(r, r, s)
     G + S
 end
