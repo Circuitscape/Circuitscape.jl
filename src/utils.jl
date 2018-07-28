@@ -74,6 +74,7 @@ end
 function compute_cholmod(str, batch_size = 5)
     cfg = parse_config(str)
     T = cfg["precision"] in SINGLE ? Float32 : Float64
+    V = cfg["use_64bit_indexing"] in TRUELIST ? Int64 : Int32
     if T == Float32
         cswarn("Cholmod supports only double precision. Implicit conversion may occur")
     end
@@ -85,7 +86,8 @@ end
 function compute_single(str)
     cfg = parse_config(str)
     cfg["precision"] = "single"
-    _compute(Float32, cfg)
+    V = cfg["use_64bit_indexing"] in TRUELIST ? Int64 : Int32
+    _compute(Float32, V, cfg)
 end
 
 function compute_parallel(str, n_processes = 2)
