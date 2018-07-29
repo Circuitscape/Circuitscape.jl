@@ -61,6 +61,7 @@ function compute(dict)
     update_logging!(cfg)
     write_config(cfg)
     T = cfg["precision"] in SINGLE ? Float32 : Float64
+    V = cfg["use_64bit_indexing"] in TRUELIST ? Int64 : Int32
     csinfo("Precision used: $(cfg["precision"])")
     is_parallel = cfg["parallelize"] in TRUELIST
     if is_parallel 
