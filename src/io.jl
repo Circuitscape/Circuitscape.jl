@@ -1,12 +1,12 @@
 abstract type Data end 
 
-struct IncludeExcludePairs{T}
+struct IncludeExcludePairs{V}
     mode::Symbol
-    point_ids::Vector{T}
-    include_pairs::Matrix{T}
+    point_ids::Vector{V}
+    include_pairs::Matrix{V}
 end
-function IncludeExcludePairs()
-    IncludeExcludePairs(:undef, INT[], Matrix{INT}(0, 0))
+function IncludeExcludePairs(V)
+    IncludeExcludePairs(:undef, V[], Matrix{V}(0, 0))
 end
 
 struct NetworkData{T,V} <: Data
@@ -17,13 +17,13 @@ struct NetworkData{T,V} <: Data
 end
 
 struct RasterMeta
-    ncols::INT
-    nrows::INT
+    ncols::Int
+    nrows::Int
     xllcorner::Float64
     yllcorner::Float64
     cellsize::Float64
     nodata::Float64
-    file_type::INT
+    file_type::Int
 end
 function RasterMeta()
     RasterMeta(0,0,0,0,0,0,0)
@@ -40,24 +40,10 @@ struct RasData{T,V} <: Data
     hbmeta::RasterMeta
 end
 
-function read_graph(is_res::Bool, gpath::String, ::Type{T}) where {T}
-    i,j,v = load_graph(gpath, T)
-    idx = findfirst(x -> x < 1, i)
-    idx != 0 && throw("Indices no good")
-    idx = findfirst(x -> x < 1, j)
-    idx != 0 && throw("Indices no good")
-    if is_res
-        v = 1./v
-    end
-    m = max(i[end], j[end])
-    A = sparse(i,j,v,m,m)
-    A + A'
-end
-
-function load_graph(gpath::String, ::Type{T}) where {T}
+function load_graph(V, gpath::String, ::Type{T}) where {T}
     g = readdlm(gpath, T)
-    i = zeros(INT, size(g, 1))
-    j = zeros(INT, size(g, 1))
+    i = zeros(V, size(g, 1))
+    j = zeros(V, size(g, 1))
     v = zeros(T, size(g, 1))
     for iter = 1:size(g, 1)
         i[iter] = g[iter,1] + 1
@@ -67,7 +53,7 @@ function load_graph(gpath::String, ::Type{T}) where {T}
     i,j,v
 end
 
-read_focal_points(path::String) = INT.(vec(readcsv(path)) + 1)
+read_focal_points(V, path::String) = V.(vec(readcsv(path)) + 1)
 
 function read_point_strengths(T, path::String, inc = true)
     a = readdlm(path, T)
@@ -121,8 +107,8 @@ end
 
 function _ascii_grid_read_header(habitat_file, f)
     file_type = _guess_file_type(habitat_file, f)
-    ncols = parse(INT, split(readline(f))[2])
-    nrows = parse(INT, split(readline(f))[2])
+    ncols = parse(Int, split(readline(f))[2])
+    nrows = parse(Int, split(readline(f))[2])
     xllcorner = float(split(readline(f))[2])
     yllcorner = float(split(readline(f))[2])
     cellsize = float(split(readline(f))[2])
@@ -178,27 +164,27 @@ function read_polymap(T, file::String, habitatmeta;
     polymap
 end
 
-function read_point_map(file, habitatmeta)
+function read_point_map(V, file, habitatmeta)
 
     # Advanced mode 
     if file == "none" 
-        return (INT[], INT[], INT[])
+        return (V[], V[], V[])
     end
 
     f = endswith(file, ".gz") ? GZip.open(file, "r") : open(file, "r")
     filetype = _guess_file_type(file, f)
     _points_rc = filetype == TXTLIST ? readdlm(file) :
-                        read_polymap(INT, file, habitatmeta)
+                        read_polymap(V, file, habitatmeta)
 
-    i = INT[]
-    j = INT[]
-    v = INT[]
+    i = V[]
+    j = V[]
+    v = V[]
     if filetype == TXTLIST
         I = _points_rc[:,2]
         J = _points_rc[:,3]
         v = _points_rc[:,1]
-        i  = ceil.(INT, habitatmeta.nrows - (J - habitatmeta.yllcorner) / habitatmeta.cellsize)
-        j = ceil.(INT, (I - habitatmeta.xllcorner) / habitatmeta.cellsize)
+        i  = ceil.(V, habitatmeta.nrows - (J - habitatmeta.yllcorner) / habitatmeta.cellsize)
+        j = ceil.(V, (I - habitatmeta.xllcorner) / habitatmeta.cellsize)
     else
         (i,j,v) = findnz(_points_rc)
     end
@@ -218,10 +204,10 @@ function read_point_map(file, habitatmeta)
     j = j[idx]
     v = v[idx]
 
-    INT.(i), INT.(j), INT.(v)
+    V.(i), V.(j), V.(v)
 end
 
-function read_source_and_ground_maps(T, source_file, ground_file, habitatmeta,
+function read_source_and_ground_maps(T, V, source_file, ground_file, habitatmeta,
                                         is_res) 
 
     ground_map = Matrix{T}(0,0)
@@ -234,7 +220,7 @@ function read_source_and_ground_maps(T, source_file, ground_file, habitatmeta,
         ground_map = read_polymap(T, ground_file, habitatmeta; nodata_as = -1)
         ground_map = map(T, ground_map)
     else
-        rc = readdlm(ground_file, INT)
+        rc = readdlm(ground_file, V)
         ground_map = -9999 * ones(T, habitatmeta.nrows, habitatmeta.ncols)
         ground_map[rc[:,2], rc[:,3]] = rc[:,1]
     end
@@ -246,7 +232,7 @@ function read_source_and_ground_maps(T, source_file, ground_file, habitatmeta,
         source_map = read_polymap(T, source_file, habitatmeta)
         source_map = map(T, source_map)
     else
-        rc = readdlm(source_file, INT)
+        rc = readdlm(source_file, V)
         source_map = -9999 * ones(T, habitatmeta.nrows, habitatmeta.ncols)
         source_map[rc[:,2], rc[:,3]] = rc[:,1]
     end
@@ -263,7 +249,7 @@ function read_source_and_ground_maps(T, source_file, ground_file, habitatmeta,
     source_map, ground_map
 end
 
-function read_included_pairs(file)
+function read_included_pairs(V, file)
 
     f = endswith(file, "gz") ? Gzip.open(file, "r") : open(file, "r")
     filetype = _guess_file_type(file, f)
@@ -277,25 +263,25 @@ function read_included_pairs(file)
             maxval = float(split(readline(f))[2])
         end
         included_pairs = readdlm(file, skipstart=2)
-        point_ids = INT.(included_pairs[:,1])
+        point_ids = V.(included_pairs[:,1])
         deleteat!(point_ids, 1)
         included_pairs = included_pairs[2:end, 2:end]
         map!(x -> x > maxval ? 0 : x, included_pairs, included_pairs)
         idx = find(x -> x >= minval, included_pairs)
         mode = :include
-        bin = map(x -> x >= minval ? INT(1) : INT(0), included_pairs)
+        bin = map(x -> x >= minval ? V(1) : V(0), included_pairs)
         IncludeExcludePairs(mode, point_ids, bin)
     else
         open(file, "r") do f
             mode = Symbol(split(readline(f))[2])
         end
         included_pairs = readdlm(file, skipstart = 1)
-        point_ids = INT.(sort!(unique(included_pairs)))
+        point_ids = V.(sort!(unique(included_pairs)))
         if point_ids[1] == 0
             deleteat!(point_ids, 1)
         end
 
-        mat = zeros(INT, size(point_ids, 1), size(point_ids, 1))
+        mat = zeros(V, size(point_ids, 1), size(point_ids, 1))
 
         for i = 1:size(included_pairs, 1)
             idx1 = findfirst(x -> x == included_pairs[i, 1], point_ids)
@@ -309,7 +295,7 @@ function read_included_pairs(file)
     end
 end
 
-function get_network_data(T, cfg)::NetworkData{T,INT}
+function get_network_data(T, V, cfg)::NetworkData{T,V}
     
     hab_is_res = cfg["habitat_map_is_resistances"] in TRUELIST
     hab_file = cfg["habitat_file"]
@@ -319,15 +305,15 @@ function get_network_data(T, cfg)::NetworkData{T,INT}
 
     is_pairwise = cfg["scenario"] in PAIRWISE
 
-    I,J,V = load_graph(hab_file, T)
+    i,j,v = load_graph(V, hab_file, T)
     if hab_is_res
-        V = 1./V
+        v = 1./v
     end
 
     if is_pairwise
-        fp = read_focal_points(fp_file)
+        fp = read_focal_points(V, fp_file)
     else
-        fp = INT[]
+        fp = V[]
     end
 
     if !is_pairwise
@@ -338,10 +324,10 @@ function get_network_data(T, cfg)::NetworkData{T,INT}
         ground_map = Matrix{T}(0,0)
     end
 
-    NetworkData((I,J,V), fp, source_map, ground_map)
+    NetworkData((i,j,v), fp, source_map, ground_map)
 end
 
-function load_raster_data(T, cfg)::RasData{T,INT}
+function load_raster_data(T, V, cfg)::RasData{T,V}
 
     # Habitat file
     hab_file = cfg["habitat_file"]
@@ -382,9 +368,9 @@ function load_raster_data(T, cfg)::RasData{T,INT}
 
     # Read polymap
     if use_polygons
-        polymap = read_polymap(INT, polygon_file, hbmeta)
+        polymap = read_polymap(V, polygon_file, hbmeta)
     else
-        polymap = Matrix{INT}(0,0)
+        polymap = Matrix{V}(0,0)
     end
 
     # Read and update cellmap with mask file
@@ -395,15 +381,15 @@ function load_raster_data(T, cfg)::RasData{T,INT}
 
     # Read point file
     if !is_advanced
-        points_rc = read_point_map(point_file, hbmeta)
+        points_rc = read_point_map(V, point_file, hbmeta)
     else
-        points_rc = (INT[], INT[], INT[]) 
+        points_rc = (V[], V[], V[]) 
     end
 
     # Advanced mode reading
     if is_advanced
         source_map, ground_map = 
-        read_source_and_ground_maps(T, source_file, ground_file,
+        read_source_and_ground_maps(T, V, source_file, ground_file,
                                     hbmeta, ground_is_res)
     else
         source_map, ground_map = Matrix{T}(0,0), Matrix{T}(0,0)
@@ -411,9 +397,9 @@ function load_raster_data(T, cfg)::RasData{T,INT}
 
     # Included Pairs
     if use_inc_pairs
-        included_pairs = read_included_pairs(inc_pairs_file)
+        included_pairs = read_included_pairs(V, inc_pairs_file)
     else
-        included_pairs = IncludeExcludePairs()
+        included_pairs = IncludeExcludePairs(V)
     end
 
     # Variable source strengths

@@ -66,7 +66,7 @@ end
 let
 
     cfg = Circuitscape.parse_config("input/raster/one_to_all/11/oneToAllVerify11.ini")
-    r = Circuitscape.load_raster_data(Float64, cfg)
+    r = Circuitscape.load_raster_data(Float64, Int32, cfg)
 
     cellmap = r.cellmap
     polymap = r.polymap

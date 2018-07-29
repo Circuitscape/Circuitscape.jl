@@ -25,6 +25,3 @@ const INFO = ["INFO", "info", "Info"]
 const DEBUG = ["DEBUG", "debug", "Debug"]
 const WARNING = ["WARNING", "WARN", "warning", "warn", "Warning", "Warn"]
 const CRITICAL = ["CRITICAL", "critical", "Critical"]
-
-# Constant for index type
-const INT = Int32

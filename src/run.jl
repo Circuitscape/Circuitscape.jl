@@ -14,11 +14,12 @@ Inputs:
 function compute(path::String)
     cfg = parse_config(path)
     update_logging!(cfg)
-    if cfg["use_64bit_indexing"] in TRUELIST
-        INT = Int64
-    end
+    #=if cfg["use_64bit_indexing"] in TRUELIST
+        global INT = Int64
+    end=#
     write_config(cfg)
     T = cfg["precision"] in SINGLE ? Float32 : Float64
+    V = cfg["use_64bit_indexing"] in TRUELIST ? Int64 : Int32
     csinfo("Precision used: $(cfg["precision"])")
     is_parallel = cfg["parallelize"] in TRUELIST
     if is_parallel
@@ -26,30 +27,30 @@ function compute(path::String)
         csinfo("Starting up Circuitscape to use $n processes in parallel")
         myaddprocs(n)
     end
-    t = @elapsed r = _compute(T, cfg)
+    t = @elapsed r = _compute(T, V, cfg)
     csinfo("Time taken to complete job = $t")
     is_parallel && rmprocs(workers())
     r
 end
 
-function _compute(T, cfg)
+function _compute(T, V, cfg)
     is_raster = cfg["data_type"] in RASTER
     scenario = cfg["scenario"]
     if is_raster
         if scenario in PAIRWISE
-            raster_pairwise(T, cfg)
+            raster_pairwise(T, V, cfg)
         elseif scenario in ADVANCED
-            raster_advanced(T, cfg)
+            raster_advanced(T, V, cfg)
         elseif scenario in ONETOALL
-            raster_one_to_all(T, cfg)
+            raster_one_to_all(T, V, cfg)
         else
-            raster_one_to_all(T, cfg)
+            raster_one_to_all(T, V, cfg)
         end
     else
         if scenario in PAIRWISE
-            network_pairwise(T, cfg)
+            network_pairwise(T, V, cfg)
         else
-            network_advanced(T, cfg)
+            network_advanced(T, V, cfg)
         end
     end
 end
@@ -60,6 +61,7 @@ function compute(dict)
     update_logging!(cfg)
     write_config(cfg)
     T = cfg["precision"] in SINGLE ? Float32 : Float64
+    V = cfg["use_64bit_indexing"] in TRUELIST ? Int64 : Int32
     csinfo("Precision used: $(cfg["precision"])")
     is_parallel = cfg["parallelize"] in TRUELIST
     if is_parallel 
@@ -67,7 +69,7 @@ function compute(dict)
         csinfo("Starting up Circuitscape to use $n processes in parallel")
         myaddprocs(n)
     end
-    t = @elapsed r = _compute(T, cfg)
+    t = @elapsed r = _compute(T, V, cfg)
     csinfo("Time taken to complete job = $t")
     is_parallel && rmprocs(workers())
     r

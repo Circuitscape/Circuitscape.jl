@@ -1,7 +1,7 @@
-function network_advanced(T, cfg)::Matrix{T}
+function network_advanced(T, V, cfg)::Matrix{T}
 
     # Get data
-    data = get_network_data(T, cfg)
+    data = get_network_data(T, V, cfg)
 
     # Get flags
     flags = get_network_flags(cfg)
@@ -32,7 +32,7 @@ function compute_advanced_data(data::NetworkData{T,V},
     t = @elapsed G = laplacian(A)
     csinfo("Time taken to construct graph laplacian = $t")
 
-    nodemap, polymap = Matrix{INT}(0,0), Matrix{INT}(0,0)
+    nodemap, polymap = Matrix{V}(0,0), Matrix{V}(0,0)
     cellmap = Matrix{T}(0,0)
 
     sources, grounds, finite_grounds = 
@@ -40,5 +40,5 @@ function compute_advanced_data(data::NetworkData{T,V},
 
     source_map = Matrix{eltype(A)}(0,0)
     AdvancedData(G, cc, nodemap, polymap, RasterMeta(), 
-                 sources, grounds, source_map, finite_grounds, INT(-1), INT(0), cellmap)
+                 sources, grounds, source_map, finite_grounds, V(-1), V(0), cellmap)
 end

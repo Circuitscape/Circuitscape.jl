@@ -173,7 +173,16 @@ function _get_node_currents_posneg(G::SparseMatrixCSC{T,V},
         branch_currents = branch_currents + spdiagm(finiteground_currents, 0, n, n)
     end
 
-    s = vec(sum(branch_currents, 1))
+    # For some reason, the following fails on Windows 32-bit
+    # s = vec(sum(branch_currents, 1))
+
+    s = zeros(T, size(branch_currents, 2))
+    for i = 1:size(branch_currents, 1)
+        for j in nzrange(branch_currents, i)
+            s[i] += branch_currents.nzval[j]
+        end
+    end
+
     s
 end
 
@@ -190,15 +199,15 @@ function dropnonzeros!(G)
     dropzeros!(G)
 end
 
-function _get_branch_currents(G, voltages, pos)
+function _get_branch_currents(G::SparseMatrixCSC{T,V}, voltages, pos) where {T,V}
 
     branch_currents = _get_branch_currents_posneg(G, voltages, pos)
     
     # Make sparse matrix with branch_currents as right upper triangle
     N = size(G, 1)
     n = size(branch_currents, 1)
-    I = zeros(INT, n)
-    J = zeros(INT, n)
+    I = zeros(V, n)
+    J = zeros(V, n)
     k = 1
     for i = 1:N
         for j in nzrange(G, i)
