@@ -17,6 +17,8 @@ function update_logging!(cfg)
         setlevel!(logger, "warn")
     elseif log_level in CRITICAL
         setlevel!(logger, "critical")
+    elseif log_level in OFF
+        setlevel!(logger, "not_set")
     end
     if !(log_file in NONE)
         push!(logger, 

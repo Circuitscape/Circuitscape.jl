@@ -74,3 +74,9 @@ function compute(dict)
     is_parallel && rmprocs(workers())
     r
 end
+
+function compute_silent(file)
+    cfg = parse_config(file)
+    cfg["log_level"] = "off"
+    compute(cfg)
+end
