@@ -1,10 +1,14 @@
 module Circuitscape
-using AMG
+using AlgebraicMultigrid
 using SimpleWeightedGraphs
 using LightGraphs
 using IterativeSolvers
 using Memento
 using GZip
+
+using LinearAlgebra
+using SparseArrays
+using SharedArrays
 
 include("consts.jl")
 include("config.jl")
