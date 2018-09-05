@@ -9,6 +9,7 @@ using GZip
 using LinearAlgebra
 using SparseArrays
 using SharedArrays
+using Distributed
 
 include("consts.jl")
 include("config.jl")

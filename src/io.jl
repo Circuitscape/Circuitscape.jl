@@ -74,7 +74,7 @@ function read_cellmap(habitat_file::String, is_res::Bool, ::Type{T}) where {T}
             throw("Error: zero resistance values are not currently supported for habitat maps. Use a short-circuit region file instead.")
         else
             for i in eachindex(cell_map)
-                gmap[i] = 1./cell_map[i]
+                gmap[i] = 1 ./ cell_map[i]
             end
             gmap[ind] = 0
         end
@@ -307,7 +307,7 @@ function get_network_data(T, V, cfg)::NetworkData{T,V}
 
     i,j,v = load_graph(V, hab_file, T)
     if hab_is_res
-        v = 1./v
+        v = 1 ./ v
     end
 
     if is_pairwise

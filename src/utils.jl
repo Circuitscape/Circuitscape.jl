@@ -4,7 +4,7 @@ export  model_problem,
         calculate_cum_current_map,
         calculate_max_current_map
 
-using Base.Test
+using Test
 
  """
  Construct nodemap specific to a connected component
@@ -389,7 +389,7 @@ read_node_currents(str) = readdlm(str)
 
 read_aagrid(file) = readdlm(file, skipstart = 6) # Will change to 6 
 
-compare_aagrid{T}(r::Matrix{T}, x::Matrix{T}, tol = 1e-6) = sum(abs2, x - r) < tol
+compare_aagrid(r::Matrix{T}, x::Matrix{T}, tol = 1e-6) where T = sum(abs2, x - r) < tol
 
 function get_comp(list_to_comp, f)
     outfile = ""
