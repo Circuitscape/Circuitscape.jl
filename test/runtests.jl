@@ -1,5 +1,5 @@
 using Circuitscape
-using Base.Test
+using Test
 import Circuitscape: compute_single, compute_cholmod, compute_parallel,
                      runtests
 

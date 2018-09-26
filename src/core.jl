@@ -147,7 +147,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
             pi = csub[i]
             comp_i = findfirst(comp, pi)
             comp_i = V(comp_i)
-            I = find(x -> x == pi, points)
+            I = findall(x -> x == pi, points)
             smash_repeats!(ret, I)
 
             # Preprocess matrix
@@ -168,7 +168,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
                 pj = csub[j]
                 comp_j = findfirst(comp, pj)
                 comp_j = V(comp_j)
-                J = find(x -> x == pj, points)
+                J = findall(x -> x == pj, points)
 
                 # Forget excluded pairs
                 ex = false
@@ -345,7 +345,7 @@ function _cholmod_solver_path(data::GraphData{T,V}, flags,
 
             pi = csub[i]
             comp_i = V(findfirst(comp, pi))
-            I = find(x -> x == pi, points)
+            I = findall(x -> x == pi, points)
             # smash_repeats!(ret, I)
             smash_repeats!(resistances, I)
 
@@ -357,7 +357,7 @@ function _cholmod_solver_path(data::GraphData{T,V}, flags,
 
                 pj = csub[j]
                 comp_j = V(findfirst(comp, pj))
-                J = find(x -> x == pj, points)
+                J = findall(x -> x == pj, points)
 
                 # Forget excluded pairs
                 ex = false
