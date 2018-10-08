@@ -1,11 +1,11 @@
 function parse_config(path::String)
     cf = init_config()
     f = open(path, "r")
-    for i in EachLine(f, chomp = false)
+    for i in eachline(f, keep = true)
         if first(i) == '['
             continue
         end
-        idx = search(i, '=')
+        idx = something(findfirst(isequal('='), i), 0)
         var = rstrip(i[1:idx-1])
         val = strip(i[idx+1:end])
         cf[var] = val

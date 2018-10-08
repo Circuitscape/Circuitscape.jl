@@ -124,7 +124,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
         end
 
         # Conductance matrix corresponding to CC
-        matrix = comps[cid]
+        matrix = comps[cid]        
 
         # Regularization step
         matrix.nzval .+= eps(eltype(matrix)) * norm(matrix.nzval)
@@ -222,7 +222,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
             f(1)
             update_shortcut_resistances!(idx, shortcut, resistances, points, comp)
         else
-            X = pmap(x ->f(x), 1:size(csub,1))
+            X = map(x ->f(x), 1:size(csub,1))
 
             # Set all resistances
             for x in X

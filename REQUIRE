@@ -1,7 +1,7 @@
-julia 0.6
+julia 0.7
 IterativeSolvers 0.4.1
-Memento 0.7.0
+Memento 0.10.0
 SimpleWeightedGraphs 0.3.0
 LightGraphs 0.11.0
-AMG 0.1.2
+AlgebraicMultigrid 0.2.0
 GZip

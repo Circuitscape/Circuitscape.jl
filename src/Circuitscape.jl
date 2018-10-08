@@ -1,15 +1,18 @@
+# __precompile__(false)
 module Circuitscape
 using AlgebraicMultigrid
 using SimpleWeightedGraphs
 using LightGraphs
 using IterativeSolvers
-using Memento
 using GZip
 
 using LinearAlgebra
 using SparseArrays
 using SharedArrays
 using Distributed
+using DelimitedFiles
+using Logging
+using Dates
 
 include("consts.jl")
 include("config.jl")
