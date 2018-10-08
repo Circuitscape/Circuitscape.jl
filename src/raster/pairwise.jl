@@ -114,7 +114,9 @@ function _pt_file_polygons_path(rasterdata::RasData{T,V},
     write_cum_maps(cum, gmap, cfg, rasterdata.hbmeta, 
                     flags.outputflags.write_max_cur_maps)
 
-    # resistances
+    # save resistances
+    save_resistances(r, cfg)
+
     r
 end
 
