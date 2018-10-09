@@ -170,7 +170,7 @@ function _get_node_currents_posneg(G::SparseMatrixCSC{T,V},
             map!(x -> x > 0 ? x : 0, finiteground_currents, finiteground_currents)
         end
         n = size(G, 1)
-        branch_currents = branch_currents + spdiagm(finiteground_currents, 0, n, n)
+        branch_currents = branch_currents + spdiagm(0 => finiteground_currents)
     end
 
     # For some reason, the following fails on Windows 32-bit

@@ -170,6 +170,8 @@ function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Matrix{T} where {
     voltages = Vector{eltype(G)}()
     outvolt = alloc_map(hbmeta)
     outcurr = alloc_map(hbmeta)
+    println("hello")
+    @show length(cc)
 
     for c in cc
 
@@ -191,7 +193,7 @@ function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Matrix{T} where {
         else
             f_local = finitegrounds
         end
-
+    
         voltages = multiple_solver(cfg, a_local, s_local, g_local, f_local)
         local_nodemap = construct_local_node_map(nodemap, c, polymap)
         solver_called = true
@@ -263,9 +265,10 @@ function multiple_solver(cfg, a::SparseMatrixCSC{T,V}, sources, grounds, finiteg
     
     asolve = deepcopy(a)
     if finitegrounds[1] != -9999
-        asolve = a + spdiagm(finitegrounds, 0, size(a, 1), size(a, 1))
+        # asolve = a + spdiagm(finitegrounds, 0, size(a, 1), size(a, 1))
+        asolve = a + spdiagm(0 => finitegrounds)
     end
-
+    
     infgrounds = find(x -> x == Inf, grounds)
     deleteat!(sources, infgrounds)
     dst_del = V[]

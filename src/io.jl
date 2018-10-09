@@ -358,15 +358,11 @@ function load_raster_data(T, V, cfg)::RasData{T,V}
     source_file = cfg["source_file"]
     ground_file = cfg["ground_file"]
     ground_is_res = cfg["ground_file_is_resistances"] in TRUELIST
-
-    println("hello")
     
     csinfo("Reading maps")
-    println("hello")
 
     # Read cell map
     cellmap, hbmeta = read_cellmap(hab_file, hab_is_res, T)
-    println("hello")
     c = count(x -> x > 0, cellmap)
     csinfo("Resistance/Conductance map has $c nodes")
 
