@@ -125,11 +125,11 @@ function resolve_conflicts(sources::Vector{T},
 
     if any(conflicts)
         if policy == :rmvsrc
-            sources[findall(conflicts)] = 0
+            sources[findall(x->x!=0,conflicts)] = 0
         elseif policy == :rmvgnd
-            grounds[findall(conflicts)] = 0
+            grounds[findall(x->x!=0,conflicts)] = 0
         elseif policy == :rmvall
-            sources[findall(conflicts)] = 0
+            sources[findall(x->x!=0,conflicts)] = 0
         end
     end
 
@@ -164,7 +164,7 @@ function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Matrix{T} where {
     write_c_maps = flags.outputflags.write_cur_maps
 
     volt = zeros(eltype(G), size(nodemap))
-    ind = findall(nodemap)
+    ind = findall(x->x!=0,nodemap)
     f_local = Vector{eltype(G)}()
     solver_called = false
     voltages = Vector{eltype(G)}()

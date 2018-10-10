@@ -326,16 +326,16 @@ function construct_node_map(gmap, polymap::Matrix{V}) where V
 end
 
 function relabel!(nodemap::Matrix{V}, offset = V(0)) where V
-    oldlabels = nodemap[findall(nodemap)]
+    oldlabels = nodemap[findall(x->x!=0,nodemap)]
     newlabels = zeros(V, size(oldlabels)) 
     s = sort(oldlabels)
     perm = sortperm(oldlabels)
     prepend!(s, s[1] - 1)
-    f = findall(diff(s))
+    f = findall(x->x!=0,diff(s))
     newlabels[f] .= 1
     newlabels = cumsum(newlabels)
     newlabels[perm] = copy(newlabels)
-    nodemap[findall(nodemap)] = newlabels .- V(1) .+ offset
+    nodemap[findall(x->x!=0,nodemap)] = newlabels .- V(1) .+ offset
 end
 
 function construct_graph(gmap, nodemap::Matrix{S}, avg_res, four_neighbors) where S
@@ -405,14 +405,14 @@ function create_new_polymap(gmap, polymap::Matrix{V}, points_rc,
             newpoly = point_map
         elseif point_file_no_polygons
             k = maximum(polymap)
-            for i in findall(point_map)
+            for i in findall(x->x!=0,point_map)
                 if polymap[i] == 0
                     newpoly[i] = point_map[i] + k
                 end
             end
         else
             k = max(maximum(polymap), maximum(point_map))
-            for i in findall(point_map)
+            for i in findall(x->x!=0,point_map)
                 v1 = point_map[i]
                 v2 = newpoly[i]
                 if v2 == 0
