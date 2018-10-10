@@ -114,7 +114,7 @@ function _ascii_grid_read_header(habitat_file, f)
     cellsize = float(split(readline(f))[2])
     nodata = -Inf
     s = split(readline(f))
-    if contains(s[1], "NODATA") || contains(s[1], "nodata")
+    if occursin("NODATA", s[1]) || occursin("nodata", s[1])
         nodata = float(s[2])
     end
     seek(f, 0)
@@ -129,7 +129,7 @@ function _guess_file_type(filename, f)
         return PAIRS_AAGRID
     elseif startswith(s, "mode")
         return PAIRS_LIST
-    elseif contains(filename, ".asc")
+    elseif occursin(".asc", filename)
         return AAGRID
     elseif endswith(filename, ".txt")
         return TXTLIST

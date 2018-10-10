@@ -55,17 +55,17 @@ model_problem(s::Integer) = model_problem(Float64, s)
 function test_problem(str)
     base_path = joinpath(dirname(pathof(Circuitscape)), "..", "test", "input")
     str2 = replace(str, ".ini" => "")
-    if contains(str, "sgVerify")
+    if occursin("sgVerify", str)
         config_path = joinpath(base_path, "raster", "pairwise", replace(str2, "sgVerify" => ""), str)
-    elseif contains(str, "mgVerify")
+    elseif occursin("mgVerify", str)
         config_path = joinpath(base_path, "raster", "advanced", replace(str2, "mgVerify" => ""), str)
-    elseif contains(str, "oneToAll")
+    elseif occursin("oneToAll", str)
         config_path = joinpath(base_path, "raster", "one_to_all", replace(str2, "oneToAllVerify" => ""), str)
-    elseif contains(str, "allToOne")
+    elseif occursin("allToOne", str)
         config_path = joinpath(base_path, "raster", "all_to_one", replace(str2, "allToOneVerify" => ""), str)
-    elseif contains(str, "sgNetworkVerify")
+    elseif occursin("sgNetworkVerify", str)
         config_path = joinpath(base_path, "network", str)
-    elseif contains(str, "mgNetworkVerify")
+    elseif occursin("mgNetworkVerify", str)
         config_path = joinpath(base_path, "network", str)
     end
 end    
@@ -132,7 +132,7 @@ function accumulate_current_maps(path, f)
 
     cmap_list = readdir(dir) |> 
                     x -> filter(y -> startswith(y, "$(name)_"), x) |>
-                    x -> filter(y -> contains(y, "_curmap_"), x)
+                    x -> filter(y -> occursin("_curmap_", y), x)
     isempty(cmap_list) && return
 
     headers = ""
@@ -348,8 +348,8 @@ function compare_all_output(str, is_single = false)
     tol = is_single ?  1e-4 : 1e-6
 
     for f in gen_list
-        !contains(f, "_") && continue
-        contains(f, "resistances") && continue
+        !occursin("_", f) && continue
+        occursin("resistances", f) && continue
 
         info("Testing $f")
 
@@ -361,10 +361,10 @@ function compare_all_output(str, is_single = false)
             info("Test $f passed")
 
         # Network output files
-        elseif contains(f, "Network")
+        elseif occursin("Network", f)
 
             # Branch currents
-            if contains(f, "branch")
+            if occursin("branch", f)
                 r = read_branch_currents("output/$f")
                 x = !startswith(f, "mg") ? get_network_comp(list_to_comp, f) : readdlm("output_verify/$f")
                 @test compare_branch(r, x, tol)
