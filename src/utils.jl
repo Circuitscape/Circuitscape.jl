@@ -294,7 +294,9 @@ function runtests(which = :compute)
         info("Testing sgVerify$i")
         r = f("input/raster/pairwise/$i/sgVerify$(i).ini")
         x = readdlm("output_verify/sgVerify$(i)_resistances.out")
+        _x = readdlm("output/sgVerify$(i)_resistances.out")
         # x = x[2:end, 2:end]
+        @test sum(abs2, _x - r) < tol
         @test sum(abs2, x - r) < tol
         compare_all_output("sgVerify$(i)", is_single)
         info("Test sgVerify$i passed")

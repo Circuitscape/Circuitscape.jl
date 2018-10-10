@@ -473,13 +473,16 @@ function save_resistances(r, cfg)
     end
 end
 
-function write_cum_maps(cum, cellmap::Matrix{T}, cfg, hbmeta, write_max = false) where T
-    cum_curr = zeros(T, size(cellmap)...)
-    for i = 1:nprocs()
-        cum_curr .+= cum.cum_curr[i]
-    end 
-    postprocess_cum_curmap!(cum_curr)
-    write_aagrid(cum_curr, "", cfg, hbmeta, cum = true)
+function write_cum_maps(cum, cellmap::Matrix{T}, cfg, hbmeta, write_max, write_cum) where T
+    
+    if write_cum || cfg["write_cur_maps"] in TRUELIST
+        cum_curr = zeros(T, size(cellmap)...)
+        for i = 1:nprocs()
+            cum_curr .+= cum.cum_curr[i]
+        end 
+        postprocess_cum_curmap!(cum_curr)
+        write_aagrid(cum_curr, "", cfg, hbmeta, cum = true)
+    end
 
     if write_max
         max_curr = fill(T(-9999), size(cellmap)...)
