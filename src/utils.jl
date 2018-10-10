@@ -205,7 +205,7 @@ end
 mycsid() = myid() - minimum(workers()) + 1
 
 function initialize_cum_maps(cellmap::Matrix{T}, max = false) where T
-    cum_curr = Vector{SharedMatrix{T}}(nprocs())
+    cum_curr = Vector{SharedMatrix{T}}(undef,nprocs())
     for i = 1:nprocs()
         cum_curr[i] = SharedArray(zeros(T, size(cellmap)...))
     end

@@ -88,7 +88,7 @@ end
 function _ascii_grid_reader(T, file)
     f = endswith(file, ".gz") ? GZip.open(file, "r") : open(file, "r")
     rastermeta = _ascii_grid_read_header(file, f)
-    c = Matrix{T}(0,0)
+    c = Matrix{T}(undef,0,0)
     ss = 6
     if rastermeta.nodata == -Inf
         ss = 5
@@ -210,8 +210,8 @@ end
 function read_source_and_ground_maps(T, V, source_file, ground_file, habitatmeta,
                                         is_res) 
 
-    ground_map = Matrix{T}(0,0)
-    source_map = Matrix{T}(0,0)
+    ground_map = Matrix{T}(undef,0,0)
+    source_map = Matrix{T}(undef,0,0)
 
     f = endswith(ground_file, "gz") ? Gzip.open(ground_file, "r") : open(ground_file, "r")
     filetype = _guess_file_type(ground_file, f)
@@ -320,8 +320,8 @@ function get_network_data(T, V, cfg)::NetworkData{T,V}
         source_map = read_point_strengths(T, source_file)
         ground_map = read_point_strengths(T, ground_file)
     else
-        source_map = Matrix{T}(0,0)
-        ground_map = Matrix{T}(0,0)
+        source_map = Matrix{T}(undef,0,0)
+        ground_map = Matrix{T}(undef,0,0)
     end
 
     NetworkData((i,j,v), fp, source_map, ground_map)
@@ -370,7 +370,7 @@ function load_raster_data(T, V, cfg)::RasData{T,V}
     if use_polygons
         polymap = read_polymap(V, polygon_file, hbmeta)
     else
-        polymap = Matrix{V}(0,0)
+        polymap = Matrix{V}(undef,0,0)
     end
 
     # Read and update cellmap with mask file
@@ -392,7 +392,7 @@ function load_raster_data(T, V, cfg)::RasData{T,V}
         read_source_and_ground_maps(T, V, source_file, ground_file,
                                     hbmeta, ground_is_res)
     else
-        source_map, ground_map = Matrix{T}(0,0), Matrix{T}(0,0)
+        source_map, ground_map = Matrix{T}(undef,0,0), Matrix{T}(undef,0,0)
     end
 
     # Included Pairs
@@ -406,7 +406,7 @@ function load_raster_data(T, V, cfg)::RasData{T,V}
     if use_var_source
         strengths = read_point_strengths(T, var_source_file)
     else
-        strengths = Matrix{T}(0,0)
+        strengths = Matrix{T}(undef, 0,0)
     end
     
     RasData(cellmap, polymap, source_map, ground_map, points_rc, strengths,

@@ -543,7 +543,7 @@ Calculate laplacian of the adjacency matrix of a graph
 """
 function laplacian(G::SparseMatrixCSC{T,V}) where {T,V}
     n = size(G, 1)
-    s = Vector{eltype(G)}(n)
+    s = Vector{eltype(G)}(undef,n)
     for i = 1:n
         s[i] = sum_off_diag(G, i)
         for j in nzrange(G, i)
