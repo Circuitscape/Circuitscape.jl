@@ -182,7 +182,7 @@ function accumulate_current_maps(path, f)
     csinfo("Writing to $accum_path")
     open(accum_path, "w") do f
         write(f, headers)
-        writedlm(f, round.(accum, 8), ' ')
+        writedlm(f, round.(accum, digits=8), ' ')
     end
 
 end
@@ -211,7 +211,7 @@ function initialize_cum_maps(cellmap::Matrix{T}, max = false) where T
     end
     max_curr = Vector{SharedMatrix{T}}()
     if max
-        max_curr = Vector{SharedMatrix{T}}(nprocs())
+        max_curr = Vector{SharedMatrix{T}}(undef,nprocs())
         for i = 1:nprocs()
             max_curr[i] = SharedArray(fill(T(-9999), size(cellmap)...))
         end

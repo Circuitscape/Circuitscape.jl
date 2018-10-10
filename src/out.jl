@@ -346,7 +346,7 @@ function write_aagrid(cmap, name, cfg, hbmeta;
     write(f, "cellsize      $(hbmeta.cellsize)\n")
     write(f, "NODATA_value  $(hbmeta.nodata)\n")
 
-    writedlm(f, round.(cmap, 8), ' ')
+    writedlm(f, round.(cmap, digits=8), ' ')
     close(f)
 end
 
@@ -388,7 +388,7 @@ function write_aagrid(cmap, name, cfg, hbmeta, cellmap;
     write(f, "cellsize      $(hbmeta.cellsize)\n")
     write(f, "NODATA_value  $(hbmeta.nodata)\n")
 
-    writedlm(f, round.(cmap, 8), ' ')
+    writedlm(f, round.(cmap, digits=8), ' ')
     close(f)
 end
 
