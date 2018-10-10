@@ -11,7 +11,7 @@ using Test
  """
 function construct_local_node_map(nodemap, component, polymap)
     local_nodemap = zeros(eltype(nodemap), size(nodemap))
-    idx = findin(nodemap, component)
+    idx = findall(in(component), nodemap)
     local_nodemap[idx] = nodemap[idx]
     if nodemap == local_nodemap
         return local_nodemap
@@ -21,7 +21,7 @@ end
 
 function _construct_local_nodemap(local_nodemap, polymap, idx)
     if isempty(polymap)
-        i = find(local_nodemap)
+        i = findall(local_nodemap)
         local_nodemap[i] = 1:length(i)
         return local_nodemap
     else
