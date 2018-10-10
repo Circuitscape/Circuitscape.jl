@@ -53,7 +53,7 @@ function load_graph(V, gpath::String, ::Type{T}) where {T}
     i,j,v
 end
 
-read_focal_points(V, path::String) = V.(vec(readcsv(path)) + 1)
+read_focal_points(V, path::String) = V.(vec(readdlm(path)) .+ 1)
 
 function read_point_strengths(T, path::String, inc = true)
     a = readdlm(path, T)

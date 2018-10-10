@@ -226,8 +226,8 @@ end
 function initialize_cum_vectors(v::Vector{T}) where T
     cum_curr = Vector{SharedMatrix{T}}()
     max_curr = Vector{SharedMatrix{T}}()
-    cum_branch_curr = Vector{SharedVector{T}}(nprocs())
-    cum_node_curr = Vector{SharedVector{T}}(nprocs())
+    cum_branch_curr = Vector{SharedVector{T}}(undef,nprocs())
+    cum_node_curr = Vector{SharedVector{T}}(undef,nprocs())
     for i = 1:nprocs()
         cum_branch_curr[i] = SharedArray(zeros(T, size(v)...))
         cum_node_curr[i] = SharedArray(zeros(T, size(v)...))
