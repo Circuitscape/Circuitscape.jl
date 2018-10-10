@@ -170,8 +170,6 @@ function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Matrix{T} where {
     voltages = Vector{eltype(G)}()
     outvolt = alloc_map(hbmeta)
     outcurr = alloc_map(hbmeta)
-    println("hello")
-    @show length(cc)
 
     for c in cc
 

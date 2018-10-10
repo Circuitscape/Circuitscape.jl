@@ -286,7 +286,7 @@ function read_included_pairs(V, file)
         for i = 1:size(included_pairs, 1)
             idx1 = findfirst(x -> x == included_pairs[i, 1], point_ids)
             idx2 = findfirst(x -> x == included_pairs[i, 2], point_ids)
-            if idx1 != 0 && idx2 != 0
+            if idx1 != nothing && idx2 != nothing
                 mat[idx1,idx2] = 1
                 mat[idx2,idx1] = 1
             end
