@@ -109,13 +109,13 @@ function _ascii_grid_read_header(habitat_file, f)
     file_type = _guess_file_type(habitat_file, f)
     ncols = parse(Int, split(readline(f))[2])
     nrows = parse(Int, split(readline(f))[2])
-    xllcorner = float(split(readline(f))[2])
-    yllcorner = float(split(readline(f))[2])
-    cellsize = float(split(readline(f))[2])
+    xllcorner = parse(Float64, split(readline(f))[2])
+    yllcorner = parse(Float64, split(readline(f))[2])
+    cellsize = parse(Float64, split(readline(f))[2])
     nodata = -Inf
     s = split(readline(f))
     if occursin("NODATA", s[1]) || occursin("nodata", s[1])
-        nodata = float(s[2])
+        nodata = parse(Float64, s[2])
     end
     seek(f, 0)
     RasterMeta(ncols, nrows, xllcorner, yllcorner, cellsize, nodata, file_type)
@@ -259,8 +259,8 @@ function read_included_pairs(V, file)
 
     if filetype == PAIRS_AAGRID
         open(file, "r") do f
-            minval = float(split(readline(f))[2])
-            maxval = float(split(readline(f))[2])
+            minval = parse(Float64, split(readline(f))[2])
+            maxval = parse(Float64, split(readline(f))[2])
         end
         included_pairs = readdlm(file, skipstart=2)
         point_ids = V.(included_pairs[:,1])
