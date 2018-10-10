@@ -145,7 +145,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
             ret = Vector{Tuple{V,V,T}}()
 
             pi = csub[i]
-            comp_i = findfirst(comp, pi)
+            comp_i = something(findfirst(isequal(pi),comp), 0)
             comp_i = V(comp_i)
             I = findall(x -> x == pi, points)
             smash_repeats!(ret, I)
@@ -166,7 +166,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
             for j in rng
 
                 pj = csub[j]
-                comp_j = findfirst(comp, pj)
+                comp_j = something(findfirst(isequal(pj), comp), 0)
                 comp_j = V(comp_j)
                 J = findall(x -> x == pj, points)
 
@@ -218,7 +218,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
         end
 
         if get_shortcut_resistances        
-            idx = findfirst(points, csub[1])
+            idx = something(findfirst(isequal(csub[1]), points), 0)
             f(1)
             update_shortcut_resistances!(idx, shortcut, resistances, points, comp)
         else
@@ -480,7 +480,7 @@ function get_num_pairs(ccs, fp::Vector{V}, exclude_pairs) where V
 
     for (i,cc) in enumerate(ccs)
         sub_fp = filter(x -> x in cc, fp) |> unique
-        l = endof(sub_fp)
+        l = lastindex(sub_fp)
         for ii = 1:l
             pt1 = sub_fp[ii]
             for jj = ii+1:l

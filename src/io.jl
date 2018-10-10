@@ -6,7 +6,7 @@ struct IncludeExcludePairs{V}
     include_pairs::Matrix{V}
 end
 function IncludeExcludePairs(V)
-    IncludeExcludePairs(:undef, V[], Matrix{V}(0, 0))
+    IncludeExcludePairs(:undef, V[], Matrix{V}(undef,0,0))
 end
 
 struct NetworkData{T,V} <: Data
@@ -76,7 +76,7 @@ function read_cellmap(habitat_file::String, is_res::Bool, ::Type{T}) where {T}
             for i in eachindex(cell_map)
                 gmap[i] = 1 ./ cell_map[i]
             end
-            gmap[ind] = 0
+            gmap[ind] .= 0
         end
     else
         copy!(gmap, cell_map)
@@ -146,7 +146,7 @@ function read_polymap(T, file::String, habitatmeta;
 
     ind = findall(x -> x == rastermeta.nodata, polymap)
     if nodata_as != -1
-        polymap[ind] = nodata_as
+        polymap[ind] .= nodata_as
     end
 
     if rastermeta.cellsize != habitatmeta.cellsize
@@ -186,7 +186,8 @@ function read_point_map(V, file, habitatmeta)
         i  = ceil.(V, habitatmeta.nrows - (J - habitatmeta.yllcorner) / habitatmeta.cellsize)
         j = ceil.(V, (I - habitatmeta.xllcorner) / habitatmeta.cellsize)
     else
-        (i,j,v) = findnz(_points_rc)
+        _I = findall(!iszero, _points_rc)
+        (i,j,v) =  (getindex.(_I, 1), getindex.(_I, 2), _points_rc[_I])
     end
 
     ind = findall(x -> x < 0, v)

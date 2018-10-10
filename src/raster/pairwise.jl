@@ -316,7 +316,7 @@ function construct_node_map(gmap, polymap::Matrix{V}) where V
             idx1 = findall(x -> x == polynum, polymap_pruned)
             idx2 = findall(x -> x == polynum, polymap)
             if length(idx1) > 0
-                nodemap[idx2] = nodemap[idx1[1]]
+                nodemap[idx2] .= nodemap[idx1[1]]
             end
         end
     end
@@ -332,10 +332,10 @@ function relabel!(nodemap::Matrix{V}, offset = V(0)) where V
     perm = sortperm(oldlabels)
     prepend!(s, s[1] - 1)
     f = findall(diff(s))
-    newlabels[f] = 1
+    newlabels[f] .= 1
     newlabels = cumsum(newlabels)
     newlabels[perm] = copy(newlabels)
-    nodemap[findall(nodemap)] = newlabels - V(1) + offset
+    nodemap[findall(nodemap)] = newlabels .- V(1) .+ offset
 end
 
 function construct_graph(gmap, nodemap::Matrix{S}, avg_res, four_neighbors) where S
