@@ -4,14 +4,14 @@ export  model_problem,
         calculate_cum_current_map,
         calculate_max_current_map
 
-using Base.Test
+using Test
 
  """
  Construct nodemap specific to a connected component
  """
 function construct_local_node_map(nodemap, component, polymap)
     local_nodemap = zeros(eltype(nodemap), size(nodemap))
-    idx = findin(nodemap, component)
+    idx = findall(in(component), nodemap)
     local_nodemap[idx] = nodemap[idx]
     if nodemap == local_nodemap
         return local_nodemap
@@ -21,7 +21,7 @@ end
 
 function _construct_local_nodemap(local_nodemap, polymap, idx)
     if isempty(polymap)
-        i = find(local_nodemap)
+        i = findall(local_nodemap)
         local_nodemap[i] = 1:length(i)
         return local_nodemap
     else
@@ -391,7 +391,7 @@ read_node_currents(str) = readdlm(str)
 
 read_aagrid(file) = readdlm(file, skipstart = 6) # Will change to 6 
 
-compare_aagrid{T}(r::Matrix{T}, x::Matrix{T}, tol = 1e-6) = sum(abs2, x - r) < tol
+compare_aagrid(r::Matrix{T}, x::Matrix{T}, tol = 1e-6) where {T} = sum(abs2, x - r) < tol
 
 function get_comp(list_to_comp, f)
     outfile = ""
@@ -404,7 +404,7 @@ end
 function get_network_comp(list_to_comp, f)
     s = split(f, ['_', '.'])
     for i = 1:size(s, 1)
-        if all(isnumber, s[i])
+        if all(isnumeric, s[i])
             f = replace(f, "_$(s[i])", "_$(parse(Int, s[i]) - 1 |> string)", 1)
         end
     end
@@ -415,10 +415,10 @@ end
 function compare_branch(r, x, tol = 1e-6)
     x[:,1] = x[:,1] + 1
     x[:,2] = x[:,2] + 1
-    sum(abs2, sortrows(r) - sortrows(x)) < tol
+    sum(abs2, sortslices(r, dims=1) - sortslices(x, dims=1)) < tol
 end
 
 function compare_node(r, x, tol = 1e-6)
     x[:,1] = x[:,1] + 1
-    sum(abs2, sortrows(r) - sortrows(x)) < tol
+    sum(abs2, sortslices(r, dims=1) - sortslices(x, dims=1)) < tol
 end

@@ -125,11 +125,11 @@ function resolve_conflicts(sources::Vector{T},
 
     if any(conflicts)
         if policy == :rmvsrc
-            sources[find(conflicts)] = 0
+            sources[findall(conflicts)] = 0
         elseif policy == :rmvgnd
-            grounds[find(conflicts)] = 0
+            grounds[findall(conflicts)] = 0
         elseif policy == :rmvall
-            sources[find(conflicts)] = 0
+            sources[findall(conflicts)] = 0
         end
     end
 
@@ -164,7 +164,7 @@ function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Matrix{T} where {
     write_c_maps = flags.outputflags.write_cur_maps
 
     volt = zeros(eltype(G), size(nodemap))
-    ind = find(nodemap)
+    ind = findall(nodemap)
     f_local = Vector{eltype(G)}()
     solver_called = false
     voltages = Vector{eltype(G)}()
@@ -239,7 +239,7 @@ function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Matrix{T} where {
     end
 
     if is_onetoall
-        idx = find(source_map)
+        idx = findall(source_map)
         val = volt[idx] ./ source_map[idx]
         if val[1] ≈ 0
             ret = Matrix{T}(1,1)
@@ -266,7 +266,7 @@ function multiple_solver(cfg, a::SparseMatrixCSC{T,V}, sources, grounds, finiteg
         asolve = a + spdiagm(finitegrounds, 0, size(a, 1), size(a, 1))
     end
 
-    infgrounds = find(x -> x == Inf, grounds)
+    infgrounds = findall(x -> x == Inf, grounds)
     deleteat!(sources, infgrounds)
     dst_del = V[]
     append!(dst_del, infgrounds)

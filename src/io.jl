@@ -53,7 +53,7 @@ function load_graph(V, gpath::String, ::Type{T}) where {T}
     i,j,v
 end
 
-read_focal_points(V, path::String) = V.(vec(readcsv(path)) + 1)
+read_focal_points(V, path::String) = V.(vec(readdlm(path)) + 1)
 
 function read_point_strengths(T, path::String, inc = true)
     a = readdlm(path, T)
@@ -68,7 +68,7 @@ function read_cellmap(habitat_file::String, is_res::Bool, ::Type{T}) where {T}
     cell_map, rastermeta = _ascii_grid_reader(T, habitat_file)
 
     gmap = similar(cell_map)
-    ind = find(x -> x == -9999, cell_map)
+    ind = findall(x -> x == -9999, cell_map)
     if is_res
         if count(x -> x == 0, cell_map) > 0
             throw("Error: zero resistance values are not currently supported for habitat maps. Use a short-circuit region file instead.")
@@ -144,21 +144,21 @@ function read_polymap(T, file::String, habitatmeta;
 
     polymap, rastermeta = _ascii_grid_reader(T, file)
 
-    ind = find(x -> x == rastermeta.nodata, polymap)
+    ind = findall(x -> x == rastermeta.nodata, polymap)
     if nodata_as != -1
         polymap[ind] = nodata_as
     end
 
     if rastermeta.cellsize != habitatmeta.cellsize
-        warn("cellsize is not the same")
+        @warn("cellsize is not the same")
     elseif rastermeta.ncols != habitatmeta.ncols
-        warn("ncols is not the same")
+        @warn("ncols is not the same")
     elseif rastermeta.nrows != habitatmeta.nrows
-        warn("nrows is not the same")
+        @warn("nrows is not the same")
     elseif rastermeta.yllcorner != habitatmeta.yllcorner
-        warn("yllcorner is not the same")
+        @warn("yllcorner is not the same")
     elseif rastermeta.xllcorner != habitatmeta.xllcorner
-        warn("xllcorner is not the same")
+        @warn("xllcorner is not the same")
     end
 
     polymap
@@ -189,7 +189,7 @@ function read_point_map(V, file, habitatmeta)
         (i,j,v) = findnz(_points_rc)
     end
 
-    ind = find(x -> x < 0, v)
+    ind = findall(x -> x < 0, v)
 
     # Get rid of negative resistances
     for index in ind
@@ -238,11 +238,11 @@ function read_source_and_ground_maps(T, V, source_file, ground_file, habitatmeta
     end
 
     if is_res
-        ind = find(x -> x == -9999, ground_map)
+        ind = findall(x -> x == -9999, ground_map)
         ground_map = 1 ./ ground_map
         ground_map[ind] = 0
     else
-        ind = find(x -> x == -9999, ground_map)
+        ind = findall(x -> x == -9999, ground_map)
         ground_map[ind] = 0
     end
 
@@ -267,7 +267,7 @@ function read_included_pairs(V, file)
         deleteat!(point_ids, 1)
         included_pairs = included_pairs[2:end, 2:end]
         map!(x -> x > maxval ? 0 : x, included_pairs, included_pairs)
-        idx = find(x -> x >= minval, included_pairs)
+        idx = findall(x -> x >= minval, included_pairs)
         mode = :include
         bin = map(x -> x >= minval ? V(1) : V(0), included_pairs)
         IncludeExcludePairs(mode, point_ids, bin)
