@@ -82,8 +82,8 @@ function _get_sources_and_grounds(source_map, ground_map,
     grounds = zeros(eltype(G), size(G, 1))
 
     if is_raster
-        (i1, j1, v1) = begin _I = findall(!izero, source_map); getindex.(_I, 1), getindex.(_I, 2), getindex.(_I, 3) end
-        (i2, j2, v2) = begin _I = findall(!iszero, ground_map); getindex.(_I, 1), getindex.(_I, 2), getindex.(_I, 3) end
+        (i1, j1, v1) = begin _I = findall(!iszero, source_map); getindex.(_I, 1), getindex.(_I, 2), source_map[_I] end
+        (i2, j2, v2) = begin _I = findall(!iszero, ground_map); getindex.(_I, 1), getindex.(_I, 2), ground_map[_I] end
         for i = 1:size(i1, 1)
             v = V(nodemap[i1[i], j1[i]])
             if v != 0
@@ -135,7 +135,7 @@ function resolve_conflicts(sources::Vector{T},
 
     infgrounds = map(x -> x == Inf, grounds)
     infconflicts = map((x,y) -> x > 0 && y > 0, infgrounds, sources)
-    grounds[infconflicts] .= 0
+    grounds[infconflicts] = 0
     
     sources, grounds, finitegrounds
 end

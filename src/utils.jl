@@ -256,7 +256,7 @@ function runtests(which = :compute)
     @testset "Network Pairwise" begin 
     # Network pairwise tests
     for i = 1:3
-        info("Testing sgNetworkVerify$i")
+        @info("Testing sgNetworkVerify$i")
         r = f("input/network/sgNetworkVerify$(i).ini")
         x = readdlm("output_verify/sgNetworkVerify$(i)_resistances.out")
         valx = x[2:end, 2:end]
@@ -266,20 +266,20 @@ function runtests(which = :compute)
         pts_r = r[2:end,1]
         @test pts_x + 1 == pts_r
         compare_all_output("sgNetworkVerify$(i)", is_single)
-        info("Test sgNetworkVerify$i passed")
+        @info("Test sgNetworkVerify$i passed")
     end
     end
 
     @testset "Network Advanced" begin
     # Network advanced tests
     for i = 1:3
-        info("Testing mgNetworkVerify$i")
+        @info("Testing mgNetworkVerify$i")
         r = f("input/network/mgNetworkVerify$(i).ini")
         x = readdlm("output_verify/mgNetworkVerify$(i)_voltages.txt")
         x[:,1] = x[:,1] + 1
         @test sum(abs2, x - r) < tol
         compare_all_output("mgNetworkVerify$(i)", is_single)
-        info("Test mgNetworkVerify$i passed")
+        @info("Test mgNetworkVerify$i passed")
     end
     end
 
@@ -291,51 +291,51 @@ function runtests(which = :compute)
         if i == 16 && Sys.WORD_SIZE == 32 
             continue
         end
-        info("Testing sgVerify$i")
+        @info("Testing sgVerify$i")
         r = f("input/raster/pairwise/$i/sgVerify$(i).ini")
         x = readdlm("output_verify/sgVerify$(i)_resistances.out")
         # x = x[2:end, 2:end]
         @test sum(abs2, x - r) < tol
         compare_all_output("sgVerify$(i)", is_single)
-        info("Test sgVerify$i passed")
+        @info("Test sgVerify$i passed")
     end
     end
 
     @testset "Raster Advanced" begin 
     # Raster advanced tests
     for i in 1:5
-        info("Testing mgVerify$i")
+        @info("Testing mgVerify$i")
         r = f("input/raster/advanced/$i/mgVerify$(i).ini")
         x = readdlm("output_verify/mgVerify$(i)_voltmap.asc"; skipstart = 6)
         @test sum(abs2, x - r) < 1e-4
         # compare_all_output("mgVerify$(i)")
-        info("Test mgVerify$i passed")
+        @info("Test mgVerify$i passed")
     end
     end
 
     @testset "Raster One to All" begin 
     # Raster one to all test
     for i in 1:13
-        info("Testing oneToAllVerify$i")
+        @info("Testing oneToAllVerify$i")
         r = f("input/raster/one_to_all/$i/oneToAllVerify$(i).ini")
         x = readdlm("output_verify/oneToAllVerify$(i)_resistances.out")
         # x = x[:,2]
         @test sum(abs2, x - r) < tol
         compare_all_output("oneToAllVerify$(i)", is_single)
-        info("Test oneToAllVerify$i passed")
+        @info("Test oneToAllVerify$i passed")
     end
     end
 
     @testset "Raster ALl to One" begin
     # Raster all to one test
     for i in 1:12
-        info("Testing allToOneVerify$i")
+        @info("Testing allToOneVerify$i")
         r = f("input/raster/all_to_one/$i/allToOneVerify$(i).ini")
         x = readdlm("output_verify/allToOneVerify$(i)_resistances.out")
         # x = x[:,2]
 
         @test sum(abs2, x - r) < tol
-        info("Test allToOneVerify$i passed")
+        @info("Test allToOneVerify$i passed")
     end
     end
 
@@ -351,14 +351,14 @@ function compare_all_output(str, is_single = false)
         !occursin("_", f) && continue
         occursin("resistances", f) && continue
 
-        info("Testing $f")
+        @info("Testing $f")
 
         # Raster output files
         if endswith(f, "asc")
             r = read_aagrid("output/$f")
             x = get_comp(list_to_comp, f)
             @test compare_aagrid(r, x, tol)
-            info("Test $f passed")
+            @info("Test $f passed")
 
         # Network output files
         elseif occursin("Network", f)
@@ -368,14 +368,14 @@ function compare_all_output(str, is_single = false)
                 r = read_branch_currents("output/$f")
                 x = !startswith(f, "mg") ? get_network_comp(list_to_comp, f) : readdlm("output_verify/$f")
                 @test compare_branch(r, x, tol)
-                info("Test $f passed")
+                @info("Test $f passed")
 
             # Node currents
             else
                 r = read_node_currents("output/$f")
                 x = !startswith(f, "mg") ? get_network_comp(list_to_comp, f) : readdlm("output_verify/$f")
                 @test compare_node(r, x, tol)
-                info("Test $f passed")
+                @info("Test $f passed")
             end
         end
     end

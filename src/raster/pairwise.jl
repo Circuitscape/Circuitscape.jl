@@ -316,7 +316,7 @@ function construct_node_map(gmap, polymap::Matrix{V}) where V
             idx1 = findall(x -> x == polynum, polymap_pruned)
             idx2 = findall(x -> x == polynum, polymap)
             if length(idx1) > 0
-                nodemap[idx2] .= nodemap[idx1[1]]
+                nodemap[idx2] = nodemap[idx1[1]]
             end
         end
     end
