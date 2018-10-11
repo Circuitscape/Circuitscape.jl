@@ -82,8 +82,8 @@ function _get_sources_and_grounds(source_map, ground_map,
     grounds = zeros(eltype(G), size(G, 1))
 
     if is_raster
-        (i1, j1, v1) = findnz(source_map)
-        (i2, j2, v2) = findnz(ground_map)
+        (i1, j1, v1) = begin _I = findall(!izero, source_map); getindex.(_I, 1), getindex.(_I, 2), getindex.(_I, 3) end
+        (i2, j2, v2) = begin _I = findall(!iszero, ground_map); getindex.(_I, 1), getindex.(_I, 2), getindex.(_I, 3) end
         for i = 1:size(i1, 1)
             v = V(nodemap[i1[i], j1[i]])
             if v != 0
@@ -135,7 +135,7 @@ function resolve_conflicts(sources::Vector{T},
 
     infgrounds = map(x -> x == Inf, grounds)
     infconflicts = map((x,y) -> x > 0 && y > 0, infgrounds, sources)
-    grounds[infconflicts] = 0
+    grounds[infconflicts] .= 0
     
     sources, grounds, finitegrounds
 end
@@ -233,7 +233,7 @@ function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Matrix{T} where {
 
     scenario = cfg["scenario"]
     if !solver_called
-        ret = Matrix{T}(1,1)
+        ret = Matrix{T}(undef,1,1)
         ret[1] = -1
         return ret
     end
@@ -242,16 +242,16 @@ function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Matrix{T} where {
         idx = findall(source_map)
         val = volt[idx] ./ source_map[idx]
         if val[1] ≈ 0
-            ret = Matrix{T}(1,1)
+            ret = Matrix{T}(undef,1,1)
             ret[1] = -1
             return ret
         else
-            ret = Matrix{T}(length(val),1)
+            ret = Matrix{T}(undef,length(val),1)
             ret[:,1] = val
             return ret
         end
     elseif is_alltoone
-        ret = Matrix{T}(1,1)
+        ret = Matrix{T}(undef,1,1)
         ret[1] = 0
         return ret
     end
@@ -303,4 +303,4 @@ struct FullGraph{T,V}
     cellmap::Matrix{T}
 end
 FullGraph(G::SparseMatrixCSC{T,V}, cellmap) where {T,V} = FullGraph(G, collect(V, 1:size(G,1)), 
-                            Matrix{V}(0,0), RasterMeta(), cellmap)
+                            Matrix{V}(undef,0,0), RasterMeta(), cellmap)

@@ -58,7 +58,7 @@ read_focal_points(V, path::String) = V.(vec(readdlm(path)) .+ 1)
 function read_point_strengths(T, path::String, inc = true)
     a = readdlm(path, T)
     if inc
-        a[:,1] = a[:,1] + 1
+        @. a[:,1] = a[:,1] + 1
     end
     a
 end

@@ -32,13 +32,13 @@ function compute_advanced_data(data::NetworkData{T,V},
     t = @elapsed G = laplacian(A)
     csinfo("Time taken to construct graph laplacian = $t")
 
-    nodemap, polymap = Matrix{V}(0,0), Matrix{V}(0,0)
-    cellmap = Matrix{T}(0,0)
+    nodemap, polymap = Matrix{V}(undef,0,0), Matrix{V}(undef,0,0)
+    cellmap = Matrix{T}(undef,0,0)
 
     sources, grounds, finite_grounds = 
                 get_sources_and_grounds(data, flags, G, nodemap)
 
-    source_map = Matrix{eltype(A)}(0,0)
+    source_map = Matrix{eltype(A)}(undef,0,0)
     AdvancedData(G, cc, nodemap, polymap, RasterMeta(), 
                  sources, grounds, source_map, finite_grounds, V(-1), V(0), cellmap)
 end
