@@ -173,7 +173,7 @@ function read_point_map(V, file, habitatmeta)
 
     f = endswith(file, ".gz") ? GZip.open(file, "r") : open(file, "r")
     filetype = _guess_file_type(file, f)
-    _points_rc = filetype == TXTLIST ? readdlm(file) :
+    _points_rc = filetype == TXTLIST ? readdlm(file, Float64) :
                         read_polymap(V, file, habitatmeta)
 
     i = V[]
@@ -183,7 +183,7 @@ function read_point_map(V, file, habitatmeta)
         I = _points_rc[:,2]
         J = _points_rc[:,3]
         v = _points_rc[:,1]
-        i  = ceil.(V, habitatmeta.nrows - (J - habitatmeta.yllcorner) / habitatmeta.cellsize)
+        i = ceil.(V, habitatmeta.nrows - (J - habitatmeta.yllcorner) / habitatmeta.cellsize)
         j = ceil.(V, (I - habitatmeta.xllcorner) / habitatmeta.cellsize)
     else
         (i,j,v) = findnz(_points_rc)
@@ -203,6 +203,16 @@ function read_point_map(V, file, habitatmeta)
     i = i[idx]
     j = j[idx]
     v = v[idx]
+
+    if (minimum(j) < 0) || (minimum(v) < 0) ||
+            (maximum(j) > (habitatmeta.nrows - 1)) ||
+            (maximum(v) > (habitatmeta.ncols - 1))
+        throw("At least one focal node location falls outside of habitat map")
+    end
+
+    if size(unique(i),1) < 2
+        throw("Less than two valid focal nodes found. Please check focal node location file.")
+    end
 
     V.(i), V.(j), V.(v)
 end
