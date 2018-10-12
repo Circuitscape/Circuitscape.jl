@@ -344,7 +344,7 @@ function _cholmod_solver_path(data::GraphData{T,V}, flags,
         function g(i)
 
             pi = csub[i]
-            comp_i = V(findfirst(comp, pi))
+            comp_i = V(something(findfirst(isequal(pi),comp),0))
             I = findall(x -> x == pi, points)
             # smash_repeats!(ret, I)
             smash_repeats!(resistances, I)
@@ -356,7 +356,7 @@ function _cholmod_solver_path(data::GraphData{T,V}, flags,
             for j in rng
 
                 pj = csub[j]
-                comp_j = V(findfirst(comp, pj))
+                comp_j = V(something(findfirst(isequal(pj), comp),0))
                 J = findall(x -> x == pj, points)
 
                 # Forget excluded pairs
@@ -391,7 +391,7 @@ function _cholmod_solver_path(data::GraphData{T,V}, flags,
             postprocess(output, component_data, flags, shortcut, cfg)
         end
         if get_shortcut_resistances
-            idx = findfirst(points, csub[1])
+            idx = something(findfirst(isequal(csub[1]), points),0)
             g(1)
         else 
             g.(1:size(csub, 1))
@@ -504,7 +504,7 @@ function get_num_pairs_shortcut(ccs, fp::Vector{V}, exclude_pairs) where V
 
     for (i,cc) in enumerate(ccs)
         sub_fp = filter(x -> x in cc, fp) |> unique
-        l = endof(sub_fp)
+        l = lastindex(sub_fp)
         l == 0 && continue
         for ii = 1:1
             pt1 = sub_fp[ii]
@@ -619,7 +619,7 @@ function update_voltmatrix!(shortcut, output, component_data)
     j = output.col
 
     for i = 2:size(c, 1)
-        ind = findfirst(cc, c[i])
+        ind = something(findfirst(isequal(c[i]), cc),0)
         if ind != 0
             voltageAtPoint = voltages[ind]
             voltageAtPoint = 1 - (voltageAtPoint/r)

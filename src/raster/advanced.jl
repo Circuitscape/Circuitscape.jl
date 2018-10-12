@@ -125,11 +125,11 @@ function resolve_conflicts(sources::Vector{T},
 
     if any(conflicts)
         if policy == :rmvsrc
-            sources[findall(x->x!=0,conflicts)] = 0
+            sources[findall(x->x!=0,conflicts)] .= 0
         elseif policy == :rmvgnd
-            grounds[findall(x->x!=0,conflicts)] = 0
+            grounds[findall(x->x!=0,conflicts)] .= 0
         elseif policy == :rmvall
-            sources[findall(x->x!=0,conflicts)] = 0
+            sources[findall(x->x!=0,conflicts)] .= 0
         end
     end
 
@@ -239,7 +239,7 @@ function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Matrix{T} where {
     end
 
     if is_onetoall
-        idx = findall(source_map)
+        idx = findall(x->x!=0,source_map)
         val = volt[idx] ./ source_map[idx]
         if val[1] ≈ 0
             ret = Matrix{T}(undef,1,1)

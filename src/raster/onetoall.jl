@@ -72,10 +72,10 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
     end
 
     for i = 1:num_points_to_solve
-        copy!(point_map, original_point_map)
+        copyto!(point_map, original_point_map)
         str = use_variable_strengths ? strengths[i,2] : 1
         csinfo("Solving point $i of $num_points_to_solve")
-        copy!(s, z)
+        copyto!(s, z)
         n = points_unique[i]
         if use_included_pairs
             for j = 1:num_points_to_solve

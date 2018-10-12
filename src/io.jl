@@ -79,7 +79,7 @@ function read_cellmap(habitat_file::String, is_res::Bool, ::Type{T}) where {T}
             gmap[ind] .= 0
         end
     else
-        copy!(gmap, cell_map)
+        copyto!(gmap, cell_map)
         gmap[ind] = 0
     end
     gmap, rastermeta
@@ -183,8 +183,8 @@ function read_point_map(V, file, habitatmeta)
         I = _points_rc[:,2]
         J = _points_rc[:,3]
         v = _points_rc[:,1]
-        i  = ceil.(V, habitatmeta.nrows - (J - habitatmeta.yllcorner) / habitatmeta.cellsize)
-        j = ceil.(V, (I - habitatmeta.xllcorner) / habitatmeta.cellsize)
+        i  = ceil.(V, habitatmeta.nrows .- (J .- habitatmeta.yllcorner) ./ habitatmeta.cellsize)
+        j = ceil.(V, (I .- habitatmeta.xllcorner) ./ habitatmeta.cellsize)
     else
         _I = findall(!iszero, _points_rc)
         (i,j,v) =  (getindex.(_I, 1), getindex.(_I, 2), _points_rc[_I])
@@ -241,10 +241,10 @@ function read_source_and_ground_maps(T, V, source_file, ground_file, habitatmeta
     if is_res
         ind = findall(x -> x == -9999, ground_map)
         ground_map = 1 ./ ground_map
-        ground_map[ind] = 0
+        ground_map[ind] .= 0
     else
         ind = findall(x -> x == -9999, ground_map)
-        ground_map[ind] = 0
+        ground_map[ind] .= 0
     end
 
     source_map, ground_map

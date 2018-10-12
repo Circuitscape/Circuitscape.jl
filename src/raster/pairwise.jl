@@ -156,8 +156,8 @@ function compute_graph_data_polygons(rasterdata::RasData{T,V},
     x,y = 0,0
     # x = find(x -> x == pt1, points_rc[3])[1]
     # y = find(x -> x == pt2, points_rc[3])[1]
-    x = findfirst(points_rc[3], pt1)
-    y = findfirst(points_rc[3], pt2)
+    x = something(findfirst(isequal(pt1), points_rc[3]), 0)
+    y = something(findfirst(isequal(pt2), points_rc[3]), 0)
     c1 = nodemap[points_rc[1][x], points_rc[2][x]]
     c2 = nodemap[points_rc[1][y], points_rc[2][y]]
     points = V[c1, c2]
@@ -316,7 +316,7 @@ function construct_node_map(gmap, polymap::Matrix{V}) where V
             idx1 = findall(x -> x == polynum, polymap_pruned)
             idx2 = findall(x -> x == polynum, polymap)
             if length(idx1) > 0
-                nodemap[idx2] = nodemap[idx1[1]]
+                nodemap[idx2] .= nodemap[idx1[1]]
             end
         end
     end
@@ -392,7 +392,7 @@ weird_avg(x,y) = (x + y) / (2*√2)
 weirder_avg(x, y) = 1 / (√2 * (1/x + 1/y) / 2)
 
 function create_new_polymap(gmap, polymap::Matrix{V}, points_rc, 
-                pt1 = 0, pt2 = 0, point_map = Matrix{V}(0,0)) where V
+                pt1 = 0, pt2 = 0, point_map = Matrix{V}(undef,0,0)) where V
     
     f(x) = (points_rc[1][x], points_rc[2][x])
 
@@ -421,7 +421,7 @@ function create_new_polymap(gmap, polymap::Matrix{V}, points_rc,
                 end
                 if v1 != v2
                     ind = findall(x -> x == v2, newpoly)
-                    newpoly[ind] = v1
+                    newpoly[ind] .= v1
                 end
             end
         end
@@ -457,7 +457,7 @@ function create_new_polymap(gmap, polymap::Matrix{V}, points_rc,
                     coords = map(x -> f(x), nz)
                     vals = map(x -> polymap[x...], coords)
                     overlap = findall(in(vals), polymap)
-                    newpoly[overlap] = k + 1
+                    newpoly[overlap] .= k + 1
                     k += 1
                 end
             end
