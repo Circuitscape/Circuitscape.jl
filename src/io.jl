@@ -80,7 +80,7 @@ function read_cellmap(habitat_file::String, is_res::Bool, ::Type{T}) where {T}
         end
     else
         copyto!(gmap, cell_map)
-        gmap[ind] = 0
+        gmap[ind] .= 0
     end
     gmap, rastermeta
 end

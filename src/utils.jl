@@ -264,7 +264,7 @@ function runtests(which = :compute)
         @test sum(abs2, valx - valr) < tol
         pts_x = x[2:end,1]
         pts_r = r[2:end,1]
-        @test pts_x + 1 == pts_r
+        @test pts_x .+ 1 == pts_r
         compare_all_output("sgNetworkVerify$(i)", is_single)
         @info("Test sgNetworkVerify$i passed")
     end
@@ -276,7 +276,7 @@ function runtests(which = :compute)
         @info("Testing mgNetworkVerify$i")
         r = f("input/network/mgNetworkVerify$(i).ini")
         x = readdlm("output_verify/mgNetworkVerify$(i)_voltages.txt")
-        x[:,1] = x[:,1] + 1
+        @. x[:,1] = x[:,1] + 1
         @test sum(abs2, x - r) < tol
         compare_all_output("mgNetworkVerify$(i)", is_single)
         @info("Test mgNetworkVerify$i passed")
@@ -402,8 +402,8 @@ end
 function get_network_comp(list_to_comp, f)
     s = split(f, ['_', '.'])
     for i = 1:size(s, 1)
-        if all(isnumber, s[i])
-            f = replace(f, "_$(s[i])", "_$(parse(Int, s[i]) - 1 |> string)", 1)
+        if all(isnumeric, s[i])
+            f = replace(f, "_$(s[i])"=>"_$(parse(Int, s[i]) - 1 |> string)", count=1)
         end
     end
     @assert isfile("output_verify/$f")
@@ -411,12 +411,12 @@ function get_network_comp(list_to_comp, f)
 end
 
 function compare_branch(r, x, tol = 1e-6)
-    x[:,1] = x[:,1] + 1
-    x[:,2] = x[:,2] + 1
-    sum(abs2, sortrows(r) - sortrows(x)) < tol
+    @. x[:,1] = x[:,1] + 1
+    @. x[:,2] = x[:,2] + 1
+    sum(abs2, sortslices(r, dims=1) - sortslices(x, dims=1)) < tol
 end
 
 function compare_node(r, x, tol = 1e-6)
-    x[:,1] = x[:,1] + 1
-    sum(abs2, sortrows(r) - sortrows(x)) < tol
+    @. x[:,1] = x[:,1] + 1
+    sum(abs2, sortslices(r, dims=1) - sortslices(x, dims=1)) < tol
 end

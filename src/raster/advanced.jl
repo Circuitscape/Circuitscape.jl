@@ -135,7 +135,7 @@ function resolve_conflicts(sources::Vector{T},
 
     infgrounds = map(x -> x == Inf, grounds)
     infconflicts = map((x,y) -> x > 0 && y > 0, infgrounds, sources)
-    grounds[infconflicts] = 0
+    grounds[infconflicts] .= 0
     
     sources, grounds, finitegrounds
 end
