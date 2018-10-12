@@ -61,7 +61,8 @@ function _pt_file_no_polygons_path(rasterdata::RasData{T,V},
     r = single_ground_all_pairs(graphdata, flags, cfg)
 
     write_cum_maps(graphdata.cum, rasterdata.cellmap, cfg, rasterdata.hbmeta, 
-                    flags.outputflags.write_max_cur_maps)
+                    flags.outputflags.write_max_cur_maps,
+                    flags.outputflags.write_cum_cur_map_only)
 
     r
 end
@@ -112,9 +113,12 @@ function _pt_file_polygons_path(rasterdata::RasData{T,V},
     r = hcat(P, vcat(pts', resistances))
 
     write_cum_maps(cum, gmap, cfg, rasterdata.hbmeta, 
-                    flags.outputflags.write_max_cur_maps)
+                   flags.outputflags.write_max_cur_maps, 
+                   flags.outputflags.write_cum_cur_map_only)
 
-    # resistances
+    # save resistances
+    save_resistances(r, cfg)
+
     r
 end
 
