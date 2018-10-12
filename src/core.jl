@@ -459,7 +459,7 @@ function _cholmod_solver_path(data::GraphData{T,V}, flags,
 end
 
 function construct_cholesky_factor(matrix)
-    cholfact(matrix + sparse(10eps()*I,size(matrix,1)))
+    cholesky(matrix + sparse(10eps()*I,size(matrix)...))
 end
 
 """
