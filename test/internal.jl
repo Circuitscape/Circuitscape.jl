@@ -6,7 +6,7 @@ let
         gmap = [0 1 2
                 2 0 0
                 2 0 2]
-        nodemap = construct_node_map(gmap, Matrix{Int}(0,0))
+        nodemap = construct_node_map(gmap, Matrix{Int}(undef,0,0))
         @test nodemap == [0 3 4
                           1 0 0
                           2 0 5]
@@ -65,6 +65,7 @@ end
 
 let
 
+    println("pwd = $(pwd())")
     cfg = Circuitscape.parse_config("input/raster/one_to_all/11/oneToAllVerify11.ini")
     r = Circuitscape.load_raster_data(Float64, Int32, cfg)
 
@@ -103,28 +104,28 @@ let
                    1 0 0
                    2 0 5]
         A = construct_graph(gmap, nodemap, false, true)
-        r = full(A) - [0 2 0 0 0
+        r = Matrix(A) - [0 2 0 0 0
                        2 0 0 0 0
                        0 0 0 1.5 0
                        0 0 1.5 0 0
                        0 0 0 0 0]
         @test sum(abs2, r) < 1e-6
         A = construct_graph(gmap, nodemap, true, true)
-        r = full(A) - [0 2 0 0 0
+        r = Matrix(A) - [0 2 0 0 0
                        2 0 0 0 0
                        0 0 0 1.3333 0
                        0 0 1.33333 0 0
                        0 0 0 0 0]
         @test sum(abs2, r) < 1e-6
         A = construct_graph(gmap, nodemap, false, false)
-        r = full(A) - [0 2 1.06066 0 0
+        r = Matrix(A) - [0 2 1.06066 0 0
                        2 0 0 0 0
                        1.06066 0 0 1.5 0
                        0 0 1.5 0 0
                        0 0 0 0 0]
         @test sum(abs2, r) < 1e-6
         A = construct_graph(gmap, nodemap, true, false)
-        r = full(A) - [0 2 0.942809 0 0
+        r = Matrix(A) - [0 2 0.942809 0 0
                        2 0 0 0 0
                        0.942809 0 0 1.3333 0
                        0 0 1.3333 0 0

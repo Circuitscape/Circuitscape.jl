@@ -170,7 +170,7 @@ function _get_node_currents_posneg(G::SparseMatrixCSC{T,V},
             map!(x -> x > 0 ? x : 0, finiteground_currents, finiteground_currents)
         end
         n = size(G, 1)
-        branch_currents = branch_currents + spdiagm(finiteground_currents, 0, n, n)
+        branch_currents = branch_currents + spdiagm(0 => finiteground_currents)
     end
 
     # For some reason, the following fails on Windows 32-bit
@@ -346,7 +346,7 @@ function write_aagrid(cmap, name, cfg, hbmeta;
     write(f, "cellsize      $(hbmeta.cellsize)\n")
     write(f, "NODATA_value  $(hbmeta.nodata)\n")
 
-    writedlm(f, round.(cmap, 8), ' ')
+    writedlm(f, round.(cmap, digits=8), ' ')
     close(f)
 end
 
@@ -388,7 +388,7 @@ function write_aagrid(cmap, name, cfg, hbmeta, cellmap;
     write(f, "cellsize      $(hbmeta.cellsize)\n")
     write(f, "NODATA_value  $(hbmeta.nodata)\n")
 
-    writedlm(f, round.(cmap, 8), ' ')
+    writedlm(f, round.(cmap, digits=8), ' ')
     close(f)
 end
 

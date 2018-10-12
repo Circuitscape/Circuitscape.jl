@@ -160,8 +160,8 @@ function compute_graph_data_polygons(rasterdata::RasData{T,V},
     x,y = 0,0
     # x = find(x -> x == pt1, points_rc[3])[1]
     # y = find(x -> x == pt2, points_rc[3])[1]
-    x = findfirst(points_rc[3], pt1)
-    y = findfirst(points_rc[3], pt2)
+    x = something(findfirst(isequal(pt1), points_rc[3]), 0)
+    y = something(findfirst(isequal(pt2), points_rc[3]), 0)
     c1 = nodemap[points_rc[1][x], points_rc[2][x]]
     c2 = nodemap[points_rc[1][y], points_rc[2][y]]
     points = V[c1, c2]
@@ -317,10 +317,10 @@ function construct_node_map(gmap, polymap::Matrix{V}) where V
     for i = 1:size(polynums, 1)
         polynum = polynums[i]
         if polynums[i] != 0
-            idx1 = find(x -> x == polynum, polymap_pruned)
-            idx2 = find(x -> x == polynum, polymap)
+            idx1 = findall(x -> x == polynum, polymap_pruned)
+            idx2 = findall(x -> x == polynum, polymap)
             if length(idx1) > 0
-                nodemap[idx2] = nodemap[idx1[1]]
+                nodemap[idx2] .= nodemap[idx1[1]]
             end
         end
     end
@@ -330,16 +330,16 @@ function construct_node_map(gmap, polymap::Matrix{V}) where V
 end
 
 function relabel!(nodemap::Matrix{V}, offset = V(0)) where V
-    oldlabels = nodemap[find(nodemap)]
+    oldlabels = nodemap[findall(x->x!=0,nodemap)]
     newlabels = zeros(V, size(oldlabels)) 
     s = sort(oldlabels)
     perm = sortperm(oldlabels)
     prepend!(s, s[1] - 1)
-    f = find(diff(s))
-    newlabels[f] = 1
+    f = findall(x->x!=0,diff(s))
+    newlabels[f] .= 1
     newlabels = cumsum(newlabels)
     newlabels[perm] = copy(newlabels)
-    nodemap[find(nodemap)] = newlabels - V(1) + offset
+    nodemap[findall(x->x!=0,nodemap)] = newlabels .- V(1) .+ offset
 end
 
 function construct_graph(gmap, nodemap::Matrix{S}, avg_res, four_neighbors) where S
@@ -396,7 +396,7 @@ weird_avg(x,y) = (x + y) / (2*√2)
 weirder_avg(x, y) = 1 / (√2 * (1/x + 1/y) / 2)
 
 function create_new_polymap(gmap, polymap::Matrix{V}, points_rc, 
-                pt1 = 0, pt2 = 0, point_map = Matrix{V}(0,0)) where V
+                pt1 = 0, pt2 = 0, point_map = Matrix{V}(undef,0,0)) where V
     
     f(x) = (points_rc[1][x], points_rc[2][x])
 
@@ -409,14 +409,14 @@ function create_new_polymap(gmap, polymap::Matrix{V}, points_rc,
             newpoly = point_map
         elseif point_file_no_polygons
             k = maximum(polymap)
-            for i in find(point_map)
+            for i in findall(x->x!=0,point_map)
                 if polymap[i] == 0
                     newpoly[i] = point_map[i] + k
                 end
             end
         else
             k = max(maximum(polymap), maximum(point_map))
-            for i in find(point_map)
+            for i in findall(x->x!=0,point_map)
                 v1 = point_map[i]
                 v2 = newpoly[i]
                 if v2 == 0
@@ -424,8 +424,8 @@ function create_new_polymap(gmap, polymap::Matrix{V}, points_rc,
                     continue
                 end
                 if v1 != v2
-                    ind = find(x -> x == v2, newpoly)
-                    newpoly[ind] = v1
+                    ind = findall(x -> x == v2, newpoly)
+                    newpoly[ind] .= v1
                 end
             end
         end
@@ -434,8 +434,8 @@ function create_new_polymap(gmap, polymap::Matrix{V}, points_rc,
 
     if isempty(polymap)
         newpoly = zeros(V, size(gmap)...)
-        id1 = find(x -> x == pt1, points_rc[3])
-        id2 = find(x -> x == pt2, points_rc[3])
+        id1 = findall(x -> x == pt1, points_rc[3])
+        id2 = findall(x -> x == pt2, points_rc[3])
         map(x -> newpoly[f(x)...] = pt1, id1)
         map(x -> newpoly[f(x)...] = pt2, id2)
         return newpoly
@@ -444,7 +444,7 @@ function create_new_polymap(gmap, polymap::Matrix{V}, points_rc,
         k = maximum(polymap)
         for p in (pt1, pt2)
             # find the locations of the point
-            idx = find(x -> x == p, points_rc[3])
+            idx = findall(x -> x == p, points_rc[3])
 
             if length(idx) == 1
                 continue
@@ -460,8 +460,8 @@ function create_new_polymap(gmap, polymap::Matrix{V}, points_rc,
                 else
                     coords = map(x -> f(x), nz)
                     vals = map(x -> polymap[x...], coords)
-                    overlap = findin(polymap, vals)
-                    newpoly[overlap] = k + 1
+                    overlap = findall(in(vals), polymap)
+                    newpoly[overlap] .= k + 1
                     k += 1
                 end
             end

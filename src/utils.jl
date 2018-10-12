@@ -4,14 +4,14 @@ export  model_problem,
         calculate_cum_current_map,
         calculate_max_current_map
 
-using Base.Test
+using Test
 
  """
  Construct nodemap specific to a connected component
  """
 function construct_local_node_map(nodemap, component, polymap)
     local_nodemap = zeros(eltype(nodemap), size(nodemap))
-    idx = findin(nodemap, component)
+    idx = findall(in(component), nodemap)
     local_nodemap[idx] = nodemap[idx]
     if nodemap == local_nodemap
         return local_nodemap
@@ -21,7 +21,7 @@ end
 
 function _construct_local_nodemap(local_nodemap, polymap, idx)
     if isempty(polymap)
-        i = find(local_nodemap)
+        i = findall(x ->x!=0, local_nodemap)
         local_nodemap[i] = 1:length(i)
         return local_nodemap
     else
@@ -40,7 +40,7 @@ function model_problem(T, s)
     cellmap = ones(T, s, s)
     
     # Nodemap is just 1:endof(cellmap)
-    nodemap = reshape(1:endof(cellmap), s, s) |> collect
+    nodemap = reshape(1:lastindex(cellmap), s, s) |> collect
 
     # Construct graph with 4 neighbors
     G = construct_graph(cellmap, nodemap, true, true)
@@ -53,19 +53,19 @@ model_problem(s::Integer) = model_problem(Float64, s)
 # Testing utilities 
 
 function test_problem(str)
-    base_path = joinpath(Pkg.dir("Circuitscape"), "test", "input")
-    str2 = replace(str, ".ini", "")
-    if contains(str, "sgVerify")
-        config_path = joinpath(base_path, "raster", "pairwise", replace(str2, "sgVerify", ""), str)
-    elseif contains(str, "mgVerify")
-        config_path = joinpath(base_path, "raster", "advanced", replace(str2, "mgVerify", ""), str)
-    elseif contains(str, "oneToAll")
-        config_path = joinpath(base_path, "raster", "one_to_all", replace(str2, "oneToAllVerify", ""), str)
-    elseif contains(str, "allToOne")
-        config_path = joinpath(base_path, "raster", "all_to_one", replace(str2, "allToOneVerify", ""), str)
-    elseif contains(str, "sgNetworkVerify")
+    base_path = joinpath(dirname(pathof(Circuitscape)), "..", "test", "input")
+    str2 = replace(str, ".ini" => "")
+    if occursin("sgVerify", str)
+        config_path = joinpath(base_path, "raster", "pairwise", replace(str2, "sgVerify" => ""), str)
+    elseif occursin("mgVerify", str)
+        config_path = joinpath(base_path, "raster", "advanced", replace(str2, "mgVerify" => ""), str)
+    elseif occursin("oneToAll", str)
+        config_path = joinpath(base_path, "raster", "one_to_all", replace(str2, "oneToAllVerify" => ""), str)
+    elseif occursin("allToOne", str)
+        config_path = joinpath(base_path, "raster", "all_to_one", replace(str2, "allToOneVerify" => ""), str)
+    elseif occursin("sgNetworkVerify", str)
         config_path = joinpath(base_path, "network", str)
-    elseif contains(str, "mgNetworkVerify")
+    elseif occursin("mgNetworkVerify", str)
         config_path = joinpath(base_path, "network", str)
     end
 end    
@@ -132,7 +132,7 @@ function accumulate_current_maps(path, f)
 
     cmap_list = readdir(dir) |> 
                     x -> filter(y -> startswith(y, "$(name)_"), x) |>
-                    x -> filter(y -> contains(y, "_curmap_"), x)
+                    x -> filter(y -> occursin("_curmap_", y), x)
     isempty(cmap_list) && return
 
     headers = ""
@@ -182,7 +182,7 @@ function accumulate_current_maps(path, f)
     csinfo("Writing to $accum_path")
     open(accum_path, "w") do f
         write(f, headers)
-        writedlm(f, round.(accum, 8), ' ')
+        writedlm(f, round.(accum, digits=8), ' ')
     end
 
 end
@@ -205,13 +205,13 @@ end
 mycsid() = myid() - minimum(workers()) + 1
 
 function initialize_cum_maps(cellmap::Matrix{T}, max = false) where T
-    cum_curr = Vector{SharedMatrix{T}}(nprocs())
+    cum_curr = Vector{SharedMatrix{T}}(undef,nprocs())
     for i = 1:nprocs()
         cum_curr[i] = SharedArray(zeros(T, size(cellmap)...))
     end
     max_curr = Vector{SharedMatrix{T}}()
     if max
-        max_curr = Vector{SharedMatrix{T}}(nprocs())
+        max_curr = Vector{SharedMatrix{T}}(undef,nprocs())
         for i = 1:nprocs()
             max_curr[i] = SharedArray(fill(T(-9999), size(cellmap)...))
         end
@@ -226,8 +226,8 @@ end
 function initialize_cum_vectors(v::Vector{T}) where T
     cum_curr = Vector{SharedMatrix{T}}()
     max_curr = Vector{SharedMatrix{T}}()
-    cum_branch_curr = Vector{SharedVector{T}}(nprocs())
-    cum_node_curr = Vector{SharedVector{T}}(nprocs())
+    cum_branch_curr = Vector{SharedVector{T}}(undef,nprocs())
+    cum_node_curr = Vector{SharedVector{T}}(undef,nprocs())
     for i = 1:nprocs()
         cum_branch_curr[i] = SharedArray(zeros(T, size(v)...))
         cum_node_curr[i] = SharedArray(zeros(T, size(v)...))
@@ -256,7 +256,7 @@ function runtests(which = :compute)
     @testset "Network Pairwise" begin 
     # Network pairwise tests
     for i = 1:3
-        info("Testing sgNetworkVerify$i")
+        @info("Testing sgNetworkVerify$i")
         r = f("input/network/sgNetworkVerify$(i).ini")
         x = readdlm("output_verify/sgNetworkVerify$(i)_resistances.out")
         valx = x[2:end, 2:end]
@@ -264,22 +264,22 @@ function runtests(which = :compute)
         @test sum(abs2, valx - valr) < tol
         pts_x = x[2:end,1]
         pts_r = r[2:end,1]
-        @test pts_x + 1 == pts_r
+        @test pts_x .+ 1 == pts_r
         compare_all_output("sgNetworkVerify$(i)", is_single)
-        info("Test sgNetworkVerify$i passed")
+        @info("Test sgNetworkVerify$i passed")
     end
     end
 
     @testset "Network Advanced" begin
     # Network advanced tests
     for i = 1:3
-        info("Testing mgNetworkVerify$i")
+        @info("Testing mgNetworkVerify$i")
         r = f("input/network/mgNetworkVerify$(i).ini")
         x = readdlm("output_verify/mgNetworkVerify$(i)_voltages.txt")
-        x[:,1] = x[:,1] + 1
+        @. x[:,1] = x[:,1] + 1
         @test sum(abs2, x - r) < tol
         compare_all_output("mgNetworkVerify$(i)", is_single)
-        info("Test mgNetworkVerify$i passed")
+        @info("Test mgNetworkVerify$i passed")
     end
     end
 
@@ -291,7 +291,7 @@ function runtests(which = :compute)
         if i == 16 && Sys.WORD_SIZE == 32 
             continue
         end
-        info("Testing sgVerify$i")
+        @info("Testing sgVerify$i")
         r = f("input/raster/pairwise/$i/sgVerify$(i).ini")
         x = readdlm("output_verify/sgVerify$(i)_resistances.out")
         _x = readdlm("output/sgVerify$(i)_resistances.out")
@@ -299,45 +299,45 @@ function runtests(which = :compute)
         @test sum(abs2, _x - r) < tol
         @test sum(abs2, x - r) < tol
         compare_all_output("sgVerify$(i)", is_single)
-        info("Test sgVerify$i passed")
+        @info("Test sgVerify$i passed")
     end
     end
 
     @testset "Raster Advanced" begin 
     # Raster advanced tests
     for i in 1:5
-        info("Testing mgVerify$i")
+        @info("Testing mgVerify$i")
         r = f("input/raster/advanced/$i/mgVerify$(i).ini")
         x = readdlm("output_verify/mgVerify$(i)_voltmap.asc"; skipstart = 6)
         @test sum(abs2, x - r) < 1e-4
         # compare_all_output("mgVerify$(i)")
-        info("Test mgVerify$i passed")
+        @info("Test mgVerify$i passed")
     end
     end
 
     @testset "Raster One to All" begin 
     # Raster one to all test
     for i in 1:13
-        info("Testing oneToAllVerify$i")
+        @info("Testing oneToAllVerify$i")
         r = f("input/raster/one_to_all/$i/oneToAllVerify$(i).ini")
         x = readdlm("output_verify/oneToAllVerify$(i)_resistances.out")
         # x = x[:,2]
         @test sum(abs2, x - r) < tol
         compare_all_output("oneToAllVerify$(i)", is_single)
-        info("Test oneToAllVerify$i passed")
+        @info("Test oneToAllVerify$i passed")
     end
     end
 
     @testset "Raster ALl to One" begin
     # Raster all to one test
     for i in 1:12
-        info("Testing allToOneVerify$i")
+        @info("Testing allToOneVerify$i")
         r = f("input/raster/all_to_one/$i/allToOneVerify$(i).ini")
         x = readdlm("output_verify/allToOneVerify$(i)_resistances.out")
         # x = x[:,2]
 
         @test sum(abs2, x - r) < tol
-        info("Test allToOneVerify$i passed")
+        @info("Test allToOneVerify$i passed")
     end
     end
 
@@ -350,34 +350,34 @@ function compare_all_output(str, is_single = false)
     tol = is_single ?  1e-4 : 1e-6
 
     for f in gen_list
-        !contains(f, "_") && continue
-        contains(f, "resistances") && continue
+        !occursin("_", f) && continue
+        occursin("resistances", f) && continue
 
-        info("Testing $f")
+        @info("Testing $f")
 
         # Raster output files
         if endswith(f, "asc")
             r = read_aagrid("output/$f")
             x = get_comp(list_to_comp, f)
             @test compare_aagrid(r, x, tol)
-            info("Test $f passed")
+            @info("Test $f passed")
 
         # Network output files
-        elseif contains(f, "Network")
+        elseif occursin("Network", f)
 
             # Branch currents
-            if contains(f, "branch")
+            if occursin("branch", f)
                 r = read_branch_currents("output/$f")
                 x = !startswith(f, "mg") ? get_network_comp(list_to_comp, f) : readdlm("output_verify/$f")
                 @test compare_branch(r, x, tol)
-                info("Test $f passed")
+                @info("Test $f passed")
 
             # Node currents
             else
                 r = read_node_currents("output/$f")
                 x = !startswith(f, "mg") ? get_network_comp(list_to_comp, f) : readdlm("output_verify/$f")
                 @test compare_node(r, x, tol)
-                info("Test $f passed")
+                @info("Test $f passed")
             end
         end
     end
@@ -391,7 +391,7 @@ read_node_currents(str) = readdlm(str)
 
 read_aagrid(file) = readdlm(file, skipstart = 6) # Will change to 6 
 
-compare_aagrid{T}(r::Matrix{T}, x::Matrix{T}, tol = 1e-6) = sum(abs2, x - r) < tol
+compare_aagrid(r::Matrix{T}, x::Matrix{T}, tol = 1e-6) where T = sum(abs2, x - r) < tol
 
 function get_comp(list_to_comp, f)
     outfile = ""
@@ -404,8 +404,8 @@ end
 function get_network_comp(list_to_comp, f)
     s = split(f, ['_', '.'])
     for i = 1:size(s, 1)
-        if all(isnumber, s[i])
-            f = replace(f, "_$(s[i])", "_$(parse(Int, s[i]) - 1 |> string)", 1)
+        if all(isnumeric, s[i])
+            f = replace(f, "_$(s[i])"=>"_$(parse(Int, s[i]) - 1 |> string)", count=1)
         end
     end
     @assert isfile("output_verify/$f")
@@ -413,12 +413,12 @@ function get_network_comp(list_to_comp, f)
 end
 
 function compare_branch(r, x, tol = 1e-6)
-    x[:,1] = x[:,1] + 1
-    x[:,2] = x[:,2] + 1
-    sum(abs2, sortrows(r) - sortrows(x)) < tol
+    @. x[:,1] = x[:,1] + 1
+    @. x[:,2] = x[:,2] + 1
+    sum(abs2, sortslices(r, dims=1) - sortslices(x, dims=1)) < tol
 end
 
 function compare_node(r, x, tol = 1e-6)
-    x[:,1] = x[:,1] + 1
-    sum(abs2, sortrows(r) - sortrows(x)) < tol
+    @. x[:,1] = x[:,1] + 1
+    sum(abs2, sortslices(r, dims=1) - sortslices(x, dims=1)) < tol
 end

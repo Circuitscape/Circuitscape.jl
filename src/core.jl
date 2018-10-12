@@ -124,7 +124,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
         end
 
         # Conductance matrix corresponding to CC
-        matrix = comps[cid]
+        matrix = comps[cid]        
 
         # Regularization step
         matrix.nzval .+= eps(eltype(matrix)) * norm(matrix.nzval)
@@ -145,9 +145,9 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
             ret = Vector{Tuple{V,V,T}}()
 
             pi = csub[i]
-            comp_i = findfirst(comp, pi)
+            comp_i = something(findfirst(isequal(pi),comp), 0)
             comp_i = V(comp_i)
-            I = find(x -> x == pi, points)
+            I = findall(x -> x == pi, points)
             smash_repeats!(ret, I)
 
             # Preprocess matrix
@@ -166,9 +166,9 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
             for j in rng
 
                 pj = csub[j]
-                comp_j = findfirst(comp, pj)
+                comp_j = something(findfirst(isequal(pj), comp), 0)
                 comp_j = V(comp_j)
-                J = find(x -> x == pj, points)
+                J = findall(x -> x == pj, points)
 
                 # Forget excluded pairs
                 ex = false
@@ -218,7 +218,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
         end
 
         if get_shortcut_resistances        
-            idx = findfirst(points, csub[1])
+            idx = something(findfirst(isequal(csub[1]), points), 0)
             f(1)
             update_shortcut_resistances!(idx, shortcut, resistances, points, comp)
         else
@@ -344,8 +344,8 @@ function _cholmod_solver_path(data::GraphData{T,V}, flags,
         function g(i)
 
             pi = csub[i]
-            comp_i = V(findfirst(comp, pi))
-            I = find(x -> x == pi, points)
+            comp_i = V(something(findfirst(isequal(pi),comp),0))
+            I = findall(x -> x == pi, points)
             # smash_repeats!(ret, I)
             smash_repeats!(resistances, I)
 
@@ -356,8 +356,8 @@ function _cholmod_solver_path(data::GraphData{T,V}, flags,
             for j in rng
 
                 pj = csub[j]
-                comp_j = V(findfirst(comp, pj))
-                J = find(x -> x == pj, points)
+                comp_j = V(something(findfirst(isequal(pj), comp),0))
+                J = findall(x -> x == pj, points)
 
                 # Forget excluded pairs
                 ex = false
@@ -391,7 +391,7 @@ function _cholmod_solver_path(data::GraphData{T,V}, flags,
             postprocess(output, component_data, flags, shortcut, cfg)
         end
         if get_shortcut_resistances
-            idx = findfirst(points, csub[1])
+            idx = something(findfirst(isequal(csub[1]), points),0)
             g(1)
         else 
             g.(1:size(csub, 1))
@@ -459,7 +459,7 @@ function _cholmod_solver_path(data::GraphData{T,V}, flags,
 end
 
 function construct_cholesky_factor(matrix)
-    cholfact(matrix + sparse(10eps()*I,size(matrix,1)))
+    cholesky(matrix + sparse(10eps()*I,size(matrix)...))
 end
 
 """
@@ -480,7 +480,7 @@ function get_num_pairs(ccs, fp::Vector{V}, exclude_pairs) where V
 
     for (i,cc) in enumerate(ccs)
         sub_fp = filter(x -> x in cc, fp) |> unique
-        l = endof(sub_fp)
+        l = lastindex(sub_fp)
         for ii = 1:l
             pt1 = sub_fp[ii]
             for jj = ii+1:l
@@ -504,7 +504,7 @@ function get_num_pairs_shortcut(ccs, fp::Vector{V}, exclude_pairs) where V
 
     for (i,cc) in enumerate(ccs)
         sub_fp = filter(x -> x in cc, fp) |> unique
-        l = endof(sub_fp)
+        l = lastindex(sub_fp)
         l == 0 && continue
         for ii = 1:1
             pt1 = sub_fp[ii]
@@ -543,7 +543,7 @@ Calculate laplacian of the adjacency matrix of a graph
 """
 function laplacian(G::SparseMatrixCSC{T,V}) where {T,V}
     n = size(G, 1)
-    s = Vector{eltype(G)}(n)
+    s = Vector{eltype(G)}(undef,n)
     for i = 1:n
         s[i] = sum_off_diag(G, i)
         for j in nzrange(G, i)
@@ -619,7 +619,7 @@ function update_voltmatrix!(shortcut, output, component_data)
     j = output.col
 
     for i = 2:size(c, 1)
-        ind = findfirst(cc, c[i])
+        ind = something(findfirst(isequal(c[i]), cc),0)
         if ind != 0
             voltageAtPoint = voltages[ind]
             voltageAtPoint = 1 - (voltageAtPoint/r)

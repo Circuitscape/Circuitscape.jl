@@ -21,9 +21,9 @@ function compute_graph_data(data::NetworkData{T,V})::GraphData{T,V} where {T,V}
     i,j,v = data.coords
 
     idx = findfirst(x -> x < 1, i)
-    idx != 0 && throw("Indices no good")
+    idx != nothing && throw("Indices no good")
     idx = findfirst(x -> x < 1, j)
-    idx != 0 && throw("Indices no good")
+    idx != nothing && throw("Indices no good")
     
     m = max(i[end], j[end])
     A = sparse(i,j,v,m,m)
@@ -37,10 +37,10 @@ function compute_graph_data(data::NetworkData{T,V})::GraphData{T,V} where {T,V}
     # T = eltype(i)
     exclude_pairs = Tuple{V,V}[]
 
-    nodemap = Matrix{V}(0,0)
-    polymap = Matrix{V}(0,0)
+    nodemap = Matrix{V}(undef,0,0)
+    polymap = Matrix{V}(undef,0,0)
     hbmeta = RasterMeta()
-    cellmap = Matrix{T}(0,0)
+    cellmap = Matrix{T}(undef,0,0)
 
     cum = initialize_cum_vectors(v)
 
