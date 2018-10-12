@@ -40,7 +40,7 @@ function model_problem(T, s)
     cellmap = ones(T, s, s)
     
     # Nodemap is just 1:endof(cellmap)
-    nodemap = reshape(1:endof(cellmap), s, s) |> collect
+    nodemap = reshape(1:lastindex(cellmap), s, s) |> collect
 
     # Construct graph with 4 neighbors
     G = construct_graph(cellmap, nodemap, true, true)
