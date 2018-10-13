@@ -211,7 +211,7 @@ function read_point_map(V, file, habitatmeta)
          throw("At least one focal node location falls outside of habitat map")
      end
 
-     if size(unique(i),1) < 2
+     if size(unique(v),1) < 2
          throw("Less than two valid focal nodes found. Please check focal node location file.")
      end
 
