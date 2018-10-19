@@ -204,16 +204,16 @@ function read_point_map(V, file, habitatmeta)
     i = i[idx]
     j = j[idx]
     v = v[idx]
-
-     if (minimum(i) < 0) || (minimum(j) < 0) ||
-             (maximum(i) > (habitatmeta.nrows - 1)) ||
-             (maximum(j) > (habitatmeta.ncols - 1))
+    
+    if (minimum(i) < 0) || (minimum(j) < 0) ||
+            (maximum(i) > (habitatmeta.nrows)) ||
+            (maximum(j) > (habitatmeta.ncols))
          throw("At least one focal node location falls outside of habitat map")
-     end
+    end
 
-     if size(unique(v),1) < 2
-         throw("Less than two valid focal nodes found. Please check focal node location file.")
-     end
+    if size(unique(v),1) < 2
+        throw("Less than two valid focal nodes found. Please check focal node location file.")
+    end
 
 
     V.(i), V.(j), V.(v)
