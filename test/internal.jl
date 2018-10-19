@@ -157,3 +157,11 @@ SIZE_3 =
  0.0   0.0   0.0   0.0   0.0  -1.0   0.0  -1.0   2.0]
 
  @test model_problem(3) == SIZE_3
+
+# Issue 151
+try 
+    Circuitscape.read_point_map(Int32, "samples.txt", 
+                                Circuitscape.RasterMeta(50, 50, 0.0, 0.0, 0.5, -9999.0, 2))
+catch e 
+    @test e == "At least one focal node location falls outside of habitat map"
+end

@@ -203,7 +203,7 @@ function read_point_map(V, file, habitatmeta)
     i = i[idx]
     j = j[idx]
     v = v[idx]
-
+    
     if (minimum(i) < 0) || (minimum(j) < 0) ||
             (maximum(i) > (habitatmeta.nrows)) ||
             (maximum(j) > (habitatmeta.ncols))
