@@ -218,6 +218,7 @@ function compute_graph_data_no_polygons(data::RasData{T,V},
     end
 
     points = zeros(V, length(points_rc[3]))
+    @show points_rc
     for (i,v) in enumerate(zip(points_rc[1], points_rc[2]))
         points[i] = nodemap[v...]
     end
