@@ -6,6 +6,7 @@ Linux and OSX: [![Build Status](https://travis-ci.org/Circuitscape/Circuitscape.
 
 Windows: [![Build status](https://ci.appveyor.com/api/projects/status/4a8u8985hq2mt569?svg=true)](https://ci.appveyor.com/project/ranjanan/circuitscape-jl)
 
+**Users of Circuitscape on Julia v0.6 should now shift to Julia 1.0. Circuitscape on Julia v0.6 will no longer be supported.**
 
 Circuitscape is an open-source program that uses circuit theory to model connectivity 
 in heterogeneous landscapes. Its most common applications include modeling movement and gene flow 
@@ -96,6 +97,7 @@ precision = single
 2. Once you start Julia, install Circuitscape by: 
 
 ```julia
+julia> using Pkg
 julia> Pkg.add("Circuitscape")
 ```
 
