@@ -1,6 +1,6 @@
 Circuitscape is licensed under the MIT "Expat" License:
 
-Copyright (c) 2017-2018: Contributors
+Copyright (c) 2017-2018: Ranjan Anantharaman, Viral Shah, Brad McRae, and Tanmay Mohapatra
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
