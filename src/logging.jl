@@ -13,14 +13,12 @@ function update_logging!(cfg)
     log_file = cfg["log_file"]
 
     if log_level in DEBUG
-        setlevel!(logger, "debug")
+        Logging.LogLevel(Logging.Debug)
     elseif log_level in WARNING
-        setlevel!(logger, "warn")
-    elseif log_level in CRITICAL
-        setlevel!(logger, "critical")
+        Logging.LogLevel(Logging.Warn)
     end
-    if !(log_file in NONE)
+    #=if !(log_file in NONE)
         push!(logger, 
             DefaultHandler(log_file, DefaultFormatter(fmt)))
-    end
+    end=#
 end
