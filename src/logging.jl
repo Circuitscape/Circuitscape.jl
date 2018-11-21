@@ -1,9 +1,6 @@
 const fmt = "[{date} | {level} | {name}]: {msg}"
 const ui_interface = Ref{Function}((x,y) -> nothing)
 
-# const logger = Memento.config!("info", 
-#                        fmt = fmt)
-
 csinfo(msg) = (@info(string(Dates.now()) * " : " * msg); ui_interface[](msg, :info))
 cswarn(msg) = (@warn(string(Dates.now()) * " : " * msg); ui_interace[](msg, :warn))
 
@@ -17,8 +14,4 @@ function update_logging!(cfg)
     elseif log_level in WARNING
         Logging.LogLevel(Logging.Warn)
     end
-    #=if !(log_file in NONE)
-        push!(logger, 
-            DefaultHandler(log_file, DefaultFormatter(fmt)))
-    end=#
 end
