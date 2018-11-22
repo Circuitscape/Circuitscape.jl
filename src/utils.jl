@@ -1,5 +1,5 @@
 export  model_problem,
-        test_problem, 
+        test_problem,
         accumulate_current_maps,
         calculate_cum_current_map,
         calculate_max_current_map
@@ -35,10 +35,10 @@ end
 Define model circuitscape problem - helps in tests
 """
 function model_problem(T, s)
-    
+
     # Cell map is the uniform 1 across the grid
     cellmap = ones(T, s, s)
-    
+
     # Nodemap is just 1:endof(cellmap)
     nodemap = reshape(1:lastindex(cellmap), s, s) |> collect
 
@@ -50,7 +50,7 @@ function model_problem(T, s)
 end
 model_problem(s::Integer) = model_problem(Float64, s)
 
-# Testing utilities 
+# Testing utilities
 
 function test_problem(str)
     base_path = joinpath(dirname(pathof(Circuitscape)), "..", "test", "input")
@@ -68,7 +68,7 @@ function test_problem(str)
     elseif occursin("mgNetworkVerify", str)
         config_path = joinpath(base_path, "network", str)
     end
-end    
+end
 
 # Utility funciton for calling Circuitscape with Cholmod
 function compute_cholmod(str, batch_size = 5)
@@ -118,19 +118,19 @@ end
 # Helps start new processes from the INI file
 function myaddprocs(n)
     addprocs(n)
-    @everywhere eval(:(using Circuitscape))
+    @everywhere Core.eval(Main, :(using Circuitscape))
 end
 
-# Reads the directory with the current maps 
+# Reads the directory with the current maps
 # and accumulates all current maps
 function accumulate_current_maps(path, f)
     dir = dirname(path)
     base = basename(path)
-    
-    # If base file has a dot 
+
+    # If base file has a dot
     name = split(base, '.')[1]
 
-    cmap_list = readdir(dir) |> 
+    cmap_list = readdir(dir) |>
                     x -> filter(y -> startswith(y, "$(name)_"), x) |>
                     x -> filter(y -> occursin("_curmap_", y), x)
     isempty(cmap_list) && return
@@ -143,7 +143,7 @@ function accumulate_current_maps(path, f)
     # Read the headers from the first file
     open(first_file, "r") do f
 
-        # Get num cols 
+        # Get num cols
         str = readline(f)
         headers = headers * str * "\n"
         ncol = split(str)[2] |> x -> parse(Int, x)
@@ -164,7 +164,7 @@ function accumulate_current_maps(path, f)
         csinfo("Accumulating $file")
         cmap_path = joinpath(dir, file)
         cmap = readdlm(cmap_path, skipstart = 6)
-        f_in_place!(accum, cmap, f) 
+        f_in_place!(accum, cmap, f)
     end
     for i in eachindex(accum)
         if accum[i] < -9999
@@ -172,8 +172,8 @@ function accumulate_current_maps(path, f)
         end
     end
 
-    name =  if isequal(f, +) 
-                "cum" 
+    name =  if isequal(f, +)
+                "cum"
             elseif isequal(f, max)
                 "max"
             end
@@ -219,7 +219,7 @@ function initialize_cum_maps(cellmap::Matrix{T}, max = false) where T
     cum_branch_curr = Vector{SharedVector{T}}()
     cum_node_curr = Vector{SharedVector{T}}()
 
-    Cumulative(cum_curr, max_curr, 
+    Cumulative(cum_curr, max_curr,
         cum_branch_curr, cum_node_curr)
 end
 
@@ -233,13 +233,13 @@ function initialize_cum_vectors(v::Vector{T}) where T
         cum_node_curr[i] = SharedArray(zeros(T, size(v)...))
     end
 
-    Cumulative(cum_curr, max_curr, 
+    Cumulative(cum_curr, max_curr,
         cum_branch_curr, cum_node_curr)
 end
 
-function runtests(which = :compute)
+function runtests(f = compute)
 
-    str = if which == :compute_single
+    str = if f == compute_single
             "Single"
           else
             "Double"
@@ -249,11 +249,9 @@ function runtests(which = :compute)
     tol = 1e-6
     str == "Single" && (is_single = true; tol = 1e-4)
 
-    f = eval(which)
+    @testset "$str Precision Tests" begin
 
-    @testset "$str Precision Tests" begin 
-
-    @testset "Network Pairwise" begin 
+    @testset "Network Pairwise" begin
     # Network pairwise tests
     for i = 1:3
         @info("Testing sgNetworkVerify$i")
@@ -284,11 +282,11 @@ function runtests(which = :compute)
     end
 
 
-    @testset "Raster Pairwise" begin 
+    @testset "Raster Pairwise" begin
     # Raster pairwise tests
     for i = 1:16
-        # Weird windows 32 stuff 
-        if i == 16 && Sys.WORD_SIZE == 32 
+        # Weird windows 32 stuff
+        if i == 16 && Sys.WORD_SIZE == 32
             continue
         end
         @info("Testing sgVerify$i")
@@ -303,7 +301,7 @@ function runtests(which = :compute)
     end
     end
 
-    @testset "Raster Advanced" begin 
+    @testset "Raster Advanced" begin
     # Raster advanced tests
     for i in 1:5
         @info("Testing mgVerify$i")
@@ -315,7 +313,7 @@ function runtests(which = :compute)
     end
     end
 
-    @testset "Raster One to All" begin 
+    @testset "Raster One to All" begin
     # Raster one to all test
     for i in 1:13
         @info("Testing oneToAllVerify$i")
@@ -381,7 +379,7 @@ function compare_all_output(str, is_single = false)
             end
         end
     end
-            
+
 end
 
 list_of_files(str, pref) = readdir(pref) |> y -> filter(x -> startswith(x, "$(str)_"), y)
@@ -389,7 +387,7 @@ generate_lists(str) = list_of_files(str, "output/"), list_of_files(str, "output_
 read_branch_currents(str) = readdlm(str)
 read_node_currents(str) = readdlm(str)
 
-read_aagrid(file) = readdlm(file, skipstart = 6) # Will change to 6 
+read_aagrid(file) = readdlm(file, skipstart = 6) # Will change to 6
 
 compare_aagrid(r::Matrix{T}, x::Matrix{T}, tol = 1e-6) where T = sum(abs2, x - r) < tol
 
