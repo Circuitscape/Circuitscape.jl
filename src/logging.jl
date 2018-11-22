@@ -1,11 +1,9 @@
-const fmt = "[{date} | {level} | {name}]: {msg}"
+# const fmt = "[{date} | {level} | {name}]: {msg}"
+const fmt = x -> Dates.format(x, "yyyy-mm-dd HH:MM:SS") 
 const ui_interface = Ref{Function}((x,y) -> nothing)
 
-# const logger = Memento.config!("info", 
-#                        fmt = fmt)
-
-csinfo(msg) = (@info(string(Dates.now()) * " : " * msg); ui_interface[](msg, :info))
-cswarn(msg) = (@warn(string(Dates.now()) * " : " * msg); ui_interace[](msg, :warn))
+csinfo(msg) = (@info(string(fmt(Dates.now())) * " : " * msg); ui_interface[](msg, :info))
+cswarn(msg) = (@warn(string(fmt(Dates.now())) * " : " * msg); ui_interace[](msg, :warn))
 
 function update_logging!(cfg)
 
@@ -13,14 +11,8 @@ function update_logging!(cfg)
     log_file = cfg["log_file"]
 
     if log_level in DEBUG
-        setlevel!(logger, "debug")
+        Logging.LogLevel(Logging.Debug)
     elseif log_level in WARNING
-        setlevel!(logger, "warn")
-    elseif log_level in CRITICAL
-        setlevel!(logger, "critical")
-    end
-    if !(log_file in NONE)
-        push!(logger, 
-            DefaultHandler(log_file, DefaultFormatter(fmt)))
+        Logging.LogLevel(Logging.Warn)
     end
 end
