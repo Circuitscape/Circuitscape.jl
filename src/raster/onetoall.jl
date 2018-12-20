@@ -59,7 +59,8 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
     # ground_map = Matrix{eltype(a)}(0, 0)
     s = zeros(eltype(a), size(point_map))
     z = deepcopy(s)
-    cum = initialize_cum_maps(gmap)
+    cum = initialize_cum_maps(gmap, flags.outputflags.write_max_cur_maps)
+    @show length(cum.cum_curr)
 
     point_ids = included_pairs.point_ids
     res = zeros(eltype(a), size(points_unique, 1)) |> SharedArray
@@ -130,13 +131,16 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
         res[i] = v[1]
 
         cum.cum_curr[mycsid()] .+= curr
+        flags.outputflags.write_max_cur_maps && (cum.max_curr[mycsid()] = max.(cum.max_curr[mycsid()], curr))
     end
 
     pmap(x -> f(x), 1:num_points_to_solve)
 
-    write_cum_maps(cum, gmap, cfg, hbmeta, 
-                   flags.outputflags.write_max_cur_maps, 
-                   flags.outputflags.write_cum_cur_map_only)
+    if flags.outputflags.write_cur_maps
+        write_cum_maps(cum, gmap, cfg, hbmeta, 
+                       flags.outputflags.write_max_cur_maps, 
+                       flags.outputflags.write_cum_cur_map_only)
+    end
 
     hcat(points_unique, res)
 end
