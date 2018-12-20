@@ -131,7 +131,7 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
         res[i] = v[1]
 
         cum.cum_curr[mycsid()] .+= curr
-        flags.outputflags.write_max_cur_maps && (cum.max_curr[mycsid()] = max.(cum.max_curr[mycsid()], curr))
+        flags.outputflags.write_max_cur_maps && (cum.max_curr[mycsid()] .= max.(cum.max_curr[mycsid()], curr))
     end
 
     pmap(x -> f(x), 1:num_points_to_solve)
