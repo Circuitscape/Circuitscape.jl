@@ -61,7 +61,7 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
     z = deepcopy(s)
 
     point_ids = included_pairs.point_ids
-    res = zeros(eltype(a), size(points_unique, 1))
+    res = zeros(eltype(a), size(points_unique, 1)) |> SharedArray
     num_points_to_solve = size(points_unique, 1)
     original_point_map = copy(point_map)
     unique_point_map = zeros(V, size(gmap))
@@ -71,11 +71,14 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
         unique_point_map[f(1,ind), f(2,ind)] = f(3,ind)
     end
 
-    for i = 1:num_points_to_solve
-        copyto!(point_map, original_point_map)
+    # @distributed for i = 1:num_points_to_solve
+    function f(i)
+        # copyto!(point_map, original_point_map)
+        point_map = copy(original_point_map)
         str = use_variable_strengths ? strengths[i,2] : 1
         csinfo("Solving point $i of $num_points_to_solve")
-        copyto!(s, z)
+        # copyto!(s, z)
+        s = copy(z)
         n = points_unique[i]
         if use_included_pairs
             for j = 1:num_points_to_solve
@@ -126,6 +129,7 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
         end
         res[i] = v[1]
     end
+    pmap(x -> f(x), 1:num_points_to_solve)
     hcat(points_unique, res)
 end
 
