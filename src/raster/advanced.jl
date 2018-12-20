@@ -164,6 +164,7 @@ function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Tuple{Matrix{T},M
     is_onetoall = flags.is_onetoall
     write_v_maps = flags.outputflags.write_volt_maps
     write_c_maps = flags.outputflags.write_cur_maps
+    write_cum_cur_map_only = flags.outputflags.write_cum_cur_map_only
 
     volt = zeros(eltype(G), size(nodemap))
     ind = findall(x->x!=0,nodemap)
@@ -220,7 +221,7 @@ function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Tuple{Matrix{T},M
         end
     end
 
-    if write_c_maps
+    if write_c_maps && !write_cum_cur_map_only
         if !is_raster
             write_cur_maps(name, voltages, FullGraph(G, cellmap), finitegrounds, flags, cfg)
         else
