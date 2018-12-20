@@ -59,6 +59,7 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
     # ground_map = Matrix{eltype(a)}(0, 0)
     s = zeros(eltype(a), size(point_map))
     z = deepcopy(s)
+    cum = initialize_cum_maps(gmap)
 
     point_ids = included_pairs.point_ids
     res = zeros(eltype(a), size(points_unique, 1)) |> SharedArray
@@ -106,7 +107,6 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
         end
 
         check_node = nodemap[points_rc[1][i], points_rc[2][i]]
-
         
         policy = one_to_all ? :rmvgnd : :rmvsrc
         sources, grounds, finite_grounds = 
@@ -121,15 +121,23 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
         if one_to_all
             # v = advanced(cfg, a, source_map, ground_map; nodemap = nodemap, policy = :rmvgnd,
             #                check_node = check_node, src = n, polymap = Polymap(newpoly), hbmeta = hbmeta)
-            v = advanced_kernel(advanced_data, flags, cfg)
+            v, curr = advanced_kernel(advanced_data, flags, cfg)
         else
             # v = advanced(cfg, a, source_map, ground_map; nodemap = nodemap, policy = :rmvsrc,
             #                check_node = check_node, src = n, polymap = Polymap(newpoly), hbmeta = hbmeta)
-            v = advanced_kernel(advanced_data, flags, cfg)
+            v, curr = advanced_kernel(advanced_data, flags, cfg)
         end
         res[i] = v[1]
+
+        cum.cum_curr[mycsid()] .+= curr
     end
+
     pmap(x -> f(x), 1:num_points_to_solve)
+
+    write_cum_maps(cum, gmap, cfg, hbmeta, 
+                   flags.outputflags.write_max_cur_maps, 
+                   flags.outputflags.write_cum_cur_map_only)
+
     hcat(points_unique, res)
 end
 
