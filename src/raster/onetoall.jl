@@ -60,7 +60,6 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
     s = zeros(eltype(a), size(point_map))
     z = deepcopy(s)
     cum = initialize_cum_maps(gmap, flags.outputflags.write_max_cur_maps)
-    @show length(cum.cum_curr)
 
     point_ids = included_pairs.point_ids
     res = zeros(eltype(a), size(points_unique, 1)) |> SharedArray
