@@ -231,7 +231,7 @@ function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Tuple{Matrix{T},M
 
     if !is_raster
         v = [collect(1:size(G, 1))  voltages]
-        return v
+        return v, outcurr
     end
 
     scenario = cfg["scenario"]
