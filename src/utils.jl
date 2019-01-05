@@ -118,7 +118,7 @@ end
 # Helps start new processes from the INI file
 function myaddprocs(n)
     addprocs(n)
-    @everywhere Core.eval(Main, :(using Circuitscape))
+    # @everywhere Core.eval(Main, :(using Circuitscape))
 end
 
 # Reads the directory with the current maps
