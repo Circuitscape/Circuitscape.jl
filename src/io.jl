@@ -334,7 +334,7 @@ function read_included_pairs(V, filename)
             minval = parse(Float64, split(readline(f))[2])
             maxval = parse(Float64, split(readline(f))[2])
         end
-        included_pairs = readdlm(file, skipstart=2)
+        included_pairs = readdlm(filename, skipstart=2)
         point_ids = V.(included_pairs[:,1])
         deleteat!(point_ids, 1)
         included_pairs = included_pairs[2:end, 2:end]
@@ -342,9 +342,9 @@ function read_included_pairs(V, filename)
         idx = findall(x -> x >= minval, included_pairs)
         mode = :include
         bin = map(x -> x >= minval ? V(1) : V(0), included_pairs)
+        return IncludeExcludePairs(mode, point_ids, bin)
 
     elseif filetype == FILE_TYPE_INCL_PAIRS
-
         open(filename, "r") do f
             mode = Symbol(split(readline(f))[2])
         end
@@ -356,14 +356,14 @@ function read_included_pairs(V, filename)
             pair_list = pl
         end
 
-    end
-    I = pair_list[:,1] .+ 1
-    J = pair_list[:,2] .+ 1
-    V = ones(V, size(pair_list, 1))
-    max_node = maximum(pair_list) + 1
-    included_pairs = sparse(I, J, V, max_node, max_node)
+        I = pair_list[:,1] .+ 1
+        J = pair_list[:,2] .+ 1
+        V = ones(V, size(pair_list, 1))
+        max_node = maximum(pair_list) + 1
+        included_pairs = sparse(I, J, V, max_node, max_node)
 
-    IncludeExcludePairs(mode, point_ids, Matrix(included_pairs))
+        return IncludeExcludePairs(mode, point_ids, Matrix(included_pairs))
+    end
 
 end
 
