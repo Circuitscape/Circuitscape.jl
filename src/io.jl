@@ -356,8 +356,8 @@ function read_included_pairs(V, filename)
             pair_list = pl
         end
 
-        I = pair_list[:,1] .+ 1
-        J = pair_list[:,2] .+ 1
+        I = pair_list[:,1] 
+        J = pair_list[:,2] 
         V = ones(V, size(pair_list, 1))
         max_node = maximum(pair_list) + 1
         included_pairs = sparse(I, J, V, max_node, max_node)
