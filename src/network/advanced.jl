@@ -10,7 +10,9 @@ function network_advanced(T, V, cfg)::Matrix{T}
     advanced_data = compute_advanced_data(data, flags)
 
     # Send to main kernel
-    advanced_kernel(advanced_data, flags, cfg)
+    v , _ = advanced_kernel(advanced_data, flags, cfg)
+
+    v
 end
 
 function compute_advanced_data(data::NetworkData{T,V}, 

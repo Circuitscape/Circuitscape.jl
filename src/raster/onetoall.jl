@@ -59,9 +59,10 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
     # ground_map = Matrix{eltype(a)}(0, 0)
     s = zeros(eltype(a), size(point_map))
     z = deepcopy(s)
+    cum = initialize_cum_maps(gmap, flags.outputflags.write_max_cur_maps)
 
     point_ids = included_pairs.point_ids
-    res = zeros(eltype(a), size(points_unique, 1))
+    res = zeros(eltype(a), size(points_unique, 1)) |> SharedArray
     num_points_to_solve = size(points_unique, 1)
     original_point_map = copy(point_map)
     unique_point_map = zeros(V, size(gmap))
@@ -71,11 +72,14 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
         unique_point_map[f(1,ind), f(2,ind)] = f(3,ind)
     end
 
-    for i = 1:num_points_to_solve
-        copyto!(point_map, original_point_map)
+    # @distributed for i = 1:num_points_to_solve
+    function f(i)
+        # copyto!(point_map, original_point_map)
+        point_map = copy(original_point_map)
         str = use_variable_strengths ? strengths[i,2] : 1
         csinfo("Solving point $i of $num_points_to_solve")
-        copyto!(s, z)
+        # copyto!(s, z)
+        s = copy(z)
         n = points_unique[i]
         if use_included_pairs
             for j = 1:num_points_to_solve
@@ -103,7 +107,6 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
         end
 
         check_node = nodemap[points_rc[1][i], points_rc[2][i]]
-
         
         policy = one_to_all ? :rmvgnd : :rmvsrc
         sources, grounds, finite_grounds = 
@@ -118,14 +121,26 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
         if one_to_all
             # v = advanced(cfg, a, source_map, ground_map; nodemap = nodemap, policy = :rmvgnd,
             #                check_node = check_node, src = n, polymap = Polymap(newpoly), hbmeta = hbmeta)
-            v = advanced_kernel(advanced_data, flags, cfg)
+            v, curr = advanced_kernel(advanced_data, flags, cfg)
         else
             # v = advanced(cfg, a, source_map, ground_map; nodemap = nodemap, policy = :rmvsrc,
             #                check_node = check_node, src = n, polymap = Polymap(newpoly), hbmeta = hbmeta)
-            v = advanced_kernel(advanced_data, flags, cfg)
+            v, curr = advanced_kernel(advanced_data, flags, cfg)
         end
         res[i] = v[1]
+
+        cum.cum_curr[mycsid()] .+= curr
+        flags.outputflags.write_max_cur_maps && (cum.max_curr[mycsid()] .= max.(cum.max_curr[mycsid()], curr))
     end
+
+    pmap(x -> f(x), 1:num_points_to_solve)
+
+    if flags.outputflags.write_cur_maps
+        write_cum_maps(cum, gmap, cfg, hbmeta, 
+                       flags.outputflags.write_max_cur_maps, 
+                       flags.outputflags.write_cum_cur_map_only)
+    end
+
     hcat(points_unique, res)
 end
 
