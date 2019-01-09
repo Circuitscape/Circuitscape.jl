@@ -284,7 +284,7 @@ function runtests(f = compute)
 
     @testset "Raster Pairwise" begin
     # Raster pairwise tests
-    for i = 1:16
+    for i = 1:17
         # Weird windows 32 stuff
         if i == 16 && Sys.WORD_SIZE == 32
             continue
