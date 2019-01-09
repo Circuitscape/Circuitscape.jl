@@ -317,7 +317,7 @@ function read_included_pairs(V, filename)
         idx = findall(x -> x == 0 , point_ids)
         if length(idx) > 0
             deleteat!(point_ids, idx)
-            @warn("Code to include pairs is activated, some entries did not match with focal node file. Some focal nodes may have been dropped")
+            cswarn("Code to include pairs is activated, some entries did not match with focal node file. Some focal nodes may have been dropped")
         end
 
         mat = zeros(V, size(point_ids, 1), size(point_ids, 1))
