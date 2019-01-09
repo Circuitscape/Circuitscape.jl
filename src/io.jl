@@ -359,7 +359,7 @@ function read_included_pairs(V, filename)
         I = pair_list[:,1] 
         J = pair_list[:,2] 
         V = ones(V, size(pair_list, 1))
-        max_node = maximum(pair_list) + 1
+        max_node = maximum(pair_list)
         included_pairs = sparse(I, J, V, max_node, max_node)
 
         return IncludeExcludePairs(mode, point_ids, Matrix(included_pairs))
