@@ -82,7 +82,7 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
         s = copy(z)
         n = points_unique[i]
         if use_included_pairs
-            for j = 1:num_points_to_solve
+            for j = 1:size(point_ids,1)
                 if i != j && included_pairs.include_pairs[i,j] == mode
                     exclude = point_ids[j]
                     map!(x -> x == exclude ? 0 : x, point_map, point_map)

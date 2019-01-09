@@ -289,48 +289,8 @@ function read_included_pairs(V, filename)
     maxval = 0
     mode = :undef
 
-    #=if filetype == PAIRS_AAGRID
-        open(file, "r") do fV
-            minval = parse(Float64, split(readline(f))[2])
-            maxval = parse(Float64, split(readline(f))[2])
-        end
-        included_pairs = readdlm(file, skipstart=2)
-        point_ids = V.(included_pairs[:,1])
-        deleteat!(point_ids, 1)
-        included_pairs = included_pairs[2:end, 2:end]
-        map!(x -> x > maxval ? 0 : x, included_pairs, included_pairs)
-        idx = findall(x -> x >= minval, included_pairs)
-        mode = :include
-        bin = map(x -> x >= minval ? V(1) : V(0), included_pairs)
-        IncludeExcludePairs(mode, point_ids, bin)
-    else
-        open(file, "r") do f
-            mode = Symbol(split(readline(f))[2])
-        end
-        included_pairs = readdlm(file, skipstart = 1)
-        #=point_ids = V.(sort!(unique(included_pairs)))
-        if point_ids[1] == 0
-            deleteat!(point_ids, 1)
-        end
-
-        mat = zeros(V, size(point_ids, 1), size(point_ids, 1))
-
-        for i = 1:size(included_pairs, 1)
-            idx1 = findfirst(x -> x == included_pairs[i, 1], point_ids)
-            idx2 = findfirst(x -> x == included_pairs[i, 2], point_ids)
-            if idx1 != nothing && idx2 != nothing
-                mat[idx1,idx2] = 1
-                # mat[idx2,idx1] = 1
-            end
-        end=#
-        
-        
-        IncludeExcludePairs(mode, point_ids, mat)
-    end=#
-
     if filetype == FILE_TYPE_INCL_PAIRS_AAGRID
-
-        open(filename, "r") do f
+        open(filename, "r") do fV
             minval = parse(Float64, split(readline(f))[2])
             maxval = parse(Float64, split(readline(f))[2])
         end
@@ -343,26 +303,35 @@ function read_included_pairs(V, filename)
         mode = :include
         bin = map(x -> x >= minval ? V(1) : V(0), included_pairs)
         return IncludeExcludePairs(mode, point_ids, bin)
-
     elseif filetype == FILE_TYPE_INCL_PAIRS
         open(filename, "r") do f
             mode = Symbol(split(readline(f))[2])
         end
-        pair_list = readdlm(filename, V, skipstart=1,)
-        point_ids = unique(pair_list)
-        if size(pair_list, 1) == 1
+        included_pairs = readdlm(filename, skipstart = 1)
+        if size(included_pairs, 1) == 1
             pl = zeros(V, 1,2)
-            pl[1,:] = pair_list
-            pair_list = pl
+            pl[1,:] = included_pairs
+            included_pairs = pl
+        end
+        point_ids = V.(sort!(unique(included_pairs)))
+        idx = findall(x -> x == 0 , point_ids)
+        if length(idx) > 0
+            deleteat!(point_ids, idx)
+            @warn("Code to include pairs is activated, some entries did not match with focal node file. Some focal nodes may have been dropped")
         end
 
-        I = pair_list[:,1] 
-        J = pair_list[:,2] 
-        V = ones(V, size(pair_list, 1))
-        max_node = maximum(pair_list)
-        included_pairs = sparse(I, J, V, max_node, max_node)
+        mat = zeros(V, size(point_ids, 1), size(point_ids, 1))
 
-        return IncludeExcludePairs(mode, point_ids, Matrix(included_pairs))
+        for i = 1:size(included_pairs, 1)
+            idx1 = findfirst(x -> x == included_pairs[i, 1], point_ids)
+            idx2 = findfirst(x -> x == included_pairs[i, 2], point_ids)
+            if idx1 != nothing && idx2 != nothing
+                mat[idx1,idx2] = 1
+                mat[idx2,idx1] = 1
+            end
+        end
+        
+        return IncludeExcludePairs(mode, point_ids, mat)
     end
 
 end
