@@ -55,9 +55,6 @@ function single_ground_all_pairs(data::GraphData{T,V}, flags, cfg, log = true) w
         amg_solver_path(data, flags, cfg, log)
     else
         csinfo("Solver used: CHOLMOD")
-        if eltype(data.G) == Float32
-            cswarn("CHOLMOD solver mode works only in double precision")
-        end
         bs = parse(Int, cfg["cholmod_batch_size"])
         _cholmod_solver_path(data, flags, cfg, log, bs)
     end
