@@ -1,7 +1,6 @@
 # Documentation: http://docs.travis-ci.com/user/languages/julia/
 language: julia
 julia:
-  - nightly
   - 1.0
 os:
   - linux
