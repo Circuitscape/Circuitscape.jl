@@ -121,7 +121,7 @@ function _ascii_grid_read_header(habitat_file, f)
     RasterMeta(ncols, nrows, xllcorner, yllcorner, cellsize, nodata, file_type)
 end
 
-function _guess_file_type(filename, f)
+#=function _guess_file_type(filename, f)
     s = readline(f)
     seek(f, 0)
 
@@ -137,6 +137,26 @@ function _guess_file_type(filename, f)
         throw("Check file format")
     end
 
+end=#
+
+function _guess_file_type(filename, f)
+
+    hdr = readline(f)
+    seek(f, 0)
+
+    if startswith(hdr, FILE_HDR_NPY)
+        filetype = FILE_TYPE_NPY
+    elseif startswith(lowercase(hdr), FILE_HDR_AAGRID)
+        filetype = FILE_TYPE_AAGRID
+    elseif startswith(hdr, FILE_HDR_INCL_PAIRS_AAGRID)
+        filetype = FILE_TYPE_INCL_PAIRS_AAGRID
+    elseif startswith(hdr, FILE_HDR_INCL_PAIRS)
+        filetype = FILE_TYPE_INCL_PAIRS
+    else
+        filetype = FILE_TYPE_TXTLIST
+    end
+
+    return filetype
 end
 
 function read_polymap(T, file::String, habitatmeta;
@@ -173,13 +193,13 @@ function read_point_map(V, file, habitatmeta)
 
     f = endswith(file, ".gz") ? GZip.open(file, "r") : open(file, "r")
     filetype = _guess_file_type(file, f)
-    _points_rc = filetype == TXTLIST ? readdlm(file) :
+    _points_rc = filetype == FILE_TYPE_TXTLIST ? readdlm(file) :
                         read_polymap(V, file, habitatmeta)
 
     i = V[]
     j = V[]
     v = V[]
-    if filetype == TXTLIST
+    if filetype == FILE_TYPE_TXTLIST
         I = _points_rc[:,2]
         J = _points_rc[:,3]
         v = _points_rc[:,1]
@@ -228,7 +248,7 @@ function read_source_and_ground_maps(T, V, source_file, ground_file, habitatmeta
     f = endswith(ground_file, "gz") ? Gzip.open(ground_file, "r") : open(ground_file, "r")
     filetype = _guess_file_type(ground_file, f)
 
-    if filetype == AAGRID
+    if filetype == FILE_TYPE_AAGRID
         ground_map = read_polymap(T, ground_file, habitatmeta; nodata_as = -1)
         ground_map = map(T, ground_map)
     else
@@ -240,7 +260,7 @@ function read_source_and_ground_maps(T, V, source_file, ground_file, habitatmeta
     f = endswith(source_file, "gz") ? Gzip.open(source_file, "r") : open(source_file, "r")
     filetype = _guess_file_type(source_file, f)
 
-    if filetype == AAGRID
+    if filetype == FILE_TYPE_AAGRID
         source_map = read_polymap(T, source_file, habitatmeta)
         source_map = map(T, source_map)
     else
@@ -261,20 +281,20 @@ function read_source_and_ground_maps(T, V, source_file, ground_file, habitatmeta
     source_map, ground_map
 end
 
-function read_included_pairs(V, file)
+function read_included_pairs(V, filename)
 
-    f = endswith(file, "gz") ? Gzip.open(file, "r") : open(file, "r")
-    filetype = _guess_file_type(file, f)
+    f = endswith(filename, "gz") ? Gzip.open(filename, "r") : open(filename, "r")
+    filetype = _guess_file_type(filename, f)
     minval = 0
     maxval = 0
     mode = :undef
 
-    if filetype == PAIRS_AAGRID
-        open(file, "r") do f
+    if filetype == FILE_TYPE_INCL_PAIRS_AAGRID
+        open(filename, "r") do fV
             minval = parse(Float64, split(readline(f))[2])
             maxval = parse(Float64, split(readline(f))[2])
         end
-        included_pairs = readdlm(file, skipstart=2)
+        included_pairs = readdlm(filename, skipstart=2)
         point_ids = V.(included_pairs[:,1])
         deleteat!(point_ids, 1)
         included_pairs = included_pairs[2:end, 2:end]
@@ -282,15 +302,22 @@ function read_included_pairs(V, file)
         idx = findall(x -> x >= minval, included_pairs)
         mode = :include
         bin = map(x -> x >= minval ? V(1) : V(0), included_pairs)
-        IncludeExcludePairs(mode, point_ids, bin)
-    else
-        open(file, "r") do f
+        return IncludeExcludePairs(mode, point_ids, bin)
+    elseif filetype == FILE_TYPE_INCL_PAIRS
+        open(filename, "r") do f
             mode = Symbol(split(readline(f))[2])
         end
-        included_pairs = readdlm(file, skipstart = 1)
+        included_pairs = readdlm(filename, skipstart = 1)
+        if size(included_pairs, 1) == 1
+            pl = zeros(V, 1,2)
+            pl[1,:] = included_pairs
+            included_pairs = pl
+        end
         point_ids = V.(sort!(unique(included_pairs)))
-        if point_ids[1] == 0
-            deleteat!(point_ids, 1)
+        idx = findall(x -> x == 0 , point_ids)
+        if length(idx) > 0
+            deleteat!(point_ids, idx)
+            cswarn("Code to include pairs is activated, some entries did not match with focal node file. Some focal nodes may have been dropped")
         end
 
         mat = zeros(V, size(point_ids, 1), size(point_ids, 1))
@@ -303,8 +330,10 @@ function read_included_pairs(V, file)
                 mat[idx2,idx1] = 1
             end
         end
-        IncludeExcludePairs(mode, point_ids, mat)
+        
+        return IncludeExcludePairs(mode, point_ids, mat)
     end
+
 end
 
 function get_network_data(T, V, cfg)::NetworkData{T,V}

@@ -55,9 +55,6 @@ function single_ground_all_pairs(data::GraphData{T,V}, flags, cfg, log = true) w
         amg_solver_path(data, flags, cfg, log)
     else
         csinfo("Solver used: CHOLMOD")
-        if eltype(data.G) == Float32
-            cswarn("CHOLMOD solver mode works only in double precision")
-        end
         bs = parse(Int, cfg["cholmod_batch_size"])
         _cholmod_solver_path(data, flags, cfg, log, bs)
     end
@@ -105,7 +102,8 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
     
     get_shortcut_resistances = false
     if is_raster && !write_volt_maps && !write_cur_maps && 
-            !write_cum_cur_map_only && !write_max_cur_maps
+            !write_cum_cur_map_only && !write_max_cur_maps && 
+            isempty(exclude)
         get_shortcut_resistances = true
         csinfo("Triggering resistance calculation shortcut")
         num, d = get_num_pairs_shortcut(cc, points, exclude)
@@ -170,45 +168,43 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
                 comp_j = V(comp_j)
                 J = findall(x -> x == pj, points)
 
-                # Forget excluded pairs
-                ex = false
-                for c_i in I, c_j in J
-                    if (c_i, c_j) in exclude
-                        ex = true
-                        break
-                    end
-                end
-                ex && continue
-
                 if pi == pj
                     continue
                 end
 
-                # Initialize currents
-                current = zeros(T, size(matrix, 1))
-                current[comp_i] = -1
-                current[comp_j] = 1
+                # Forget excluded pairs
+                ex = false
+                for c_i in I
+                    for c_j in J
+                        if (c_i, c_j) in exclude
+                            continue
+                        end
 
-                # Solve system
-                # csinfo("Solving points $pi and $pj")
-                log && csinfo("Solving pair $(d[(pi,pj)]) of $num")
-                t2 = @elapsed v = solve_linear_system(cfg, matrix, current, P)
-                csinfo("Time taken to solve linear system = $t2 seconds")
-                v .= v .- v[comp_i]
+                        # Initialize currents
+                        current = zeros(T, size(matrix, 1))
+                        current[comp_i] = -1
+                        current[comp_j] = 1
 
-                # Calculate resistance
-                r = v[comp_j] - v[comp_i]
+                        # Solve system
+                        # csinfo("Solving points $pi and $pj")
+                        log && csinfo("Solving pair $(d[(pi,pj)]) of $num")
+                        t2 = @elapsed v = solve_linear_system(cfg, matrix, current, P)
+                        csinfo("Time taken to solve linear system = $t2 seconds")
+                        v .= v .- v[comp_i]
 
-                # Return resistance value
-                for c_i in I, c_j in J
-                    push!(ret, (c_i, c_j, r))
-                    if get_shortcut_resistances
-                        resistances[c_i, c_j] = r
-                        resistances[c_j, c_i] = r
+                        # Calculate resistance
+                        r = v[comp_j] - v[comp_i]
+
+                        # Return resistance value
+                        push!(ret, (c_i, c_j, r))
+                        if get_shortcut_resistances
+                            resistances[c_i, c_j] = r
+                            resistances[c_j, c_i] = r
+                        end
+                        output = Output(points, v, (orig_pts[c_i], orig_pts[c_j]),
+                                        (comp_i, comp_j), r, V(c_j), cum)
+                        postprocess(output, component_data, flags, shortcut, cfg)
                     end
-                    output = Output(points, v, (orig_pts[c_i], orig_pts[c_j]),
-                                    (comp_i, comp_j), r, V(c_j), cum)
-                    postprocess(output, component_data, flags, shortcut, cfg)
                 end
             end
 
@@ -306,7 +302,8 @@ function _cholmod_solver_path(data::GraphData{T,V}, flags,
     
     get_shortcut_resistances = false
     if is_raster && !write_volt_maps && !write_cur_maps && 
-            !write_cum_cur_map_only  && !write_max_cur_maps
+            !write_cum_cur_map_only  && !write_max_cur_maps &&
+            isempty(exclude)
         get_shortcut_resistances = true
         csinfo("Triggering resistance calculation shortcut")
         num, d = get_num_pairs_shortcut(cc, points, exclude)
@@ -359,23 +356,18 @@ function _cholmod_solver_path(data::GraphData{T,V}, flags,
                 comp_j = V(something(findfirst(isequal(pj), comp),0))
                 J = findall(x -> x == pj, points)
 
-                # Forget excluded pairs
-                ex = false
-                for c_i in I, c_j in J
-                    if (c_i, c_j) in exclude
-                        ex = true
-                        break
-                    end
-                end
-                ex && continue
-
                 if pi == pj
                     continue
                 end
 
+                # Forget excluded pairs
                 for c_i in I, c_j in J
-                    push!(cholmod_batch, 
-                      CholmodNode((comp_i, comp_j), (V(c_i), V(c_j))))
+                    if (c_i, c_j) in exclude
+                        continue
+                    else
+                        push!(cholmod_batch, 
+                          CholmodNode((comp_i, comp_j), (V(c_i), V(c_j))))
+                    end
                 end
             end
         end

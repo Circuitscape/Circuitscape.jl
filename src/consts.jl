@@ -19,6 +19,18 @@ const PAIRS_AAGRID = 4
 const PAIRS_LIST = 5
 const TRUELIST = ["True", "true", "1"]
 
+const FILE_TYPE_NPY = 1
+const FILE_TYPE_AAGRID = 2
+const FILE_TYPE_TXTLIST = 3
+const FILE_TYPE_INCL_PAIRS_AAGRID = 4
+const FILE_TYPE_INCL_PAIRS = 5
+
+const FILE_HDR_GZIP = "\x1f\x8b\x08"
+const FILE_HDR_NPY = "\x93NUMPY"
+const FILE_HDR_AAGRID = "ncols"
+const FILE_HDR_INCL_PAIRS_AAGRID = "min"
+const FILE_HDR_INCL_PAIRS = "mode"
+
 # Constants for logging
 const NONE = ["NONE", "None", "none"]
 const INFO = ["INFO", "info", "Info"]
