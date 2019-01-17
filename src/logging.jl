@@ -11,7 +11,6 @@ function csinfo(msg)
     msg = string(fmt(Dates.now())) * " : " * msg 
     @info(msg)
     ui_interface[](msg, :info)
-    @show log_to_file
     if log_to_file
         with_logger(file_logger) do 
             @info(msg)
@@ -25,7 +24,6 @@ function cswarn(msg)
     msg = string(fmt(Dates.now())) * " : " * msg 
     @warn(msg)
     ui_interface[](msg, :warn)
-    @show log_to_file
     if log_to_file
         with_logger(file_logger) do 
             @warn(msg)
@@ -47,6 +45,7 @@ function update_logging!(cfg)
     if log_file != "None"
         logging["file_logger"] = SimpleLogger(open(log_file, "w+"))
         logging["log_to_file"] = true
+        csinfo("Logs will recorded to file: log_file")
     else
         logging["file_logger"] = SimpleLogger()
         logging["log_to_file"] = false
