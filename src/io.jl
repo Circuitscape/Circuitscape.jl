@@ -97,9 +97,13 @@ function _ascii_grid_reader(T, file)
         c = readdlm(f, T; skipstart = ss)
     catch
         seek(f, 0)
-        d = readdlm(f; skipstart = ss)
-        d = d[:, 1:end-1]
-        c = map(T, d)
+        try 
+            d = readdlm(f; skipstart = ss)
+            d = d[:, 1:end-1]
+            c = map(T, d)
+        catch 
+            error("Failed to read habitat map. There may be errors in your file.") 
+        end
     end
     map!(x -> x == rastermeta.nodata ? -9999. : x , c, c)
     c, rastermeta
