@@ -237,14 +237,14 @@ function generate_exclude_pairs(points_rc, included_pairs::IncludeExcludePairs{V
     mat = included_pairs.include_pairs
     mode = included_pairs.mode == :include ? 0 : 1    
 
-        prune_points!(points_rc, included_pairs.point_ids)
-        for j = 1:size(mat, 2)
-            for i = 1:size(mat, 1)
-                if mat[i,j] == mode
-                    push!(exclude_pairs_array, (i,j))
-                end
+    prune_points!(points_rc, included_pairs.point_ids)
+    for j = 1:size(mat, 2)
+        for i = 1:size(mat, 1)
+            if mat[i,j] == mode && mat[j,i] == mode
+                push!(exclude_pairs_array, (i,j))
             end
         end
+    end
 
     exclude_pairs_array
 end

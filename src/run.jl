@@ -14,11 +14,12 @@ Inputs:
 function compute(path::String)
     cfg = parse_config(path)
     update_logging!(cfg)
-    #=if cfg["use_64bit_indexing"] in TRUELIST
-        global INT = Int64
-    end=#
     write_config(cfg)
     T = cfg["precision"] in SINGLE ? Float32 : Float64
+    if T == Float32 && cfg["solver"] in CHOLMOD
+        cswarn("CHOLMOD solver mode works only in double precision. Switching precision to double.")
+        T = Float64
+    end
     V = cfg["use_64bit_indexing"] in TRUELIST ? Int64 : Int32
     csinfo("Precision used: $(cfg["precision"])")
     is_parallel = cfg["parallelize"] in TRUELIST

@@ -25,7 +25,9 @@ function raster_advanced(T, V, cfg)::Matrix{T}
     advanced_data = compute_advanced_data(rasterdata, flags)
 
     # Send to main kernel
-    advanced_kernel(advanced_data, flags, cfg)
+    v, _ = advanced_kernel(advanced_data, flags, cfg)
+
+    v
 end
 
 function compute_advanced_data(data::RasData{T,V}, 
@@ -140,7 +142,7 @@ function resolve_conflicts(sources::Vector{T},
     sources, grounds, finitegrounds
 end
 
-function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Matrix{T} where {T,V}
+function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Tuple{Matrix{T},Matrix{T}} where {T,V}
 
     # Data 
     G = data.G
@@ -162,6 +164,7 @@ function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Matrix{T} where {
     is_onetoall = flags.is_onetoall
     write_v_maps = flags.outputflags.write_volt_maps
     write_c_maps = flags.outputflags.write_cur_maps
+    write_cum_cur_map_only = flags.outputflags.write_cum_cur_map_only
 
     volt = zeros(eltype(G), size(nodemap))
     ind = findall(x->x!=0,nodemap)
@@ -218,7 +221,7 @@ function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Matrix{T} where {
         end
     end
 
-    if write_c_maps
+    if write_c_maps && !write_cum_cur_map_only
         if !is_raster
             write_cur_maps(name, voltages, FullGraph(G, cellmap), finitegrounds, flags, cfg)
         else
@@ -228,14 +231,14 @@ function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Matrix{T} where {
 
     if !is_raster
         v = [collect(1:size(G, 1))  voltages]
-        return v
+        return v, outcurr
     end
 
     scenario = cfg["scenario"]
     if !solver_called
         ret = Matrix{T}(undef,1,1)
         ret[1] = -1
-        return ret
+        return ret, outcurr
     end
 
     if is_onetoall
@@ -244,19 +247,19 @@ function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Matrix{T} where {
         if val[1] ≈ 0
             ret = Matrix{T}(undef,1,1)
             ret[1] = -1
-            return ret
+            return ret, outcurr
         else
             ret = Matrix{T}(undef,length(val),1)
             ret[:,1] = val
-            return ret
+            return ret, outcurr
         end
     elseif is_alltoone
         ret = Matrix{T}(undef,1,1)
         ret[1] = 0
-        return ret
+        return ret, outcurr
     end
 
-    return volt
+    return volt, outcurr
 end
 
 function multiple_solver(cfg, a::SparseMatrixCSC{T,V}, sources, grounds, finitegrounds) where {T,V}
