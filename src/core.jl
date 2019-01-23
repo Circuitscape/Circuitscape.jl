@@ -80,6 +80,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
     write_cur_maps = outputflags.write_cur_maps
     write_cum_cur_map_only = outputflags.write_cum_cur_map_only
     write_max_cur_maps = outputflags.write_max_cur_maps
+    meta_parallelize = flags.meta_parallelize
 
     # Get number of focal points
     numpoints = size(points, 1)
@@ -110,6 +111,8 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
         csinfo("Total number of pair solves has been reduced to $num ")
     end
     shortcut = Shortcut(get_shortcut_resistances, voltmatrix, shortcut_res)    
+
+    mapf = meta_parallelize ? map : pmap
   
     for (cid, comp) in enumerate(cc)
     
@@ -218,7 +221,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
             f(1)
             update_shortcut_resistances!(idx, shortcut, resistances, points, comp)
         else
-            X = pmap(x ->f(x), 1:size(csub,1))
+            X = mapf(x ->f(x), 1:size(csub,1))
 
             # Set all resistances
             for x in X
@@ -274,6 +277,7 @@ function _cholmod_solver_path(data::GraphData{T,V}, flags,
     write_cur_maps = outputflags.write_cur_maps
     write_cum_cur_map_only = outputflags.write_cum_cur_map_only
     write_max_cur_maps = outputflags.write_max_cur_maps
+    meta_parallelize = flags.meta_parallelize
 
     # Cumulative current map
     cum = data.cum
@@ -311,6 +315,8 @@ function _cholmod_solver_path(data::GraphData{T,V}, flags,
     end
     shortcut = Shortcut(get_shortcut_resistances, voltmatrix, shortcut_res)
     
+    mapf = meta_parallelize ? map : pmap
+
     for (cid, comp) in enumerate(cc)
     
         # Subset of points relevant to CC
@@ -418,7 +424,7 @@ function _cholmod_solver_path(data::GraphData{T,V}, flags,
             end
 
 
-            pmap(x -> f(x, rng, lhs), 1:length(rng))
+            mapf(x -> f(x, rng, lhs), 1:length(rng))
             for (i,v) in enumerate(rng)
                 coords = cholmod_batch[v].points_idx
                 r = lhs[cholmod_batch[v].cc_idx[2], i] - 

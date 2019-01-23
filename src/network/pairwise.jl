@@ -55,6 +55,7 @@ function get_network_flags(cfg)
     is_advanced = cfg["scenario"] in ADVANCED
     is_alltoone = false
     is_onetoall = false
+    meta_parallelize = cfg["meta_parallelize"] in TRUELIST
     grnd_file_is_res = cfg["ground_file_is_resistances"] in TRUELIST
     policy = Symbol(cfg["remove_src_or_gnd"])
     solver = cfg["solver"]

@@ -4,6 +4,7 @@ struct RasterFlags
     is_advanced::Bool 
     is_onetoall::Bool
     is_alltoone::Bool
+    meta_parallelize::Bool
     grnd_file_is_res::Bool
     policy::Symbol
     four_neighbors::Bool
@@ -44,12 +45,13 @@ function get_raster_flags(cfg)
     ground_file_is_resistances = 
         cfg["ground_file_is_resistances"] in TRUELIST
     policy = Symbol(cfg["remove_src_or_gnd"])
+    meta_parallelize = cfg["meta_parallelize"] in TRUELIST
 
     # Output Flags
     o = get_output_flags(cfg)
     
     RasterFlags(is_raster, is_pairwise, is_advanced, 
-                is_onetoall, is_alltoone,
+                is_onetoall, is_alltoone, meta_parallelize,
                 ground_file_is_resistances, policy,
                 four_neighbors, avg_res, solver, o)
 end
