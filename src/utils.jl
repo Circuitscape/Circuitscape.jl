@@ -103,6 +103,25 @@ function compute_parallel(str, n_processes = 2)
     compute(cfg)
 end
 
+function compute_metaparallel(jobs::Vector{String}, n_procs = 1)
+    
+    l = length(jobs)
+    csinfo("Starting up $(n_procs) processes") 
+    myaddprocs(n_procs)
+    csinfo("Launching $l Circuitscape jobs among $(n_procs) processes") 
+
+    cfg_list = Vector{Dict{String,String}}(undef,l)
+    for (i,str) in enumerate(jobs)
+        cfg = parse_config(str)
+        cfg["meta_parallelize"] = "true"
+        cfg_list[i] = cfg
+    end
+    @everywhere Core.eval(Main, :(using Circuitscape))
+    ret = pmap(compute, cfg_list)
+    rmprocs(workers())
+    ret
+end
+
 function get_output_flags(cfg)
 
     # Output flags

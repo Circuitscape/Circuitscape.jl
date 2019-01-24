@@ -1,4 +1,4 @@
-export compute
+export compute, compute_metaparallel
 
 """
 `compute(path::String)`
