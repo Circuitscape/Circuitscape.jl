@@ -327,7 +327,7 @@ function write_aagrid(cmap, name, cfg, hbmeta;
         str = "voltmap"
     end
 
-    pref = split(cfg["output_file"], '.')[1]
+    pref = split(cfg["output_file"], ".out")[1]
     filename = "$(pref)_$(str)$(name).asc"
     f = open(filename, "w")
 
