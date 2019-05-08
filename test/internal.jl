@@ -169,4 +169,5 @@ catch e
 end
 
 # Users with dots in their names - issue #181
-r = f("input/raster/extra.one/1/oneToAllVerify1.ini")
+# Just check that this does not break
+f("input/raster/extra.one/1/oneToAllVerify1.ini")
