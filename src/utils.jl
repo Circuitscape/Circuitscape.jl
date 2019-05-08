@@ -134,7 +134,7 @@ function accumulate_current_maps(path, f)
     base = basename(path)
 
     # If base file has a dot
-    name = split(base, '.')[1]
+    name = split(base, ".out"")[1]
 
     cmap_list = readdir(dir) |>
                     x -> filter(y -> startswith(y, "$(name)_"), x) |>

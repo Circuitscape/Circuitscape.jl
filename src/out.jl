@@ -89,7 +89,7 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
 end
 
 function write_currents(node_curr_arr, branch_curr_arr, name, cfg)
-   pref = split(cfg["output_file"], '.')[1]
+   pref = split(cfg["output_file"], ".out")[1]
    writedlm("$(pref)_node_currents$(name).txt", node_curr_arr, '\t')
    writedlm("$(pref)_branch_currents$(name).txt", branch_curr_arr, '\t')
 end
@@ -347,7 +347,7 @@ function write_aagrid(cmap, name, cfg, hbmeta, cellmap;
                         voltage = false, cum = false, max = false,
                         log_transform = false, set_null_to_nodata = false)
 
-    pref = split(cfg["output_file"], '.')[1]
+    pref = split(cfg["output_file"], ".out")[1]
 
     if log_transform
         map!(x -> x > 0 ? log10(x) : float(hbmeta.nodata), cmap, cmap)
@@ -414,7 +414,7 @@ function write_voltages(output, name, voltages::Vector{T}, cc) where {T}
     volt_arr[:,1] = cc
     volt_arr[:,2] = voltages
 
-    pref = split(output, '.')[1]
+    pref = split(output, ".out")[1]
     writedlm("$(pref)_voltages$(name).txt", volt_arr)
 
 end
@@ -453,7 +453,7 @@ function accum_currents!(base, newcurr, cfg, G, voltages, finitegrounds, nodemap
 end
 
 function save_resistances(r, cfg)
-    pref = split(cfg["output_file"], '.')[1]
+    pref = split(cfg["output_file"], ".out")[1]
     filename = "$(pref)_resistances.out"
     filename_3col = "$(pref)_resistances_3columns.out"
     rcol = compute_3col(r)
