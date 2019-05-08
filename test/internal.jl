@@ -170,4 +170,4 @@ end
 
 # Users with dots in their names - issue #181
 # Just check that this does not break
-f("input/raster/extra.one/1/oneToAllVerify1.ini")
+compute("input/raster/extra.one/1/oneToAllVerify1.ini")
