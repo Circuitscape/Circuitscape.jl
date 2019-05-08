@@ -332,7 +332,7 @@ function runtests(f = compute)
     end
     end
 
-    @testset "Raster ALl to One" begin
+    @testset "Raster All to One" begin
     # Raster all to one test
     for i in 1:12
         @info("Testing allToOneVerify$i")
