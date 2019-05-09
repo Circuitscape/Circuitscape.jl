@@ -159,11 +159,15 @@ SIZE_3 =
 
  @test model_problem(3) == SIZE_3
 
- # Issue 151
- # Issue 151
- try
-     Circuitscape.read_point_map(Int32, "samples.txt",
-                                 Circuitscape.RasterMeta(50, 50, 0.0, 0.0, 0.5, -9999.0, 2))
- catch e
-     @test e == "At least one focal node location falls outside of habitat map"
- end
+# Issue 151
+# Issue 151
+try
+    Circuitscape.read_point_map(Int32, "samples.txt",
+                                Circuitscape.RasterMeta(50, 50, 0.0, 0.0, 0.5, -9999.0, 2))
+catch e
+    @test e == "At least one focal node location falls outside of habitat map"
+end
+
+# Users with dots in their names - issue #181
+# Just check that this does not break
+compute("input/raster/extra.one/1/oneToAllVerify1.ini")

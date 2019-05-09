@@ -134,7 +134,7 @@ function accumulate_current_maps(path, f)
     base = basename(path)
 
     # If base file has a dot
-    name = split(base, '.')[1]
+    name = split(base, ".out")[1]
 
     cmap_list = readdir(dir) |>
                     x -> filter(y -> startswith(y, "$(name)_"), x) |>
@@ -332,7 +332,7 @@ function runtests(f = compute)
     end
     end
 
-    @testset "Raster ALl to One" begin
+    @testset "Raster All to One" begin
     # Raster all to one test
     for i in 1:12
         @info("Testing allToOneVerify$i")
