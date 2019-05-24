@@ -128,3 +128,11 @@ If you have encounter any issues or would like to ask a question, please file
 a report [here](https://github.com/ranjanan/Circuitscape.jl/issues).
 Contributions in the form of 
 [pull requests](https://github.com/ranjanan/Circuitscape.jl/pulls) are also welcome! 
+
+## Notes on INI files 
+
+Circuitscape takes as input INI files, which contain paths to the raster map, sources, grounds,
+and other inputs, as well as flags for each run. If you're using the [GUI](https://circuitscape.org/downloads/)
+the INI file will automatically be generated for you and then fed into Circuitscape. But if you're 
+using the Julia prompt, then you must write one yourself. The easiest way to do this is to copy 
+an INI file [from the tests](https://github.com/Circuitscape/Circuitscape.jl/tree/master/test/input) and then modify it depending on your problem. 
