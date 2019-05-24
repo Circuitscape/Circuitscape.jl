@@ -174,15 +174,15 @@ function read_polymap(T, file::String, habitatmeta;
     end
 
     if rastermeta.cellsize != habitatmeta.cellsize
-        warn("cellsize is not the same")
+        cswarn("cellsize is not the same")
     elseif rastermeta.ncols != habitatmeta.ncols
-        warn("ncols is not the same")
+        cswarn("ncols is not the same")
     elseif rastermeta.nrows != habitatmeta.nrows
-        warn("nrows is not the same")
+        cswarn("nrows is not the same")
     elseif rastermeta.yllcorner != habitatmeta.yllcorner
-        warn("yllcorner is not the same")
+        cswarn("yllcorner is not the same")
     elseif rastermeta.xllcorner != habitatmeta.xllcorner
-        warn("xllcorner is not the same")
+        cswarn("xllcorner is not the same")
     end
 
     polymap
