@@ -136,3 +136,15 @@ and other inputs, as well as flags for each run. If you're using the [GUI](https
 the INI file will automatically be generated for you and then fed into Circuitscape. But if you're 
 using the Julia prompt, then you must write one yourself. The easiest way to do this is to copy 
 an INI file [from the tests](https://github.com/Circuitscape/Circuitscape.jl/tree/master/test/input) and then modify it depending on your problem. 
+
+## Citation
+
+A preprint is available here: https://arxiv.org/abs/1906.03542. You can also use the following BibTeX entry to cite this package: 
+```bibtex
+@misc{1906.03542,
+Author = {Ranjan Anantharaman and Kimberly Hall and Viral Shah and Alan Edelman},
+Title = {Circuitscape in Julia: High Performance Connectivity Modelling to Support Conservation Decisions},
+Year = {2019},
+Eprint = {arXiv:1906.03542},
+}
+```
