@@ -149,7 +149,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
             comp_i = something(findfirst(isequal(pi),comp), 0)
             comp_i = V(comp_i)
             I = findall(x -> x == pi, points)
-            # smash_repeats!(ret, I)
+            smash_repeats!(resistances, I)
 
             # Iteration space through all possible pairs
             rng = i+1:size(csub, 1)
