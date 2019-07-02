@@ -137,28 +137,28 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
 
         component_data = ComponentData(comp, matrix, local_nodemap, hbmeta, cellmap)        
 
+        current = [zeros(size(matrix, 1)) for i = 1:nthreads()]
+        v = [zeros(size(matrix, 1)) for i = 1:nthreads()]
+
         function f(i)
 
             # Generate return type
-            ret = Vector{Tuple{V,V,T}}()
+            # ret = Vector{Tuple{V,V,T}}()
 
             pi = csub[i]
             comp_i = something(findfirst(isequal(pi),comp), 0)
             comp_i = V(comp_i)
             I = findall(x -> x == pi, points)
-            smash_repeats!(ret, I)
-
-            # Preprocess matrix
-            # d = matrix[comp_i, comp_i]
+            # smash_repeats!(ret, I)
 
             # Iteration space through all possible pairs
             rng = i+1:size(csub, 1)
-            if nprocs() > 1 
+            #=if nprocs() > 1 
                 for j in rng
                     pj = csub[j]
                     csinfo("Scheduling pair $(d[(pi,pj)]) of $num to be solved")
                 end
-            end
+            end=#
 
             # Loop through all possible pairs
             for j in rng
@@ -174,43 +174,86 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
 
                 # Forget excluded pairs
                 ex = false
-                for c_i in I
+                #=for c_i in I
                     for c_j in J
                         if (c_i, c_j) in exclude
                             continue
                         end
+                        @show pi, pj, comp_i, comp_j, c_i, c_j
 
                         # Initialize currents
-                        current = zeros(T, size(matrix, 1))
-                        current[comp_i] = -1
-                        current[comp_j] = 1
+                        # current = zeros(T, size(matrix, 1))
+                        fill!(current[threadid()], 0)
+                        current[threadid()][comp_i] = -1
+                        current[threadid()][comp_j] = 1
 
                         # Solve system
                         # csinfo("Solving points $pi and $pj")
                         log && csinfo("Solving pair $(d[(pi,pj)]) of $num")
-                        t2 = @elapsed v = solve_linear_system(cfg, matrix, current, P)
+                        t2 = @elapsed solve_linear_system!(v[threadid()], cfg, matrix, current[threadid()], P)
                         csinfo("Time taken to solve linear system = $t2 seconds")
-                        v .= v .- v[comp_i]
+                        # v[threadid()] .= v[threadid()] .- v[threadid()][comp_i]
 
                         # Calculate resistance
-                        r = v[comp_j] - v[comp_i]
+                        r = v[threadid()][comp_j] - v[threadid()][comp_i]
+                        # @show threadid(), c_i, c_j, r, comp_j, comp_i, v[threadid()][comp_j] - v[threadid()][comp_i]
+                        @show threadid(), comp_j, comp_i, v[threadid()]
 
                         # Return resistance value
-                        push!(ret, (c_i, c_j, r))
+                        resistances[c_i, c_j] = r
+                        resistances[c_j, c_i] = r
+
                         if get_shortcut_resistances
                             resistances[c_i, c_j] = r
                             resistances[c_j, c_i] = r
                         end
-                        output = Output(points, v, (orig_pts[c_i], orig_pts[c_j]),
+                        output = Output(points, v[threadid()], (orig_pts[c_i], orig_pts[c_j]),
+                                        (comp_i, comp_j), r, V(c_j), cum)
+                        postprocess(output, component_data, flags, shortcut, cfg)
+                        break
+                    end
+                    break
+                end=#
+                c_i = I[1]
+                c_j = J[1]
+                if (c_i, c_j) in exclude
+                    continue
+                end
+                
+                # Initialize currents
+                # current = zeros(T, size(matrix, 1))
+                fill!(current[threadid()], 0)
+                current[threadid()][comp_i] = -1
+                current[threadid()][comp_j] = 1
+
+                # Solve system
+                # csinfo("Solving points $pi and $pj")
+                log && csinfo("Solving pair $(d[(pi,pj)]) of $num")
+                t2 = @elapsed solve_linear_system!(v[threadid()], cfg, matrix, current[threadid()], P)
+                csinfo("Time taken to solve linear system = $t2 seconds")
+                # v[threadid()] .= v[threadid()] .- v[threadid()][comp_i]
+
+                # Calculate resistance
+                r = v[threadid()][comp_j] - v[threadid()][comp_i]
+                # @show threadid(), c_i, c_j, r, comp_j, comp_i, v[threadid()][comp_j] - v[threadid()][comp_i]
+
+                for c_i in I 
+                    for c_j in J 
+                        # Return resistance value
+                        resistances[c_i, c_j] = r
+                        resistances[c_j, c_i] = r
+
+                        if get_shortcut_resistances
+                            resistances[c_i, c_j] = r
+                            resistances[c_j, c_i] = r
+                        end
+                        output = Output(points, v[threadid()], (orig_pts[c_i], orig_pts[c_j]),
                                         (comp_i, comp_j), r, V(c_j), cum)
                         postprocess(output, component_data, flags, shortcut, cfg)
                     end
                 end
+
             end
-
-        # matrix[comp_i, comp_i] = d
-
-        ret
         end
 
         if get_shortcut_resistances        
@@ -218,15 +261,20 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
             f(1)
             update_shortcut_resistances!(idx, shortcut, resistances, points, comp)
         else
-            X = pmap(x ->f(x), 1:size(csub,1))
+            # X = pmap(x ->f(x), 1:size(csub,1))
+            for i = 1:size(csub, 1)
+                f(i)
+            end
+            display(resistances)
 
             # Set all resistances
-            for x in X
-                for i = 1:size(x, 1)
-                    resistances[x[i][1], x[i][2]] = x[i][3]
-                    resistances[x[i][2], x[i][1]] = x[i][3]
-                end
-            end
+            #for x in X
+            #    for i = 1:size(x, 1)
+            #        resistances[x[i][1], x[i][2]] = x[i][3]
+            #        resistances[x[i][2], x[i][1]] = x[i][3]
+            #    end
+            #end
+            #
         end
 
     end
@@ -561,10 +609,10 @@ function sum_off_diag(G, i)
      sum
  end
 
-function solve_linear_system(cfg, 
+function solve_linear_system!(v, cfg, 
             G::SparseMatrixCSC{T,V}, 
             curr::Vector{T}, M)::Vector{T} where {T,V} 
-    cg(G, curr, Pl = M, tol = T(1e-6), maxiter = 100_000)
+    cg!(v, G, curr, Pl = M, tol = T(1e-6), maxiter = 100_000)
 end
 
 function postprocess(output, component_data, flags, shortcut, cfg)

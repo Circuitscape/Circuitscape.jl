@@ -13,6 +13,7 @@ using Distributed
 using DelimitedFiles
 using Logging
 using Dates
+using Base.Threads
 
 include("consts.jl")
 include("config.jl")

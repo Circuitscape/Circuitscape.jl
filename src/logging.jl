@@ -9,7 +9,7 @@ function csinfo(msg)
     log_to_file = logging["log_to_file"]
     file_logger = logging["file_logger"]
     msg = string(fmt(Dates.now())) * " : " * msg 
-    @info(msg)
+    @info("$(threadid()):" *  msg) 
     ui_interface[](msg, :info)
     if log_to_file
         with_logger(file_logger) do 

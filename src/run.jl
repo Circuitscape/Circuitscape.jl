@@ -23,14 +23,14 @@ function compute(path::String)
     V = cfg["use_64bit_indexing"] in TRUELIST ? Int64 : Int32
     csinfo("Precision used: $(cfg["precision"])")
     is_parallel = cfg["parallelize"] in TRUELIST
-    if is_parallel
-        n = parse(Int, cfg["max_parallel"])
-        csinfo("Starting up Circuitscape to use $n processes in parallel")
-        myaddprocs(n)
+    if parse(Int, ENV["JULIA_NUM_THREADS"]) > 1
+        # n = parse(Int, cfg["max_parallel"])
+        csinfo("Starting up Circuitscape to use $(nthreads()) threads in parallel")
+        # myaddprocs(n)
     end
     t = @elapsed r = _compute(T, V, cfg)
     csinfo("Time taken to complete job = $t")
-    is_parallel && rmprocs(workers())
+    # is_parallel && rmprocs(workers())
     r
 end
 
