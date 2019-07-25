@@ -210,7 +210,7 @@ end
 
 mycsid() = myid() - minimum(workers()) + 1
 
-function initialize_cum_maps(cellmap::Matrix{T}, max = false) where T
+#=function initialize_cum_maps(cellmap::Matrix{T}, max = false) where T
     cum_curr = Vector{SharedMatrix{T}}(undef,nprocs())
     for i = 1:nprocs()
         cum_curr[i] = SharedArray(zeros(T, size(cellmap)...))
@@ -224,6 +224,25 @@ function initialize_cum_maps(cellmap::Matrix{T}, max = false) where T
     end
     cum_branch_curr = Vector{SharedVector{T}}()
     cum_node_curr = Vector{SharedVector{T}}()
+
+    Cumulative(cum_curr, max_curr,
+        cum_branch_curr, cum_node_curr)
+end=#
+
+function initialize_cum_maps(cellmap::Matrix{T}, max = false) where T
+    cum_curr = Vector{Matrix{T}}(undef,nthreads())
+    for i = 1:nthreads()
+        cum_curr[i] = zeros(T, size(cellmap)...)
+    end
+    max_curr = Vector{Matrix{T}}()
+    if max
+        max_curr = Vector{Matrix{T}}(undef,nthreads())
+        for i = 1:nthreads()
+            max_curr[i] = fill(T(-9999), size(cellmap)...)
+        end
+    end
+    cum_branch_curr = Vector{Vector{T}}()
+    cum_node_curr = Vector{Vector{T}}()
 
     Cumulative(cum_curr, max_curr,
         cum_branch_curr, cum_node_curr)

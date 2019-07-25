@@ -74,11 +74,11 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
                             set_null_to_nodata = set_null_currents_to_nodata)
 
         # Accumulate by default
-        cum_curr[mycsid()] .+= cmap
+        cum_curr[threadid()] .+= cmap
 
         # Max current if user asks for it
         if write_max_cur_maps 
-            max_curr[mycsid()] .= max.(max_curr[mycsid()], cmap)
+            max_curr[threadid()] .= max.(max_curr[threadid()], cmap)
         end
 
         # Write current maps
@@ -469,7 +469,7 @@ function write_cum_maps(cum, cellmap::Matrix{T}, cfg, hbmeta, write_max, write_c
     
     if write_cum || cfg["write_cur_maps"] in TRUELIST
         cum_curr = zeros(T, size(cellmap)...)
-        for i = 1:nprocs()
+        for i = 1:nthreads()
             cum_curr .+= cum.cum_curr[i]
         end 
         postprocess_cum_curmap!(cum_curr)
@@ -478,7 +478,7 @@ function write_cum_maps(cum, cellmap::Matrix{T}, cfg, hbmeta, write_max, write_c
 
     if write_max
         max_curr = fill(T(-9999), size(cellmap)...)
-        for i = 1:nprocs()
+        for i = 1:nthreads()
             max_curr .= max.(cum.max_curr[i], max_curr)
         end
         postprocess_cum_curmap!(max_curr)

@@ -1,8 +1,8 @@
 struct Cumulative{T}
-    cum_curr::Vector{SharedMatrix{T}}
-    max_curr::Vector{SharedMatrix{T}}
-    cum_branch_curr::Vector{SharedVector{T}}
-    cum_node_curr::Vector{SharedVector{T}}
+    cum_curr::Vector{Matrix{T}}
+    max_curr::Vector{Matrix{T}}
+    cum_branch_curr::Vector{Vector{T}}
+    cum_node_curr::Vector{Vector{T}}
 end
 
 struct GraphData{T,V}
@@ -110,8 +110,21 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
         csinfo("Total number of pair solves has been reduced to $num ")
     end
     shortcut = Shortcut(get_shortcut_resistances, voltmatrix, shortcut_res)    
-  
+
     for (cid, comp) in enumerate(cc)
+
+        # Subset of points relevant to CC
+        csub = filter(x -> x in comp, points) |> unique
+        if isempty(csub)
+            continue
+        end
+
+        # Conductance matrix corresponding to CC
+        matrix = comps[cid]
+
+        t1 = @elapsed P = aspreconditioner(smoothed_aggregation(matrix))
+  
+    #=for (cid, comp) in enumerate(cc)
     
         # Subset of points relevant to CC
         csub = filter(x -> x in comp, points) |> unique
@@ -262,7 +275,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
             update_shortcut_resistances!(idx, shortcut, resistances, points, comp)
         else
             # X = pmap(x ->f(x), 1:size(csub,1))
-            for i = 1:size(csub, 1)
+            @threads for i = 1:size(csub, 1)
                 f(i)
             end
             display(resistances)
@@ -277,7 +290,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
             #
         end
 
-    end
+    end=#
 
     if get_shortcut_resistances
         resistances = shortcut.shortcut_res
