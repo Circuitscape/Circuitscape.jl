@@ -34,7 +34,7 @@ function pick(path)
     pick(joinpath(path, str))
 end
 
-alldir(path) = vcat("↩", readdir(path))
+alldir(path) = vcat("..", readdir(path))
 
 function manualfilepicker() 
     println()
