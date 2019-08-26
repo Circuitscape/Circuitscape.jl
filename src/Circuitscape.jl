@@ -27,5 +27,8 @@ include("raster/advanced.jl")
 include("network/advanced.jl")
 include("raster/onetoall.jl")
 include("run.jl")
+include("INIBuilder/INIBuilder.jl")
+
+using .INIBuilder
 
 end
