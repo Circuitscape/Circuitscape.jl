@@ -136,7 +136,7 @@ function step10(name, path)
     end
 end
     
-function build()
+function start()
     logo = raw"""
 
     `-````````````````````````````````````````````````
@@ -163,9 +163,8 @@ function build()
     normal  = "\033[0m\033[0m"
     
     welcome_message = raw"""
-    Welcome to INIBuilder. 
+    Welcome to Circuitscape. 
     """
-    # TODO: Styling the logo. Too much effort?
     logo = replace(logo, "d" => "$(red)d$(normal)")
     logo = replace(logo, "h" => "$(red)h$(normal)")
     logo = replace(logo, "o" => "$(magenta)o$(normal)")

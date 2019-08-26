@@ -7,6 +7,6 @@ using ..Circuitscape
 include("filepicker.jl")
 include("run.jl")
 
-export build 
+export start 
 
 end
