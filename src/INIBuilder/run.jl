@@ -168,7 +168,7 @@ function build()
     # TODO: Styling the logo. Too much effort?
     logo = replace(logo, "d" => "$(red)d$(normal)")
     logo = replace(logo, "h" => "$(red)h$(normal)")
-    logo = replace(logo, "o" => "$(blue)o$(normal)")
+    logo = replace(logo, "o" => "$(magenta)o$(normal)")
     print(logo)
     print(welcome_message)
 
