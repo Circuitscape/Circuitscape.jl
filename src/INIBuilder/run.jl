@@ -32,9 +32,9 @@ end
 
 function step3()
     println()
-    println("Step 3: Enter path to habitat file")
-    n = ["PREVIOUS STEP", "Enter path manually", "Use filepicker"]
-    n = request(RadioMenu(n))
+    println("Step 3a: Enter path to habitat file")
+    opt = ["PREVIOUS STEP", "Enter path manually", "Use filepicker"]
+    n = request(RadioMenu(opt))
     n == 1 && step2()
     path = n == 2 ? manualfilepicker() : filepicker()
     cfg["habitat_file"] = path
@@ -53,14 +53,16 @@ function step4()
     if !is_advanced
         println()
         println("Step 4: Enter path to focal nodes:")
-        n = ["PREVIOUS STEP", "Enter path manually", "Use filepicker"]
+        opt = ["PREVIOUS STEP", "Enter path manually", "Use filepicker"]
+        n = request(RadioMenu(opt))
         n == 1 && step3()
         path = n == 2 ? manualfilepicker() : filepicker()
         cfg["point_file"] = path
     else
         println()
         println("Step 4a: Enter path to source file") 
-        n = ["PREVIOUS STEP", "Enter path manually", "Use filepicker"]
+        opt = ["PREVIOUS STEP", "Enter path manually", "Use filepicker"]
+        n = request(RadioMenu(opt))
         n == 1 && step3()
         path = n == 2 ? manualfilepicker() : filepicker()
         cfg["source_file"] = path
@@ -90,12 +92,18 @@ function step6()
     println("Step 6: Choose number of parallel processes")
     opt = collect(1:Sys.CPU_THREADS) |> x -> string.(x)
     n = request(RadioMenu(opt))
+    n > 1 && (cfg["parallelize"] = "true")
+    cfg["max_parallel"] = string(n)
+    step7()
 end
 
 function step7()
     println()
     println("Step 7: Choose outputs")
-    opt = ["PREVIOUS STEP", "Current maps", "Voltage maps"]
+    opt = ["PREVIOUS STEP", "Pick outputs"]
+    n = request(RadioMenu(opt))
+    n == 1 && step6()
+    opt = ["Current maps", "Voltage maps"]
     n = request(MultiSelectMenu(opt))
     1 in n && (cfg["write_cur_maps"] = "true")
     2 in n && (cfg["write_volt_maps"] = "true")
@@ -105,6 +113,9 @@ end
 function step8()
     println()
     println("Step 8: Choose output file name")
+    opt = ["PREVIOUS STEP", "Enter output file name"]
+    n = request(RadioMenu(opt))
+    n == 1 && step7() 
     name = readline(stdin) 
     step9(name)
 end
@@ -112,7 +123,10 @@ end
 function step9(name)
     println()
     println("Step 9: Choose output folder")
-    path = folderpicker()
+    opt = ["PREVIOUS STEP", "Enter path manually", "Use folderpicker"]
+    n = request(RadioMenu(opt))
+    n == 1 && step3()
+    path = n == 2 ? manualfolderpicker() : folderpicker()
     cfg["output_file"] = normpath(joinpath(path, name))
     step10(name, path)
 end
@@ -128,7 +142,7 @@ function step10(name, path)
         Circuitscape.write_config(cfg)
         println("$name.ini written to $(normpath(path))")
         println()
-        println("Would you to like to write another file?")
+        println("Would you to build another problem?")
         l = RadioMenu(["Yes", "No"])
         n = request(l)
         n == 1 && step1()
