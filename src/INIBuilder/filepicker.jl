@@ -24,8 +24,8 @@ function pick(path)
     r = alldir(path)
     l = request(RadioMenu(r, pagesize=10)) 
     str = r[l]
-    l == 1 && return manualfilepicker()
-    l == 2 && (str = "..")
+    #l == 1 && return manualfilepicker()
+    l == 1 && (str = "..")
     println("---------------------------------")
     printstyled("Selected path: ", bold=true) 
     print("$(normpath(joinpath(path,str)))\n")
@@ -45,6 +45,15 @@ function manualfilepicker()
     manualfilepicker()
 end
     
+function manualfolderpicker() 
+    println()
+    println("Enter path: ")
+    path = readline(stdin)
+    isdir(path) && return path
+    println("Invalid path, please reenter!")
+    manualfilepicker()
+end
+
 function folderpicker()
     path = h.path
     printstyled("""
@@ -54,7 +63,7 @@ function folderpicker()
 end
 
 function pickfolder(path)
-    r = vcat("↩", "DONE", readfolders(path))
+    r = vcat("..", "DONE", readfolders(path))
     l = request(RadioMenu(r, pagesize=10))
     str = r[l]
     l == 1 && (str == "..")
