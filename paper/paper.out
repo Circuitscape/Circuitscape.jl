@@ -1,0 +1,17 @@
+\BOOKMARK [1][-]{section.1}{Introduction}{}% 1
+\BOOKMARK [1][-]{section.2}{Circuitscape in Julia}{}% 2
+\BOOKMARK [1][-]{section.3}{The Algorithm}{}% 3
+\BOOKMARK [1][-]{section.4}{Numerical Methods}{}% 4
+\BOOKMARK [2][-]{subsection.4.1}{Preconditioner Implementation}{section.4}% 5
+\BOOKMARK [1][-]{section.5}{New Features}{}% 6
+\BOOKMARK [2][-]{subsection.5.1}{New Solver Mode}{section.5}% 7
+\BOOKMARK [2][-]{subsection.5.2}{Generic Programming}{section.5}% 8
+\BOOKMARK [2][-]{subsection.5.3}{Improved Parallel Computations}{section.5}% 9
+\BOOKMARK [1][-]{section.6}{Benchmarks}{}% 10
+\BOOKMARK [2][-]{subsection.6.1}{Experimental Setup}{section.6}% 11
+\BOOKMARK [2][-]{subsection.6.2}{Standard Benchmarks}{section.6}% 12
+\BOOKMARK [2][-]{subsection.6.3}{Benchmarks on Data from Existing Studies}{section.6}% 13
+\BOOKMARK [1][-]{section.7}{Discussion}{}% 14
+\BOOKMARK [1][-]{section.8}{Conclusion}{}% 15
+\BOOKMARK [1][-]{section.9}{Acknowledgement}{}% 16
+\BOOKMARK [1][-]{section.10}{References}{}% 17

@@ -7,6 +7,10 @@
 
 \keywords{landscape ecology , computational ecology,  julia programming language}
 
+\makeatletter
+\newcommand{\removelatexerror}{\let\@latex@error\@gobble}
+\makeatother
+
 \begin{document}
 
 \input{header}
@@ -49,6 +53,7 @@ The rest of this paper is organized as follows: we present an overview of the al
 
 \section{The Algorithm}
 \begin{figure}
+\removelatexerror
 \centering
 \begin{algorithm}[H]
 \SetAlgoLined
