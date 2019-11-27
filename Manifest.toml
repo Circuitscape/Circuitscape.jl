@@ -49,7 +49,7 @@ uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 deps = ["Libdl", "Test"]
 git-tree-sha1 = "ee443ef166b29282301468d8af403e1ed8f5412e"
 uuid = "92fee26a-97fe-5a0c-ad85-20a5f3185b63"
-version = "0.5.0"
+version = "0.5.1"
 
 [[Inflate]]
 deps = ["Pkg", "Printf", "Random", "Test"]
