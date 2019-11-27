@@ -20,7 +20,7 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
 AlgebraicMultigrid = "≥ 0.2.1"
-GZip = "≥ 0.5.0"
+GZip = "≥ 0.5.1"
 IterativeSolvers = "≥ 0.7.1"
 LightGraphs = "≥ 1.0.0"
 SimpleWeightedGraphs = "≥ 1.0.0"
