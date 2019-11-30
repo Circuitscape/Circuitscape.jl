@@ -86,7 +86,7 @@ function _pt_file_polygons_path(rasterdata::RasData{T,V},
     four_neighbors = flags.four_neighbors
 
     # Cumulative maps
-    cum = initialize_cum_maps(gmap)
+    cum = initialize_cum_maps(gmap, flags.outputflags.write_max_cur_maps)
 
     pts = unique(points_rc[3])
     resistances = -1 * ones(length(pts), length(pts))
