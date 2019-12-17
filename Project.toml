@@ -1,6 +1,6 @@
 name = "Circuitscape"
 uuid = "2b7a1792-8151-5239-925d-e2b8fdfa3201"
-version = "5.5.5"
+version = "5.6.0"
 
 [deps]
 AlgebraicMultigrid = "2169fc97-5a83-5252-b627-83903c6c433c"
@@ -16,6 +16,7 @@ REPL = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 SharedArrays = "1a1011a3-84de-559e-8e89-a11a2f7dc383"
 SimpleWeightedGraphs = "47aef6b3-ad0c-573a-a1e2-d07658019622"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+SuiteSparse_jll = "bea87d4a-7f5b-5778-9afe-8cc45184846c"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
@@ -24,4 +25,4 @@ GZip = "≥ 0.5.1"
 IterativeSolvers = "≥ 0.7.1"
 LightGraphs = "≥ 1.0.0"
 SimpleWeightedGraphs = "≥ 1.0.0"
-julia = "≥ 1.0.0"
+julia = "≥ 1.3.0"
