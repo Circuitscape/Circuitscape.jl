@@ -390,6 +390,7 @@ function write_volt_maps(name, output, component_data, flags, cfg)
 
     if !flags.is_raster
 
+        @show size(component_data.matrix)
         cc = component_data.cc
         write_voltages(cfg["output_file"], name, voltages, cc)
 
@@ -410,6 +411,8 @@ end
 
 function write_voltages(output, name, voltages::Vector{T}, cc) where {T}
 
+    @show size(cc, 1)
+    @show size(voltages)
     volt_arr = zeros(T, size(voltages, 1), 2)
     volt_arr[:,1] = cc
     volt_arr[:,2] = voltages

@@ -173,6 +173,7 @@ function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Tuple{Matrix{T},M
     voltages = Vector{eltype(G)}()
     outvolt = alloc_map(hbmeta)
     outcurr = alloc_map(hbmeta)
+    nodal_voltages = zeros(eltype(G), size(G, 1))
 
     for c in cc
 
@@ -199,23 +200,29 @@ function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Tuple{Matrix{T},M
         local_nodemap = construct_local_node_map(nodemap, c, polymap)
         solver_called = true
 
-        if write_v_maps && is_raster
-            accum_voltages!(outvolt, voltages, local_nodemap, hbmeta)
-        end
-        if write_c_maps && is_raster
-            accum_currents!(outcurr, voltages, cfg, a_local, voltages, f_local, local_nodemap, hbmeta)
-        end
-
-        for i in eachindex(volt)
-            _i = Int(local_nodemap[i])
-            _i != 0 && (volt[i] = voltages[_i])
+        if is_raster
+            if write_v_maps
+                accum_voltages!(outvolt, voltages, local_nodemap, hbmeta)
+            end
+            if write_c_maps
+                accum_currents!(outcurr, voltages, cfg, a_local, voltages, f_local, local_nodemap, hbmeta)
+            end
+            for i in eachindex(volt)
+                _i = Int(local_nodemap[i])
+                _i != 0 && (volt[i] = voltages[_i])
+            end
+        else
+            @show "thing"
+            nodal_voltages[c] .+= voltages
         end
     end
 
     name = src == 0 ? "" : "_$(V(src))"
+    @show size(volt)
     if write_v_maps
         if !is_raster
-            write_volt_maps(name, voltages, FullGraph(G, cellmap), flags, cfg)
+            #write_volt_maps(name, vec(volt), FullGraph(G, cellmap), flags, cfg)
+            write_volt_maps(name, nodal_voltages, FullGraph(G, cellmap), flags, cfg)
         else
             write_aagrid(outvolt, name, cfg, hbmeta, cellmap, voltage = true)
         end
@@ -223,14 +230,15 @@ function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Tuple{Matrix{T},M
 
     if write_c_maps && !write_cum_cur_map_only
         if !is_raster
-            write_cur_maps(name, voltages, FullGraph(G, cellmap), finitegrounds, flags, cfg)
+            #write_cur_maps(name, voltages, FullGraph(G, cellmap), finitegrounds, flags, cfg)
+            write_cur_maps(name, nodal_voltages, FullGraph(G, cellmap), finitegrounds, flags, cfg)
         else
             write_aagrid(outcurr, name, cfg, hbmeta, cellmap)
         end
     end
 
     if !is_raster
-        v = [collect(1:size(G, 1))  voltages]
+        v = [collect(1:size(G, 1))  nodal_voltages]
         return v, outcurr
     end
 
