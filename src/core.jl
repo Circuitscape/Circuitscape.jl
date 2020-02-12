@@ -1,3 +1,4 @@
+using Pardiso
 struct Cumulative{T}
     cum_curr::Vector{SharedMatrix{T}}
     max_curr::Vector{SharedMatrix{T}}
@@ -406,7 +407,9 @@ function _cholmod_solver_path(data::GraphData{T,V}, flags,
                 rhs[node.cc_idx[1], i] = -1
                 rhs[node.cc_idx[2], i] = 1 
             end
-            lhs = factor \ rhs
+            #lhs = factor \ rhs
+            lhs = similar(rhs)
+            solve!(factor, lhs, matrix, rhs)
 
             # Normalisation step
             for (i,val) in enumerate(rng)
@@ -451,7 +454,10 @@ function _cholmod_solver_path(data::GraphData{T,V}, flags,
 end
 
 function construct_cholesky_factor(matrix)
-    cholesky(matrix + sparse(10eps()*I,size(matrix)...))
+    #cholesky(matrix + sparse(10eps()*I,size(matrix)...))
+    ps = MKLPardisoSolver()
+    set_msglvl!(ps, 1)
+    ps
 end
 
 """
