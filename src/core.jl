@@ -409,7 +409,7 @@ function _cholmod_solver_path(data::GraphData{T,V}, flags,
             end
             #lhs = factor \ rhs
             lhs = similar(rhs)
-            solve!(factor, lhs, matrix, rhs)
+            solve!(factor, lhs, sparse(10eps()*I,size(matrix)...) + matrix, rhs)
 
             # Normalisation step
             for (i,val) in enumerate(rng)
