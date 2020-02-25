@@ -16,7 +16,6 @@ REPL = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 SharedArrays = "1a1011a3-84de-559e-8e89-a11a2f7dc383"
 SimpleWeightedGraphs = "47aef6b3-ad0c-573a-a1e2-d07658019622"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
-SuiteSparse_jll = "bea87d4a-7f5b-5778-9afe-8cc45184846c"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
