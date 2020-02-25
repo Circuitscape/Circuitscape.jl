@@ -3,3 +3,4 @@
 *.jl.mem
 *.jld
 *.tmp
+Manifest.toml
