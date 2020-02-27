@@ -11,6 +11,7 @@ const DOUBLE = ["double", "Double"]
 # Solver constants
 const AMG = ["cg+amg", "amg+cg"]
 const CHOLMOD = ["cholmod", "cholesky", "cholfact"]
+const MKLPARDISO = ["mklpardiso", "MKLPardiso", "MKLPARDISO"]
 
 # Constants used in IO
 const AAGRID = 2

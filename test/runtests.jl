@@ -1,6 +1,7 @@
 using Circuitscape
 using Test
-import Circuitscape: compute_single, compute_cholmod, compute_parallel,
+import Circuitscape: compute_single, compute_cholmod, compute_mklpardiso,
+                     compute_parallel,
                      runtests
 
 # Unit tests for internals
@@ -8,6 +9,6 @@ import Circuitscape: compute_single, compute_cholmod, compute_parallel,
     include("internal.jl")
 end
 
-for f in (compute, compute_single, compute_cholmod, compute_parallel)
+for f in (compute, compute_single, compute_cholmod, compute_mklpardiso, compute_parallel)
     runtests(f)
 end

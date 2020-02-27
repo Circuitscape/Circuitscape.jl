@@ -83,6 +83,13 @@ function compute_cholmod(str, batch_size = 5)
     cfg["cholmod_batch_size"] = string(batch_size)
     _compute(T, V, cfg)
 end
+function compute_mklpardiso(str, batch_size = 5)
+    cfg = parse_config(str)
+    T = cfg["precision"] in SINGLE ? Float32 : Float64
+    V = cfg["use_64bit_indexing"] in TRUELIST ? Int64 : Int32
+    cfg["solver"] = "mklpardiso"
+    _compute(T, V, cfg)
+end
 
 function compute_single(str)
     cfg = parse_config(str)
@@ -425,4 +432,29 @@ end
 function compare_node(r, x, tol = 1e-6)
     @. x[:,1] = x[:,1] + 1
     sum(abs2, sortslices(r, dims=1) - sortslices(x, dims=1)) < tol
+end
+
+### Pardiso option
+mutable struct MKLPardisoFactorize
+    A
+    ps::Pardiso.MKLPardisoSolver
+    verbose::Bool
+    firsttime::Bool
+end
+MKLPardisoFactorize(;verbose=false) = MKLPardisoFactorize(nothing,Pardiso.MKLPardisoSolver(),verbose,true)
+function (p::MKLPardisoFactorize)(x,A,b,update_matrix=false;kwargs...)
+    if p.firsttime
+        Pardiso.set_phase!(p.ps, Pardiso.ANALYSIS_NUM_FACT)
+        Pardiso.pardiso(p.ps, x, A, b)
+        p.firsttime = false
+    end
+
+    if update_matrix
+        Pardiso.set_phase!(p.ps, Pardiso.NUM_FACT)
+        Pardiso.pardiso(p.ps, x, A, b)
+        p.A = A
+    end
+
+    Pardiso.set_phase!(p.ps, Pardiso.SOLVE_ITERATIVE_REFINE)
+    Pardiso.pardiso(p.ps, x, A, b)
 end

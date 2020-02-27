@@ -1,4 +1,3 @@
-using Pardiso
 struct Cumulative{T}
     cum_curr::Vector{SharedMatrix{T}}
     max_curr::Vector{SharedMatrix{T}}
@@ -55,9 +54,13 @@ function single_ground_all_pairs(data::GraphData{T,V}, flags, cfg, log = true) w
         csinfo("Solver used: AMG accelerated by CG")
         amg_solver_path(data, flags, cfg, log)
     else
-        csinfo("Solver used: CHOLMOD")
+        s = cfg["solver"]
+        mklpardiso = false
+        str = s in CHOLMOD ? "CHOLMOD" : "MKL Pardiso"
+        s in MKLPARDISO && (mklpardiso = true)
+        csinfo("Solver used: $str")
         bs = parse(Int, cfg["cholmod_batch_size"])
-        _cholmod_solver_path(data, flags, cfg, log, bs)
+        cholmod_solver_path(data, flags, cfg, log, bs, mklpardiso)
     end
 end
 
@@ -254,8 +257,9 @@ struct CholmodNode{T}
     points_idx::Tuple{T,T}
 end
 
-function _cholmod_solver_path(data::GraphData{T,V}, flags, 
-                                  cfg, log, batch_size = 1000) where {T,V}
+function cholmod_solver_path(data::GraphData{T,V}, flags, 
+                                  cfg, log, batch_size = 1000, 
+                                  mklpardiso = false) where {T,V}
     
     # Data
     a = data.G
@@ -280,7 +284,7 @@ function _cholmod_solver_path(data::GraphData{T,V}, flags,
     cum = data.cum
 
     # CHOLMOD solver mode works only in double precision
-    if eltype(a) == Float32
+    if eltype(a) == Float32 && !mklpardiso 
         cswarn("Converting single precision matrix to double")
         a = Float64.(a)
     end
@@ -325,7 +329,7 @@ function _cholmod_solver_path(data::GraphData{T,V}, flags,
         # Conductance matrix corresponding to CC
         matrix = comps[cid]
 
-        t = @elapsed factor = construct_cholesky_factor(matrix)
+        t = @elapsed factor = construct_cholesky_factor(matrix, mklpardiso)
         csinfo("Time taken to construct cholesky factor = $t")
 
         # Get local nodemap for CC - useful for output writing
@@ -407,9 +411,18 @@ function _cholmod_solver_path(data::GraphData{T,V}, flags,
                 rhs[node.cc_idx[1], i] = -1
                 rhs[node.cc_idx[2], i] = 1 
             end
-            #lhs = factor \ rhs
-            lhs = similar(rhs)
-            solve!(factor, lhs, sparse(10eps()*I,size(matrix)...) + matrix, rhs)
+
+            if mklpardiso
+                lhs = similar(rhs)
+                mat = sparse(10eps()*I,size(matrix)...) + matrix
+                x = zeros(eltype(matrix), size(matrix, 1))
+                for i = 1:size(lhs, 2)
+                    factor(x, mat, rhs[:,i]) 
+                    lhs[:,i] .= x
+                end
+            else
+                lhs = factor \ rhs
+            end
 
             # Normalisation step
             for (i,val) in enumerate(rng)
@@ -453,11 +466,12 @@ function _cholmod_solver_path(data::GraphData{T,V}, flags,
     r
 end
 
-function construct_cholesky_factor(matrix)
-    #cholesky(matrix + sparse(10eps()*I,size(matrix)...))
-    ps = MKLPardisoSolver()
-    set_msglvl!(ps, 1)
-    ps
+function construct_cholesky_factor(matrix, mklpardiso = false)
+    if mklpardiso 
+        ps = MKLPardisoFactorize()
+    else 
+        cholesky(matrix + sparse(10eps()*I,size(matrix)...))
+    end
 end
 
 """
