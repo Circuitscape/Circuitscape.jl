@@ -1,4 +1,4 @@
-Copyright (c) 2017-2018: Ranjan Anantharaman and Viral B. Shah.
+Copyright (c) 2017-2020: Ranjan Anantharaman and Viral B. Shah.
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
