@@ -68,7 +68,7 @@ end
 function read_cellmap(habitat_file::String, is_res::Bool, ::Type{T}) where {T}
 
     if is_geotiff(habitat_file)
-        cell_map, rastermeta = read_geotiff(T,habitat_file)
+        cell_map, rastermeta = read_geotiff(habitat_file)
     else
         cell_map, rastermeta = _ascii_grid_reader(T, habitat_file)
     end
@@ -292,11 +292,8 @@ function read_source_and_ground_maps(T, V, source_file, ground_file, habitatmeta
     f = endswith(ground_file, "gz") ? Gzip.open(ground_file, "r") : open(ground_file, "r")
     filetype = _guess_file_type(ground_file, f)
 
-    if filetype == FILE_TYPE_AAGRID
+    if filetype == FILE_TYPE_AAGRID | filetype == FILE_TYPE_GEOTIFF
         ground_map = read_polymap(T, ground_file, habitatmeta; nodata_as = -1)
-        ground_map = map(T, ground_map)
-    elseif filetype == FILE_TYPE_GEOTIFF
-        ground_map = read_geotiff(T, ground_file, habitatmeta; nodata_as = -1)
         ground_map = map(T, ground_map)
     else
         rc = readdlm(ground_file, V)
@@ -308,12 +305,9 @@ function read_source_and_ground_maps(T, V, source_file, ground_file, habitatmeta
     f = endswith(source_file, "gz") ? Gzip.open(source_file, "r") : open(source_file, "r")
     filetype = _guess_file_type(source_file, f)
 
-    if filetype == FILE_TYPE_AAGRID
+    if filetype == FILE_TYPE_AAGRID | filetype == FILE_TYPE_GEOTIFF
         source_map = read_polymap(T, source_file, habitatmeta)
         source_map = map(T, source_map)
-    elseif filetype == FILE_TYPE_GEOTIFF
-        source_map = read_geotiff(T, source_file, habitatmeta)
-        source_map = map(T, ground_map)
     else
         rc = readdlm(source_file, V)
         source_map = -9999 * ones(T, habitatmeta.nrows, habitatmeta.ncols)
