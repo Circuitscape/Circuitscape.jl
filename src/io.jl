@@ -150,9 +150,9 @@ end
 
 end=#
 
-function is_geotiff(filename){
+function is_geotiff(filename)
     endswith(filename,"tif") | endswith(filename,"tiff")
-}
+end
 
 function read_geotiff(f)
     gt=GeoArrays.read(f)
