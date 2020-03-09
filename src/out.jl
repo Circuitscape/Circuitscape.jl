@@ -370,7 +370,7 @@ function write_grid(cmap, name, cfg, hbmeta, cellmap;
 
 end
 
-function write_aaigrid(cmap,filename,hbmeta){
+function write_aaigrid(cmap,filename,hbmeta)
 	f = open(filename, "w")
 
 	write(f, "ncols         $(hbmeta.ncols)\n")
@@ -382,7 +382,7 @@ function write_aaigrid(cmap,filename,hbmeta){
 
 	writedlm(f, round.(cmap, digits=8), ' ')
 	close(f)
-}
+end
 
 function write_geotiff(cmap, filename, hbmeta)
 	ga = GeoArray(permutedims(cmap))
