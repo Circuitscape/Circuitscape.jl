@@ -17,6 +17,9 @@ SharedArrays = "1a1011a3-84de-559e-8e89-a11a2f7dc383"
 SimpleWeightedGraphs = "47aef6b3-ad0c-573a-a1e2-d07658019622"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+GDAL_jll = "a7073274-a066-55f0-b90d-d619367d196c"
+CoordinateTransformations = "150eb455-5306-5404-9cee-2592286d6298"
+GeoArrays = "2fb1d81b-e6a0-5fc5-82e6-8e06903437ab"
 
 [compat]
 AlgebraicMultigrid = "0.2"
