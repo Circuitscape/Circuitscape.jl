@@ -156,7 +156,7 @@ end
 
 function read_geotiff(f)
     gt=GeoArrays.read(f)
-    permutedims(gt[:,:,1]), RasterMeta(size(gt,2), size(gt,1), ga.f.translation[1], ga.f.translation[1], gt.f.linear[1,1], -Inf,FILE_TYPE_GEOTIFF, gt.crs,gt.f)
+    permutedims(gt[:,:,1]), RasterMeta(size(gt,2), size(gt,1), gt.f.translation[1], gt.f.translation[2], gt.f.linear[1,1], -Inf,FILE_TYPE_GEOTIFF, gt.crs,gt.f)
 end
 
 function _guess_file_type(filename, f)
