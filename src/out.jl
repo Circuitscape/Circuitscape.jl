@@ -392,7 +392,7 @@ end
 function write_geotiff(cmap, filename, hbmeta)
 	ga = GeoArray(permutedims(cmap))
 	ga.crs = hbmeta.crs
-	ga.f = hbmeta.f
+	ga.f = hbmeta.affine_map
 	GeoArrays.write!(filename, ga)
 end
 
