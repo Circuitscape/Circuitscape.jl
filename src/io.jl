@@ -301,7 +301,7 @@ function read_source_and_ground_maps(T, V, source_file, ground_file, habitatmeta
     f = endswith(ground_file, "gz") ? Gzip.open(ground_file, "r") : open(ground_file, "r")
     filetype = _guess_file_type(ground_file, f)
 
-    if filetype == FILE_TYPE_AAGRID | filetype == FILE_TYPE_GEOTIFF
+    if filetype == FILE_TYPE_AAGRID || filetype == FILE_TYPE_GEOTIFF
         ground_map = read_polymap(T, ground_file, habitatmeta; nodata_as = -1)
         ground_map = map(T, ground_map)
     else
@@ -314,7 +314,7 @@ function read_source_and_ground_maps(T, V, source_file, ground_file, habitatmeta
     f = endswith(source_file, "gz") ? Gzip.open(source_file, "r") : open(source_file, "r")
     filetype = _guess_file_type(source_file, f)
 
-    if filetype == FILE_TYPE_AAGRID | filetype == FILE_TYPE_GEOTIFF
+    if filetype == FILE_TYPE_AAGRID || filetype == FILE_TYPE_GEOTIFF
         source_map = read_polymap(T, source_file, habitatmeta)
         source_map = map(T, source_map)
     else
