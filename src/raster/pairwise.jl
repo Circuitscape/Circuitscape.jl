@@ -1,7 +1,7 @@
 struct RasterFlags
-    is_raster::Bool 
+    is_raster::Bool
     is_pairwise::Bool
-    is_advanced::Bool 
+    is_advanced::Bool
     is_onetoall::Bool
     is_alltoone::Bool
     grnd_file_is_res::Bool
@@ -16,11 +16,11 @@ function raster_pairwise(T, V, cfg)::Matrix{T}
 
     # Get input
     rasterdata = load_raster_data(T, V, cfg)
-    
+
     # Get compute flags
     flags = get_raster_flags(cfg)
 
-    pt_file_contains_polygons = length(rasterdata.points_rc[1]) != 
+    pt_file_contains_polygons = length(rasterdata.points_rc[1]) !=
                                 length(unique(rasterdata.points_rc[3]))
 
     if pt_file_contains_polygons
@@ -31,7 +31,7 @@ function raster_pairwise(T, V, cfg)::Matrix{T}
 end
 
 function get_raster_flags(cfg)
-    
+
     # Computation flags
     is_raster = true
     is_pairwise = cfg["scenario"] in PAIRWISE
@@ -41,33 +41,33 @@ function get_raster_flags(cfg)
     four_neighbors = cfg["connect_four_neighbors_only"] in TRUELIST
     avg_res = cfg["connect_using_avg_resistances"] in TRUELIST
     solver = cfg["solver"]
-    ground_file_is_resistances = 
+    ground_file_is_resistances =
         cfg["ground_file_is_resistances"] in TRUELIST
     policy = Symbol(cfg["remove_src_or_gnd"])
 
     # Output Flags
     o = get_output_flags(cfg)
-    
-    RasterFlags(is_raster, is_pairwise, is_advanced, 
+
+    RasterFlags(is_raster, is_pairwise, is_advanced,
                 is_onetoall, is_alltoone,
                 ground_file_is_resistances, policy,
                 four_neighbors, avg_res, solver, o)
 end
 
-function _pt_file_no_polygons_path(rasterdata::RasData{T,V}, 
+function _pt_file_no_polygons_path(rasterdata::RasData{T,V},
                     flags, cfg)::Matrix{T} where {T,V}
 
     graphdata = compute_graph_data_no_polygons(rasterdata, flags)
     r = single_ground_all_pairs(graphdata, flags, cfg)
 
-    write_cum_maps(graphdata.cum, rasterdata.cellmap, cfg, rasterdata.hbmeta, 
+    write_cum_maps(graphdata.cum, rasterdata.cellmap, cfg, rasterdata.hbmeta,
                     flags.outputflags.write_max_cur_maps,
                     flags.outputflags.write_cum_cur_map_only)
 
     r
 end
 
-function _pt_file_polygons_path(rasterdata::RasData{T,V}, 
+function _pt_file_polygons_path(rasterdata::RasData{T,V},
                         flags, cfg)::Matrix{T} where {T,V}
 
     # get unique list of points
@@ -112,8 +112,8 @@ function _pt_file_polygons_path(rasterdata::RasData{T,V},
     P = [0, pts...]
     r = hcat(P, vcat(pts', resistances))
 
-    write_cum_maps(cum, gmap, cfg, rasterdata.hbmeta, 
-                   flags.outputflags.write_max_cur_maps, 
+    write_cum_maps(cum, gmap, cfg, rasterdata.hbmeta,
+                   flags.outputflags.write_max_cur_maps,
                    flags.outputflags.write_cum_cur_map_only)
 
     # save resistances
@@ -123,7 +123,7 @@ function _pt_file_polygons_path(rasterdata::RasData{T,V},
 end
 
 function calc_num_pairs(pts)
-    n = 0 
+    n = 0
     for i = 1:size(pts, 1)
         for j = i+1:size(pts, 1)
             n += 1
@@ -132,7 +132,7 @@ function calc_num_pairs(pts)
     n
 end
 
-function compute_graph_data_polygons(rasterdata::RasData{T,V}, 
+function compute_graph_data_polygons(rasterdata::RasData{T,V},
                             flags, pt1, pt2, cum)::GraphData{T,V} where {T,V}
 
     # Data
@@ -168,16 +168,16 @@ function compute_graph_data_polygons(rasterdata::RasData{T,V},
 
     # Exclude pairs array
     exclude_pairs = Tuple{V,V}[]
-    
-    GraphData(G, cc, points, [pt1, pt2], 
+
+    GraphData(G, cc, points, [pt1, pt2],
             exclude_pairs, nodemap, newpoly, hbmeta, gmap, cum)
 end
 
 #=function compute_graph_data(rasterdata, flags)
-    
+
     points_rc = rasterdata.points_rc
 
-    pt_file_contains_polygons = 
+    pt_file_contains_polygons =
             length(points_rc[1]) != length(unique(points_rc[3]))
 
     if !pt_file_contains_polygons
@@ -187,16 +187,16 @@ end
     graphdata
 end=#
 
-function compute_graph_data_no_polygons(data::RasData{T,V}, 
+function compute_graph_data_no_polygons(data::RasData{T,V},
                     flags)::GraphData{T,V} where {T,V}
 
     # Data
     cellmap = data.cellmap
     polymap = data.polymap
     points_rc = data.points_rc
-    included_pairs = data.included_pairs    
+    included_pairs = data.included_pairs
     hbmeta = data.hbmeta
-    
+
     # Flags
     avg_res = flags.avg_res
     four_neighbors = flags.four_neighbors
@@ -208,7 +208,7 @@ function compute_graph_data_no_polygons(data::RasData{T,V},
     G = laplacian(G)
 
     # Connected Components
-    cc = connected_components(SimpleWeightedGraph(G))    
+    cc = connected_components(SimpleWeightedGraph(G))
 
     # Generate exclude pairs array
     if !isempty(included_pairs)
@@ -225,8 +225,8 @@ function compute_graph_data_no_polygons(data::RasData{T,V},
     # Cumulative current maps
     cum = initialize_cum_maps(cellmap, write_max_cur_maps)
 
-    GraphData(G, cc, points, points_rc[3], 
-                exclude_pairs, nodemap, polymap, 
+    GraphData(G, cc, points, points_rc[3],
+                exclude_pairs, nodemap, polymap,
                 hbmeta, cellmap, cum)
 end
 Base.isempty(t::IncludeExcludePairs) = t.mode == :undef
@@ -235,7 +235,7 @@ function generate_exclude_pairs(points_rc, included_pairs::IncludeExcludePairs{V
 
     exclude_pairs_array = Tuple{V,V}[]
     mat = included_pairs.include_pairs
-    mode = included_pairs.mode == :include ? 0 : 1    
+    mode = included_pairs.mode == :include ? 0 : 1
 
     prune_points!(points_rc, included_pairs.point_ids)
     for j = 1:size(mat, 2)
@@ -254,7 +254,7 @@ function construct_node_map(gmap, polymap::Matrix{V}) where V
     nodemap = zeros(V, size(gmap))
     ind = gmap .> 0
     nodemap[ind] = 1:sum(ind)
-    
+
     if isempty(polymap)
         return nodemap
     end
@@ -308,7 +308,7 @@ function construct_node_map(gmap, polymap::Matrix{V}) where V
         end
     end=#
 
-    idx = gmap .> 0 
+    idx = gmap .> 0
     polymap_pruned = zeros(V, size(gmap))
     polymap_pruned[idx] = polymap[idx]
 
@@ -331,7 +331,7 @@ end
 
 function relabel!(nodemap::Matrix{V}, offset = V(0)) where V
     oldlabels = nodemap[findall(x->x!=0,nodemap)]
-    newlabels = zeros(V, size(oldlabels)) 
+    newlabels = zeros(V, size(oldlabels))
     s = sort(oldlabels)
     perm = sortperm(oldlabels)
     prepend!(s, s[1] - 1)
@@ -395,15 +395,15 @@ cond_avg(x, y) = (x + y) / 2
 weird_avg(x,y) = (x + y) / (2*√2)
 weirder_avg(x, y) = 1 / (√2 * (1/x + 1/y) / 2)
 
-function create_new_polymap(gmap, polymap::Matrix{V}, points_rc, 
+function create_new_polymap(gmap, polymap::Matrix{V}, points_rc,
                 pt1 = 0, pt2 = 0, point_map = Matrix{V}(undef,0,0)) where V
-    
+
     f(x) = (points_rc[1][x], points_rc[2][x])
 
     if !isempty(point_map)
         # Combine polymap and pointmap
         newpoly = deepcopy(polymap)
-        point_file_no_polygons = length(points_rc[3]) == 
+        point_file_no_polygons = length(points_rc[3]) ==
                         length(unique(points_rc[3]))
         if isempty(polymap)
             newpoly = point_map
