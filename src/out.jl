@@ -83,7 +83,7 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
 
         # Write current maps
         !write_cum_cur_map_only &&
-                        write_aagrid(cmap, name, cfg, hbmeta)
+                        write_grid(cmap, name, cfg, hbmeta)
 
    end
 end
@@ -333,7 +333,7 @@ function write_grid(cmap, name, cfg, hbmeta;
 		write_geotiff(cmap,filename,hbmeta)
 	else
 		filename = "$(pref)_$(str)$(name).asc"
-		write_aaigrid(cmap,filename,hbmeta)
+		write_aagrid(cmap,filename,hbmeta)
 	end
 end
 
@@ -366,11 +366,16 @@ function write_grid(cmap, name, cfg, hbmeta, cellmap;
     end
 
     filename = "$(pref)_$(str)$(name).asc"
-	write_aaigrid(cmap,filename,hbmeta)
-
+	if hbmeta.filetype == FILE_TYPE_GEOTIFF
+		filename = "$(pref)_$(str)$(name).tif"
+		write_geotiff(cmap,filename,hbmeta)
+	else
+		filename = "$(pref)_$(str)$(name).asc"
+		write_aagrid(cmap,filename,hbmeta)
+	end
 end
 
-function write_aaigrid(cmap,filename,hbmeta)
+function write_aagrid(cmap,filename,hbmeta)
 	f = open(filename, "w")
 
 	write(f, "ncols         $(hbmeta.ncols)\n")
@@ -410,7 +415,7 @@ function write_volt_maps(name, output, component_data, flags, cfg)
         set_null_voltages_to_nodata = flags.outputflags.set_null_voltages_to_nodata
 
         vm = _create_voltage_map(voltages, nodemap, hbmeta)
-        write_aagrid(vm, name, cfg, hbmeta, component_data.cellmap, voltage = true,
+        write_grid(vm, name, cfg, hbmeta, component_data.cellmap, voltage = true,
                         set_null_to_nodata = set_null_voltages_to_nodata)
     end
 end
@@ -480,7 +485,7 @@ function write_cum_maps(cum, cellmap::Matrix{T}, cfg, hbmeta, write_max, write_c
             cum_curr .+= cum.cum_curr[i]
         end
         postprocess_cum_curmap!(cum_curr)
-        write_aagrid(cum_curr, "", cfg, hbmeta, cum = true)
+        write_grid(cum_curr, "", cfg, hbmeta, cum = true)
     end
 
     if write_max
@@ -489,7 +494,7 @@ function write_cum_maps(cum, cellmap::Matrix{T}, cfg, hbmeta, write_max, write_c
             max_curr .= max.(cum.max_curr[i], max_curr)
         end
         postprocess_cum_curmap!(max_curr)
-        write_aagrid(max_curr, "", cfg, hbmeta, max = true)
+        write_grid(max_curr, "", cfg, hbmeta, max = true)
     end
 
 end
