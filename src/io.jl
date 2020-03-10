@@ -165,7 +165,7 @@ function read_geotiff(T, f)
     affine_map = gt.f
     file_type = FILE_TYPE_GEOTIFF
     nodata = -Inf
-    convert(Array{T},permutedims(gt.A[:,:,1])), RasterMeta(ncols, nrows, xll, yll, cellsize, nodata, file_type,crs, affine_map)
+    Array{T}(permutedims(gt.A[:,:,1])), RasterMeta(ncols, nrows, xll, yll, cellsize, nodata, file_type,crs, affine_map)
 end
 
 function _guess_file_type(filename, f)
