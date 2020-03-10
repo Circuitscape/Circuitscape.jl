@@ -390,7 +390,7 @@ function write_aagrid(cmap,filename,hbmeta)
 end
 
 function write_geotiff(cmap, filename, hbmeta)
-	ga = GeoArray(permutedims(convert(Float16,cmap))
+	ga = GeoArray(permutedims(convert(Float16,cmap)))
 	ga.crs = hbmeta.crs
 	ga.f = hbmeta.affine_map
 	GeoArrays.write!(filename, ga)
