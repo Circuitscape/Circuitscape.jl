@@ -68,7 +68,7 @@ end
 function read_cellmap(habitat_file::String, is_res::Bool, ::Type{T}) where {T}
 
     if is_geotiff(habitat_file)
-        cell_map, rastermeta = read_geotiff(habitat_file)
+        cell_map, rastermeta = read_geotiff(T, habitat_file)
     else
         cell_map, rastermeta = _ascii_grid_reader(T, habitat_file)
     end
@@ -154,9 +154,9 @@ function is_geotiff(filename)
     endswith(filename,"tif") | endswith(filename,"tiff")
 end
 
-function read_geotiff(f)
+function read_geotiff(T, f)
     gt=GeoArrays.read(f)
-    permutedims(gt[:,:,1]), RasterMeta(size(gt,2), size(gt,1), gt.f.translation[1], gt.f.translation[2], gt.f.linear[1,1], -Inf,FILE_TYPE_GEOTIFF, gt.crs,gt.f)
+    convert(Array{T},permutedims(gt[:,:,1])), RasterMeta(size(gt,2), size(gt,1), gt.f.translation[1], gt.f.translation[2], gt.f.linear[1,1], -Inf,FILE_TYPE_GEOTIFF, gt.crs,gt.f)
 end
 
 function _guess_file_type(filename, f)
@@ -187,7 +187,7 @@ function read_polymap(T, file::String, habitatmeta;
                             nodata_as = 0, resample = true)
 
     if is_geotiff(file)
-        polymap, rastermeta = read_geotiff(file)
+        polymap, rastermeta = read_geotiff(T, file)
     else
         polymap, rastermeta = _ascii_grid_reader(T, file)
     end
