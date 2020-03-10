@@ -328,7 +328,7 @@ function write_grid(cmap, name, cfg, hbmeta;
     end
 
     pref = split(cfg["output_file"], ".out")[1]
-	if hbmeta.filetype == FILE_TYPE_GEOTIFF
+	if hbmeta.file_type == FILE_TYPE_GEOTIFF
 		filename = "$(pref)_$(str)$(name).tif"
 		write_geotiff(cmap,filename,hbmeta)
 	else
@@ -366,7 +366,7 @@ function write_grid(cmap, name, cfg, hbmeta, cellmap;
     end
 
     filename = "$(pref)_$(str)$(name).asc"
-	if hbmeta.filetype == FILE_TYPE_GEOTIFF
+	if hbmeta.file_type == FILE_TYPE_GEOTIFF
 		filename = "$(pref)_$(str)$(name).tif"
 		write_geotiff(cmap,filename,hbmeta)
 	else
