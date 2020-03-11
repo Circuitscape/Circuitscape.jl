@@ -24,9 +24,11 @@ struct RasterMeta
     cellsize::Float64
     nodata::Float64
     file_type::Int
+    crs::String
+    affine_map::AffineMap
 end
 function RasterMeta()
-    RasterMeta(0,0,0,0,0,0,0)
+    RasterMeta(0,0,0,0,0,0,0,"",AffineMap([0 0; 0 0], [0, 0]))
 end
 
 struct RasData{T,V} <: Data
@@ -65,7 +67,11 @@ end
 
 function read_cellmap(habitat_file::String, is_res::Bool, ::Type{T}) where {T}
 
-    cell_map, rastermeta = _ascii_grid_reader(T, habitat_file)
+    if is_geotiff(habitat_file)
+        cell_map, rastermeta = read_geotiff(T, habitat_file)
+    else
+        cell_map, rastermeta = _ascii_grid_reader(T, habitat_file)
+    end
 
     gmap = similar(cell_map)
     ind = findall(x -> x == -9999, cell_map)
@@ -123,7 +129,7 @@ function _ascii_grid_read_header(habitat_file, f)
         nodata = parse(Float64, s[2])
     end
     seek(f, 0)
-    RasterMeta(ncols, nrows, xllcorner, yllcorner, cellsize, nodata, file_type)
+    RasterMeta(ncols, nrows, xllcorner, yllcorner, cellsize, nodata, file_type ,"", AffineMap([0 0; 0 0], [0, 0]))
 end
 
 #=function _guess_file_type(filename, f)
@@ -144,21 +150,43 @@ end
 
 end=#
 
+function is_geotiff(filename)
+    endswith(filename,"tif") | endswith(filename,"tiff")
+end
+
+function read_geotiff(T, f)
+    gt=GeoArrays.read(f)
+    ncols = size(gt,1)
+    nrows = size(gt,2)
+    xll = gt.f.translation[1]
+    yll= gt.f.translation[2]-gt.f.linear[1,1]-(gt.f.linear[1,1]*(size(gt,2)-1))
+    cellsize = gt.f.linear[1,1]
+    crs = gt.crs
+    affine_map = gt.f
+    file_type = FILE_TYPE_GEOTIFF
+    nodata = -Inf
+    Array{T}(permutedims(gt.A[:,:,1])), RasterMeta(ncols, nrows, xll, yll, cellsize, nodata, file_type,crs, affine_map)
+end
+
 function _guess_file_type(filename, f)
 
-    hdr = readline(f)
-    seek(f, 0)
-
-    if startswith(hdr, FILE_HDR_NPY)
-        filetype = FILE_TYPE_NPY
-    elseif startswith(lowercase(hdr), FILE_HDR_AAGRID)
-        filetype = FILE_TYPE_AAGRID
-    elseif startswith(hdr, FILE_HDR_INCL_PAIRS_AAGRID)
-        filetype = FILE_TYPE_INCL_PAIRS_AAGRID
-    elseif startswith(hdr, FILE_HDR_INCL_PAIRS)
-        filetype = FILE_TYPE_INCL_PAIRS
+    if is_geotiff(filename)
+        filetype = FILE_TYPE_GEOTIFF
     else
-        filetype = FILE_TYPE_TXTLIST
+        hdr = readline(f)
+        seek(f, 0)
+
+        if startswith(hdr, FILE_HDR_NPY)
+            filetype = FILE_TYPE_NPY
+        elseif startswith(lowercase(hdr), FILE_HDR_AAGRID)
+            filetype = FILE_TYPE_AAGRID
+        elseif startswith(hdr, FILE_HDR_INCL_PAIRS_AAGRID)
+            filetype = FILE_TYPE_INCL_PAIRS_AAGRID
+        elseif startswith(hdr, FILE_HDR_INCL_PAIRS)
+            filetype = FILE_TYPE_INCL_PAIRS
+        else
+            filetype = FILE_TYPE_TXTLIST
+        end
     end
 
     return filetype
@@ -167,23 +195,43 @@ end
 function read_polymap(T, file::String, habitatmeta;
                             nodata_as = 0, resample = true)
 
-    polymap, rastermeta = _ascii_grid_reader(T, file)
+    if is_geotiff(file)
+        polymap, rastermeta = read_geotiff(T, file)
+    else
+        polymap, rastermeta = _ascii_grid_reader(T, file)
+    end
 
     ind = findall(x -> x == rastermeta.nodata, polymap)
     if nodata_as != -1
         polymap[ind] .= nodata_as
     end
 
-    if rastermeta.cellsize != habitatmeta.cellsize
-        cswarn("cellsize is not the same")
-    elseif rastermeta.ncols != habitatmeta.ncols
-        cswarn("ncols is not the same")
-    elseif rastermeta.nrows != habitatmeta.nrows
-        cswarn("nrows is not the same")
-    elseif rastermeta.yllcorner != habitatmeta.yllcorner
-        cswarn("yllcorner is not the same")
-    elseif rastermeta.xllcorner != habitatmeta.xllcorner
-        cswarn("xllcorner is not the same")
+    if(is_geotiff(file))
+        if rastermeta.yllcorner != habitatmeta.yllcorner
+            cswarn("yllcorner is not the same")
+        elseif rastermeta.xllcorner != habitatmeta.xllcorner
+            cswarn("xllcorner is not the same")
+        elseif rastermeta.ncols != habitatmeta.ncols
+            cswarn("ncols is not the same")
+        elseif rastermeta.nrows != habitatmeta.nrows
+            cswarn("nrows is not the same")
+        elseif rastermeta.cellsize != habitatmeta.cellsize
+            cswarn("cellsize is not the same")
+        elseif rastermeta.crs != habitatmeta.crs
+            cswarn("reference system is not the same")
+        end
+    else
+        if rastermeta.cellsize != habitatmeta.cellsize
+            cswarn("cellsize is not the same")
+        elseif rastermeta.ncols != habitatmeta.ncols
+            cswarn("ncols is not the same")
+        elseif rastermeta.nrows != habitatmeta.nrows
+            cswarn("nrows is not the same")
+        elseif rastermeta.yllcorner != habitatmeta.yllcorner
+            cswarn("yllcorner is not the same")
+        elseif rastermeta.xllcorner != habitatmeta.xllcorner
+            cswarn("xllcorner is not the same")
+        end
     end
 
     polymap
@@ -253,7 +301,7 @@ function read_source_and_ground_maps(T, V, source_file, ground_file, habitatmeta
     f = endswith(ground_file, "gz") ? Gzip.open(ground_file, "r") : open(ground_file, "r")
     filetype = _guess_file_type(ground_file, f)
 
-    if filetype == FILE_TYPE_AAGRID
+    if filetype == FILE_TYPE_AAGRID || filetype == FILE_TYPE_GEOTIFF
         ground_map = read_polymap(T, ground_file, habitatmeta; nodata_as = -1)
         ground_map = map(T, ground_map)
     else
@@ -266,7 +314,7 @@ function read_source_and_ground_maps(T, V, source_file, ground_file, habitatmeta
     f = endswith(source_file, "gz") ? Gzip.open(source_file, "r") : open(source_file, "r")
     filetype = _guess_file_type(source_file, f)
 
-    if filetype == FILE_TYPE_AAGRID
+    if filetype == FILE_TYPE_AAGRID || filetype == FILE_TYPE_GEOTIFF
         source_map = read_polymap(T, source_file, habitatmeta)
         source_map = map(T, source_map)
     else

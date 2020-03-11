@@ -13,6 +13,9 @@ using Distributed
 using DelimitedFiles
 using Logging
 using Dates
+using CoordinateTransformations
+using GDAL_jll
+using GeoArrays
 
 include("consts.jl")
 include("config.jl")

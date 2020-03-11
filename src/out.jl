@@ -25,9 +25,9 @@ function compute_3col(resistances::Matrix{T}) where {T}
     r3col
 end
 
-    
+
 function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
-    
+
     # Get desired data
     G = component_data.matrix
     voltages = flags.is_advanced ? output : output.voltages
@@ -38,7 +38,7 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
 
     # Flags
     log_transform = flags.outputflags.log_transform_maps
-    set_null_currents_to_nodata = 
+    set_null_currents_to_nodata =
         flags.outputflags.set_null_currents_to_nodata
     write_max_cur_maps = flags.outputflags.write_max_cur_maps
     write_cum_cur_map_only = flags.outputflags.write_cum_cur_map_only
@@ -50,7 +50,7 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
         # Branch currents
         branch_currents_array = _convert_to_3col(branch_currents, cc)
 
-        # TODO: implement cumulative maps for netowrk mode 
+        # TODO: implement cumulative maps for netowrk mode
 
         # Accumulate branch currents
         # cum_branch_curr[mycsid()] .+= branch_currents_array[:,3]
@@ -61,7 +61,7 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
         # Accumulate node currents
         # cum_node_curr[mycsid()] .+= node_currents_array[:,2]
 
-        # !write_cum_cur_map_only && 
+        # !write_cum_cur_map_only &&
         write_currents(node_currents_array, branch_currents_array, name, cfg)
     else
 
@@ -70,20 +70,20 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
         max_curr = output.cum.max_curr
 
         # Process the current map
-        process_grid!(cmap, cellmap, hbmeta, log_transform = log_transform, 
+        process_grid!(cmap, cellmap, hbmeta, log_transform = log_transform,
                             set_null_to_nodata = set_null_currents_to_nodata)
 
         # Accumulate by default
         cum_curr[mycsid()] .+= cmap
 
         # Max current if user asks for it
-        if write_max_cur_maps 
+        if write_max_cur_maps
             max_curr[mycsid()] .= max.(max_curr[mycsid()], cmap)
         end
 
         # Write current maps
         !write_cum_cur_map_only &&
-                        write_aagrid(cmap, name, cfg, hbmeta)
+                        write_grid(cmap, name, cfg, hbmeta)
 
    end
 end
@@ -155,13 +155,13 @@ function get_node_currents(G, voltages, finitegrounds)
 
 end
 
-function _get_node_currents_posneg(G::SparseMatrixCSC{T,V}, 
+function _get_node_currents_posneg(G::SparseMatrixCSC{T,V},
                             voltages, finitegrounds, pos) where {T,V}
 
     branch_currents = _get_branch_currents(G, voltages, pos)
     branch_currents = branch_currents - branch_currents'
     dropnonzeros!(branch_currents)
-   
+
 	if finitegrounds[1]!= -9999
         finiteground_currents = finitegrounds .* voltages
         if pos
@@ -194,7 +194,7 @@ end
 function _get_branch_currents(G::SparseMatrixCSC{T,V}, voltages, pos) where {T,V}
 
     branch_currents = _get_branch_currents_posneg(G, voltages, pos)
-    
+
     # Make sparse matrix with branch_currents as right upper triangle
     N = size(G, 1)
     n = size(branch_currents, 1)
@@ -219,7 +219,7 @@ function _get_branch_currents(G::SparseMatrixCSC{T,V}, voltages, pos) where {T,V
 	# branch_currents
 end
 
-function _get_branch_currents_posneg(G::SparseMatrixCSC{T,V}, 
+function _get_branch_currents_posneg(G::SparseMatrixCSC{T,V},
                                 v::Vector{T}, pos) where {T,V}
 
     #=I,J,V = findnz(G)
@@ -297,7 +297,7 @@ function count_upper(G)
     n
 end
 
-function process_grid!(cmap, cellmap, hbmeta; log_transform = false, 
+function process_grid!(cmap, cellmap, hbmeta; log_transform = false,
                                 set_null_to_nodata = false)
     if log_transform
         map!(x -> x > 0 ? log10(x) : float(hbmeta.nodata), cmap, cmap)
@@ -312,9 +312,9 @@ function process_grid!(cmap, cellmap, hbmeta; log_transform = false,
     end
 
 end
-        
-function write_aagrid(cmap, name, cfg, hbmeta; 
-                        voltage = false, cum = false, 
+
+function write_grid(cmap, name, cfg, hbmeta;
+                        voltage = false, cum = false,
                         max = false)
 
 
@@ -328,22 +328,17 @@ function write_aagrid(cmap, name, cfg, hbmeta;
     end
 
     pref = split(cfg["output_file"], ".out")[1]
-    filename = "$(pref)_$(str)$(name).asc"
-    f = open(filename, "w")
-
-    write(f, "ncols         $(hbmeta.ncols)\n")
-    write(f, "nrows         $(hbmeta.nrows)\n")
-    write(f, "xllcorner     $(hbmeta.xllcorner)\n")
-    write(f, "yllcorner     $(hbmeta.yllcorner)\n")
-    write(f, "cellsize      $(hbmeta.cellsize)\n")
-    write(f, "NODATA_value  $(hbmeta.nodata)\n")
-
-    writedlm(f, round.(cmap, digits=8), ' ')
-    close(f)
+	if hbmeta.file_type == FILE_TYPE_GEOTIFF
+		filename = "$(pref)_$(str)$(name).tif"
+		write_geotiff(cmap,filename,hbmeta)
+	else
+		filename = "$(pref)_$(str)$(name).asc"
+		write_aagrid(cmap,filename,hbmeta)
+	end
 end
 
 
-function write_aagrid(cmap, name, cfg, hbmeta, cellmap;
+function write_grid(cmap, name, cfg, hbmeta, cellmap;
                         voltage = false, cum = false, max = false,
                         log_transform = false, set_null_to_nodata = false)
 
@@ -371,17 +366,34 @@ function write_aagrid(cmap, name, cfg, hbmeta, cellmap;
     end
 
     filename = "$(pref)_$(str)$(name).asc"
-    f = open(filename, "w")
+	if hbmeta.file_type == FILE_TYPE_GEOTIFF
+		filename = "$(pref)_$(str)$(name).tif"
+		write_geotiff(cmap,filename,hbmeta)
+	else
+		filename = "$(pref)_$(str)$(name).asc"
+		write_aagrid(cmap,filename,hbmeta)
+	end
+end
 
-    write(f, "ncols         $(hbmeta.ncols)\n")
-    write(f, "nrows         $(hbmeta.nrows)\n")
-    write(f, "xllcorner     $(hbmeta.xllcorner)\n")
-    write(f, "yllcorner     $(hbmeta.yllcorner)\n")
-    write(f, "cellsize      $(hbmeta.cellsize)\n")
-    write(f, "NODATA_value  $(hbmeta.nodata)\n")
+function write_aagrid(cmap,filename,hbmeta)
+	f = open(filename, "w")
 
-    writedlm(f, round.(cmap, digits=8), ' ')
-    close(f)
+	write(f, "ncols         $(hbmeta.ncols)\n")
+	write(f, "nrows         $(hbmeta.nrows)\n")
+	write(f, "xllcorner     $(hbmeta.xllcorner)\n")
+	write(f, "yllcorner     $(hbmeta.yllcorner)\n")
+	write(f, "cellsize      $(hbmeta.cellsize)\n")
+	write(f, "NODATA_value  $(hbmeta.nodata)\n")
+
+	writedlm(f, round.(cmap, digits=8), ' ')
+	close(f)
+end
+
+function write_geotiff(cmap, filename, hbmeta)
+	ga = GeoArray(permutedims(Array{Float32}(cmap)))
+	ga.crs = hbmeta.crs
+	ga.f = hbmeta.affine_map
+	GeoArrays.write!(filename, ga)
 end
 
 function write_volt_maps(name, output, component_data, flags, cfg)
@@ -403,7 +415,7 @@ function write_volt_maps(name, output, component_data, flags, cfg)
         set_null_voltages_to_nodata = flags.outputflags.set_null_voltages_to_nodata
 
         vm = _create_voltage_map(voltages, nodemap, hbmeta)
-        write_aagrid(vm, name, cfg, hbmeta, component_data.cellmap, voltage = true, 
+        write_grid(vm, name, cfg, hbmeta, component_data.cellmap, voltage = true,
                         set_null_to_nodata = set_null_voltages_to_nodata)
     end
 end
@@ -466,14 +478,14 @@ function save_resistances(r, cfg)
 end
 
 function write_cum_maps(cum, cellmap::Matrix{T}, cfg, hbmeta, write_max, write_cum) where T
-    
+
     if write_cum || cfg["write_cur_maps"] in TRUELIST
         cum_curr = zeros(T, size(cellmap)...)
         for i = 1:nprocs()
             cum_curr .+= cum.cum_curr[i]
-        end 
+        end
         postprocess_cum_curmap!(cum_curr)
-        write_aagrid(cum_curr, "", cfg, hbmeta, cum = true)
+        write_grid(cum_curr, "", cfg, hbmeta, cum = true)
     end
 
     if write_max
@@ -482,7 +494,7 @@ function write_cum_maps(cum, cellmap::Matrix{T}, cfg, hbmeta, write_max, write_c
             max_curr .= max.(cum.max_curr[i], max_curr)
         end
         postprocess_cum_curmap!(max_curr)
-        write_aagrid(max_curr, "", cfg, hbmeta, max = true)
+        write_grid(max_curr, "", cfg, hbmeta, max = true)
     end
 
 end

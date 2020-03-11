@@ -1,5 +1,6 @@
 import Circuitscape: construct_node_map
 using Circuitscape
+using CoordinateTransformations
 
 # Construct nodemap tests
 let
@@ -136,7 +137,7 @@ end
 
 # 2D Model Problems
 
-SIZE_2 = 
+SIZE_2 =
 
 [2.0  -1.0  -1.0   0.0
 -1.0   2.0   0.0  -1.0
@@ -145,7 +146,7 @@ SIZE_2 =
 
 @test model_problem(2) == SIZE_2
 
-SIZE_3 = 
+SIZE_3 =
 
 [2.0  -1.0   0.0  -1.0   0.0   0.0   0.0   0.0   0.0
 -1.0   3.0  -1.0   0.0  -1.0   0.0   0.0   0.0   0.0
@@ -163,7 +164,7 @@ SIZE_3 =
 # Issue 151
 try
     Circuitscape.read_point_map(Int32, "samples.txt",
-                                Circuitscape.RasterMeta(50, 50, 0.0, 0.0, 0.5, -9999.0, 2))
+                                Circuitscape.RasterMeta(50, 50, 0.0, 0.0, 0.5, -9999.0, 2, "", AffineMap([0 0; 0 0], [0, 0])))
 catch e
     @test e == "At least one focal node location falls outside of habitat map"
 end
