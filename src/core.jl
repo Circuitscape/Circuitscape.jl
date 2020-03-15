@@ -395,7 +395,6 @@ function cholmod_solver_path(data::GraphData{T,V}, flags,
             g.(1:size(csub, 1))
         end
 
-        # l = min(num, length(cholmod_batch))
         l = length(cholmod_batch)
 
         for st in 1:batch_size:l
@@ -419,10 +418,14 @@ function cholmod_solver_path(data::GraphData{T,V}, flags,
                 x = zeros(eltype(matrix), size(matrix, 1))
                 for i = 1:size(lhs, 2)
                     factor(x, mat, rhs[:,i]) 
+                    @assert norm(mat*x - rhs[:,i]) < 1e-5
                     lhs[:,i] .= x
                 end
             else
                 lhs = factor \ rhs
+                for i = 1:size(rhs, 2)
+                    @assert norm(matrix*lhs[:,i] - rhs[:,i]) < 1e-5
+                end
             end
 
             # Normalisation step
@@ -586,7 +589,7 @@ function solve_linear_system(cfg,
             G::SparseMatrixCSC{T,V}, 
             curr::Vector{T}, M)::Vector{T} where {T,V} 
     v = cg(G, curr, Pl = M, tol = T(1e-6), maxiter = 100_000)
-    # @assert norm(G*v - curr) < 1e-8
+    @assert norm(G*v - curr) < 1e-5
     v
 end
 
