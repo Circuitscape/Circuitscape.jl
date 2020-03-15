@@ -223,6 +223,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
             update_shortcut_resistances!(idx, shortcut, resistances, points, comp)
         else
             X = pmap(x ->f(x), 1:size(csub,1))
+            GC.gc()
 
             # Set all resistances
             for x in X
@@ -584,7 +585,9 @@ function sum_off_diag(G, i)
 function solve_linear_system(cfg, 
             G::SparseMatrixCSC{T,V}, 
             curr::Vector{T}, M)::Vector{T} where {T,V} 
-    cg(G, curr, Pl = M, tol = T(1e-6), maxiter = 100_000)
+    v = cg(G, curr, Pl = M, tol = T(1e-6), maxiter = 100_000)
+    @assert norm(G*v - curr) < 1e-8
+    v
 end
 
 function postprocess(output, component_data, flags, shortcut, cfg)

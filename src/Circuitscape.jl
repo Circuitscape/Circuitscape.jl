@@ -6,6 +6,7 @@ using LightGraphs
 using IterativeSolvers
 using GZip
 using Pardiso
+using GC
 
 using LinearAlgebra
 using SparseArrays
