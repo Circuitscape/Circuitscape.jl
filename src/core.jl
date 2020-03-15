@@ -213,6 +213,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
             end
 
         # matrix[comp_i, comp_i] = d
+        GC.gc()
 
         ret
         end
@@ -223,7 +224,6 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
             update_shortcut_resistances!(idx, shortcut, resistances, points, comp)
         else
             X = pmap(x ->f(x), 1:size(csub,1))
-            GC.gc()
 
             # Set all resistances
             for x in X
