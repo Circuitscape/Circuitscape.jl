@@ -281,6 +281,8 @@ function runtests(f = compute)
     end
     end
 
+    GC.gc()
+
     @testset "Network Advanced" begin
     # Network advanced tests
     for i = 1:3
@@ -294,6 +296,7 @@ function runtests(f = compute)
     end
     end
 
+    GC.gc()
 
     @testset "Raster Pairwise" begin
     # Raster pairwise tests
@@ -314,6 +317,8 @@ function runtests(f = compute)
     end
     end
 
+    GC.gc()
+
     @testset "Raster Advanced" begin
     # Raster advanced tests
     for i in 1:5
@@ -325,6 +330,8 @@ function runtests(f = compute)
         @info("Test mgVerify$i passed")
     end
     end
+
+    GC.gc()
 
     @testset "Raster One to All" begin
     # Raster one to all test
@@ -338,6 +345,8 @@ function runtests(f = compute)
         @info("Test oneToAllVerify$i passed")
     end
     end
+
+    GC.gc()
 
     @testset "Raster All to One" begin
     # Raster all to one test
