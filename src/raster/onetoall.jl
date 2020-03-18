@@ -135,7 +135,7 @@ function onetoall_kernel(data::RasterData{T,V}, flags, cfg)::Matrix{T} where {T,
         flags.outputflags.write_max_cur_maps && (cum.max_curr[mycsid()] .= max.(cum.max_curr[mycsid()], curr))
     end
 
-    pmap(x -> f(x), 1:num_points_to_solve)
+    map(x -> f(x), 1:num_points_to_solve)
 
     if flags.outputflags.write_cur_maps
         write_cum_maps(cum, gmap, cfg, hbmeta, 
