@@ -210,7 +210,7 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
                         # Solve system
                         # csinfo("Solving points $pi and $pj")
                         log && csinfo("Solving pair $(d[(pi,pj)]) of $num")
-                        t2 = @elapsed v = solve_linear_system(cfg, matrix, current, P)
+                        t2 = @elapsed v = solve_linear_system(matrix, current, P)
                         csinfo("Time taken to solve linear system = $t2 seconds")
                         v .= v .- v[comp_i]
 
@@ -445,7 +445,6 @@ function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, MKLPardisoS
                 end
             end
 
-
             pmap(x -> f(x, rng, lhs), 1:length(rng))
             for (i,v) in enumerate(rng)
                 coords = cholmod_batch[v].points_idx
@@ -596,7 +595,7 @@ function sum_off_diag(G, i)
      sum
  end
 
-function solve_linear_system(cfg, 
+function solve_linear_system(
             G::SparseMatrixCSC{T,V}, 
             curr::Vector{T}, M)::Vector{T} where {T,V} 
     v = cg(G, curr, Pl = M, tol = T(1e-6), maxiter = 100_000)

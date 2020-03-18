@@ -57,7 +57,7 @@ end
 function _pt_file_no_polygons_path(rasterdata::RasterData{T,V}, 
                     flags, cfg)::Matrix{T} where {T,V}
 
-    graphdata = compute_graph_data_no_polygons(rasterdata, flags)
+    graphdata = compute_graph_data_no_polygons(rasterdata, flags, cfg)
     r = single_ground_all_pairs(graphdata, flags, cfg)
 
     write_cum_maps(graphdata.cum, rasterdata.cellmap, cfg, rasterdata.hbmeta, 
@@ -101,7 +101,7 @@ function _pt_file_polygons_path(rasterdata::RasterData{T,V},
             pt2 = pts[j]
             csinfo("Solving pair $k of $n")
             k += 1
-            graphdata = compute_graph_data_polygons(rasterdata, flags, pt1, pt2, cum)
+            graphdata = compute_graph_data_polygons(rasterdata, flags, pt1, pt2, cum, cfg)
             pairwise_resistance = single_ground_all_pairs(graphdata, flags, cfg, false)
             resistances[i,j] = resistances[j,i] = pairwise_resistance[2,3]
         end
@@ -133,7 +133,7 @@ function calc_num_pairs(pts)
 end
 
 function compute_graph_data_polygons(rasterdata::RasterData{T,V}, 
-                            flags, pt1, pt2, cum)::GraphProblem{T,V,W} where {T,V,W}
+                            flags, pt1, pt2, cum, cfg)::GraphProblem{T,V} where {T,V}
 
     # Data
     gmap = rasterdata.cellmap
@@ -176,7 +176,7 @@ function compute_graph_data_polygons(rasterdata::RasterData{T,V},
 end
 
 function compute_graph_data_no_polygons(data::RasterData{T,V}, 
-                    flags)::GraphProblem{T,V,W} where {T,V,W}
+                    flags, cfg)::GraphProblem{T,V} where {T,V}
 
     # Data
     cellmap = data.cellmap

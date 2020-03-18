@@ -32,7 +32,7 @@ function raster_advanced(T, V, cfg)::Matrix{T}
 end
 
 function compute_advanced_data(data::RasterData{T,V}, 
-                        flags)::AdvancedProblem{T,V} where {T,V}
+                        flags,cfg)::AdvancedProblem{T,V} where {T,V}
 
     # Data
     cellmap = data.cellmap
@@ -198,7 +198,7 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, flags, cfg)::Tuple{Matrix
             f_local = finitegrounds
         end
     
-        voltages = multiple_solver(cfg, S, a_local, s_local, g_local, f_local)
+        voltages = multiple_solver(cfg, prob.solver, a_local, s_local, g_local, f_local)
         local_nodemap = construct_local_node_map(nodemap, c, polymap)
         solver_called = true
 
@@ -265,7 +265,7 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, flags, cfg)::Tuple{Matrix
     return volt, outcurr
 end
 
-function multiple_solver(cfg, solver::S, a::SparseMatrixCSC{T,V}, sources, grounds, finitegrounds) where {T,V,S}
+function multiple_solver(cfg, solver, a::SparseMatrixCSC{T,V}, sources, grounds, finitegrounds) where {T,V,S}
     
     asolve = deepcopy(a)
     if finitegrounds[1] != -9999
@@ -298,22 +298,22 @@ function multiple_solver(cfg, solver::S, a::SparseMatrixCSC{T,V}, sources, groun
     voltages
 end
 
-function multiple_solve(s::AMGSolver, matrix, sources)
+function multiple_solve(s::AMGSolver, matrix::SparseMatrixCSC{T,V}, sources::Vector{T}) where {T,V}
     t1 = @elapsed M = aspreconditioner(smoothed_aggregation(matrix))
     csinfo("Time taken to construct preconditioner = $t1 seconds")
-    t1 = @elapsed volt = solve_linear_system(cfg, matrix, sources, M)
+    t1 = @elapsed volt = solve_linear_system(matrix, sources, M)
     csinfo("Time taken to solve linear system = $t1 seconds")
     volt
 end
 
-function multiple_solve(s::CholmodSolver, matrix, sources)
+function multiple_solve(s::CholmodSolver, matrix::SparseMatrixCSC{T,V}, sources::Vector{T}) where {T,V}
     factor = construct_cholesky_factor(matrix, s)
     t1 = @elapsed volt = solve_linear_system(factor, matrix, sources)
     csinfo("Time taken to solve linear system = $t1 seconds")
     volt
 end
 
-function multiple_solve(s::MKLPardisoSolver, matrix, sources)
+function multiple_solve(s::MKLPardisoSolver, matrix::SparseMatrixCSC{T,V}, sources::Vector{T}) where {T,V}
     factor = construct_cholesky_factor(matrix, s)
     t1 = @elapsed volt = solve_linear_system(factor, matrix, sources)
     csinfo("Time taken to solve linear system = $t1 seconds")
