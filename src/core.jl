@@ -75,7 +75,7 @@ function get_solver(cfg)
         bs = parse(Int, cfg["cholmod_batch_size"])
         return CholmodSolver(bs)
     elseif s in MKLPARDISO
-        csinfo("Solver used: CHOLMOD")
+        csinfo("Solver used: MKLPardiso")
         bs = parse(Int, cfg["cholmod_batch_size"])
         return MKLPardisoSolver(bs)
     end
