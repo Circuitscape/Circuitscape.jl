@@ -10,13 +10,13 @@ function network_pairwise(T, V, cfg)::Matrix{T}
     flags = get_network_flags(cfg)
 
     # Compute graph data based on compute flags
-    graphdata = compute_graph_data(networkdata)
+    graphdata = compute_graph_data(networkdata, cfg)
 
     # Send to main kernel
     single_ground_all_pairs(graphdata, flags, cfg)
 end
 
-function compute_graph_data(data::NetworkData{T,V})::GraphData{T,V} where {T,V}
+function compute_graph_data(data::NetworkData{T,V}, cfg)::GraphProblem{T,V} where {T,V}
 
     i,j,v = data.coords
 
@@ -36,6 +36,7 @@ function compute_graph_data(data::NetworkData{T,V})::GraphData{T,V} where {T,V}
 
     # T = eltype(i)
     exclude_pairs = Tuple{V,V}[]
+    solver = get_solver(cfg)
 
     nodemap = Matrix{V}(undef,0,0)
     polymap = Matrix{V}(undef,0,0)
@@ -44,8 +45,8 @@ function compute_graph_data(data::NetworkData{T,V})::GraphData{T,V} where {T,V}
 
     cum = initialize_cum_vectors(v)
 
-    GraphData(G, cc, data.fp, data.fp, 
-                exclude_pairs, nodemap, polymap, hbmeta, cellmap, cum)
+    GraphProblem(G, cc, data.fp, data.fp, 
+                exclude_pairs, nodemap, polymap, hbmeta, cellmap, cum, solver)
 end
 
 function get_network_flags(cfg)

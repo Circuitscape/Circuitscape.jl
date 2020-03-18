@@ -14,6 +14,7 @@ using Distributed
 using DelimitedFiles
 using Logging
 using Dates
+using SuiteSparse
 
 include("consts.jl")
 include("config.jl")

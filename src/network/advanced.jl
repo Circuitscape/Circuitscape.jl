@@ -7,7 +7,7 @@ function network_advanced(T, V, cfg)::Matrix{T}
     flags = get_network_flags(cfg)
 
     # Compute advanced data
-    advanced_data = compute_advanced_data(data, flags)
+    advanced_data = compute_advanced_data(data, flags, cfg)
 
     # Send to main kernel
     v , _ = advanced_kernel(advanced_data, flags, cfg)
@@ -16,7 +16,7 @@ function network_advanced(T, V, cfg)::Matrix{T}
 end
 
 function compute_advanced_data(data::NetworkData{T,V}, 
-                            flags)::AdvancedData{T,V} where {T,V}
+                            flags, cfg)::AdvancedProblem{T,V} where {T,V}
 
     i,j,v = data.coords
     
@@ -37,10 +37,12 @@ function compute_advanced_data(data::NetworkData{T,V},
     nodemap, polymap = Matrix{V}(undef,0,0), Matrix{V}(undef,0,0)
     cellmap = Matrix{T}(undef,0,0)
 
+    solver = get_solver(cfg)
+
     sources, grounds, finite_grounds = 
                 get_sources_and_grounds(data, flags, G, nodemap)
 
     source_map = Matrix{eltype(A)}(undef,0,0)
-    AdvancedData(G, cc, nodemap, polymap, RasterMeta(), 
-                 sources, grounds, source_map, finite_grounds, V(-1), V(0), cellmap)
+    AdvancedProblem(G, cc, nodemap, polymap, RasterMeta(), 
+                 sources, grounds, source_map, finite_grounds, V(-1), V(0), cellmap, solver)
 end

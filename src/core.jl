@@ -5,7 +5,7 @@ struct Cumulative{T}
     cum_node_curr::Vector{SharedVector{T}}
 end
 
-struct GraphData{T,V}
+struct GraphProblem{T,V,W}
     G::SparseMatrixCSC{T,V}
     cc::Vector{Vector{V}}
     points::Vector{V}
@@ -16,6 +16,7 @@ struct GraphData{T,V}
     hbmeta::RasterMeta
     cellmap::Matrix{T}
     cum::Cumulative{T}
+    solver::W
 end
 
 struct ComponentData{T,V}
@@ -42,40 +43,57 @@ struct Shortcut{T}
     shortcut_res::Matrix{T}
 end
 
+abstract type Solver end
+
+struct CholmodSolver <: Solver
+    bs::Int
+end
+
+struct AMGSolver <: Solver
+end
+
+struct MKLPardisoSolver <: Solver
+    bs::Int
+end
 """
 Core kernel of Circuitscape - used to solve several pairs
 
 Input:
-* data::GraphData
+* data::GraphProblem
 """
-function single_ground_all_pairs(data::GraphData{T,V}, flags, cfg, log = true) where {T,V}
-
-    if flags.solver in AMG
-        csinfo("Solver used: AMG accelerated by CG")
-        amg_solver_path(data, flags, cfg, log)
-    else
-        s = cfg["solver"]
-        mklpardiso = false
-        str = s in CHOLMOD ? "CHOLMOD" : "MKL Pardiso"
-        s in MKLPARDISO && (mklpardiso = true)
-        csinfo("Solver used: $str")
-        bs = parse(Int, cfg["cholmod_batch_size"])
-        cholmod_solver_path(data, flags, cfg, log, bs, mklpardiso)
-    end
+function single_ground_all_pairs(prob::GraphProblem{T,V,W}, flags, cfg, log = true) where {T,V,W}
+    solve(prob, prob.solver, flags, cfg, log)
 end
 
-function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where {T,V}
+function get_solver(cfg)
+    s = cfg["solver"]
+    if s in AMG
+        csinfo("Solver used: AMG accelerated by CG")
+        return AMGSolver()
+    elseif s in CHOLMOD
+        csinfo("Solver used: CHOLMOD")
+        bs = parse(Int, cfg["cholmod_batch_size"])
+        return CholmodSolver(bs)
+    elseif s in MKLPARDISO
+        csinfo("Solver used: CHOLMOD")
+        bs = parse(Int, cfg["cholmod_batch_size"])
+        return MKLPardisoSolver(bs)
+    end
+
+end
+
+function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T} where {T,V}
 
     # Data
-    a = data.G
-    cc = data.cc
-    points = data.points
-    exclude = data.exclude_pairs
-    nodemap = data.nodemap
-    polymap = data.polymap
-    orig_pts = data.user_points
-    hbmeta = data.hbmeta
-    cellmap = data.cellmap
+    a = prob.G
+    cc = prob.cc
+    points = prob.points
+    exclude = prob.exclude_pairs
+    nodemap = prob.nodemap
+    polymap = prob.polymap
+    orig_pts = prob.user_points
+    hbmeta = prob.hbmeta
+    cellmap = prob.cellmap
 
     # Flags
     outputflags = flags.outputflags
@@ -89,7 +107,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
     numpoints = size(points, 1)
 
     # Cumulative currents
-    cum = data.cum
+    cum = prob.cum
     
     csinfo("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
 
@@ -258,20 +276,25 @@ struct CholmodNode{T}
     points_idx::Tuple{T,T}
 end
 
-function cholmod_solver_path(data::GraphData{T,V}, flags, 
-                                  cfg, log, batch_size = 1000, 
-                                  mklpardiso = false) where {T,V}
+function _check_eltype(a, solver::CholmodSolver)
+    cswarn("CHOLMOD only works with double precision. Converting single precision matrix to double")
+    Float64.(a)
+end
+_check_eltype(a, solver::MKLPardisoSolver) = a
+
+function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, MKLPardisoSolver}, flags, 
+                                  cfg, log) where {T,V}
     
     # Data
-    a = data.G
-    cc = data.cc
-    points = data.points
-    exclude = data.exclude_pairs
-    nodemap = data.nodemap
-    polymap = data.polymap
-    orig_pts = data.user_points
-    hbmeta = data.hbmeta
-    cellmap = data.cellmap
+    a = prob.G
+    cc = prob.cc
+    points = prob.points
+    exclude = prob.exclude_pairs
+    nodemap = prob.nodemap
+    polymap = prob.polymap
+    orig_pts = prob.user_points
+    hbmeta = prob.hbmeta
+    cellmap = prob.cellmap
 
     # Flags
     outputflags = flags.outputflags
@@ -282,13 +305,13 @@ function cholmod_solver_path(data::GraphData{T,V}, flags,
     write_max_cur_maps = outputflags.write_max_cur_maps
 
     # Cumulative current map
-    cum = data.cum
+    cum = prob.cum
 
-    # CHOLMOD solver mode works only in double precision
-    if eltype(a) == Float32 && !mklpardiso 
-        cswarn("Converting single precision matrix to double")
-        a = Float64.(a)
-    end
+    # Check - CHOLMOD solver mode works only in double precision
+    a = _check_eltype(a, solver)
+
+    # Batchsize
+    batch_size = solver.bs
 
     # Get number of focal points
     numpoints = size(points, 1)
@@ -330,8 +353,7 @@ function cholmod_solver_path(data::GraphData{T,V}, flags,
         # Conductance matrix corresponding to CC
         matrix = comps[cid]
 
-        t = @elapsed factor = construct_cholesky_factor(matrix, mklpardiso)
-        csinfo("Time taken to construct cholesky factor = $t")
+        t = @elapsed factor = construct_cholesky_factor(matrix, solver)
 
         # Get local nodemap for CC - useful for output writing
         t2 = @elapsed local_nodemap = construct_local_node_map(nodemap, comp, polymap)
@@ -412,21 +434,7 @@ function cholmod_solver_path(data::GraphData{T,V}, flags,
                 rhs[node.cc_idx[2], i] = 1 
             end
 
-            if mklpardiso
-                lhs = similar(rhs)
-                mat = sparse(10eps()*I,size(matrix)...) + matrix
-                x = zeros(eltype(matrix), size(matrix, 1))
-                for i = 1:size(lhs, 2)
-                    factor(x, mat, rhs[:,i]) 
-                    @assert norm(mat*x - rhs[:,i]) < 1e-5
-                    lhs[:,i] .= x
-                end
-            else
-                lhs = factor \ rhs
-                for i = 1:size(rhs, 2)
-                    @assert norm(matrix*lhs[:,i] - rhs[:,i]) < 1e-5
-                end
-            end
+            lhs = solve_linear_system(factor, matrix, rhs)
 
             # Normalisation step
             for (i,val) in enumerate(rng)
@@ -470,13 +478,16 @@ function cholmod_solver_path(data::GraphData{T,V}, flags,
     r
 end
 
-function construct_cholesky_factor(matrix, mklpardiso = false)
-    if mklpardiso 
-        ps = MKLPardisoFactorize()
-    else 
-        cholesky(matrix + sparse(10eps()*I,size(matrix)...))
-    end
+# TODO: In the pardiso case, we're not really constructing the factor
+# So can we make this consistent?
+function construct_cholesky_factor(matrix, ::CholmodSolver)
+    t = @elapsed factor = cholesky(matrix + sparse(10eps()*I,size(matrix)...))
+    csinfo("Time taken to construct cholesky factor = $t")
+    factor
 end
+construct_cholesky_factor(matrix, ::MKLPardisoSolver) = 
+            MKLPardisoFactorize()
+
 
 """
 Returns all possible pairs to solve.
@@ -591,6 +602,26 @@ function solve_linear_system(cfg,
     v = cg(G, curr, Pl = M, tol = T(1e-6), maxiter = 100_000)
     @assert norm(G*v - curr) < 1e-5
     v
+end
+
+function solve_linear_system(factor::MKLPardisoFactorize, matrix, rhs)
+    lhs = similar(rhs)
+    mat = sparse(10eps()*I,size(matrix)...) + matrix
+    x = zeros(eltype(matrix), size(matrix, 1))
+    for i = 1:size(lhs, 2)
+        factor(x, mat, rhs[:,i]) 
+        @assert norm(mat*x - rhs[:,i]) < 1e-5
+        lhs[:,i] .= x
+    end
+    lhs
+end
+
+function solve_linear_system(factor::SuiteSparse.CHOLMOD.Factor, matrix, rhs)
+    lhs = factor \ rhs
+    for i = 1:size(rhs, 2)
+        @assert norm(matrix*lhs[:,i] - rhs[:,i]) < 1e-5
+    end
+    lhs
 end
 
 function postprocess(output, component_data, flags, shortcut, cfg)

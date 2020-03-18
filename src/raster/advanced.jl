@@ -1,4 +1,4 @@
-struct AdvancedData{T,V}
+struct AdvancedProblem{T,V,W}
     G::SparseMatrixCSC{T,V}
     cc::Vector{Vector{V}}
     nodemap::Matrix{V}
@@ -11,6 +11,7 @@ struct AdvancedData{T,V}
     check_node::V
     src::V
     cellmap::Matrix{T}
+    solver::W
 end
 
 function raster_advanced(T, V, cfg)::Matrix{T}
@@ -22,7 +23,7 @@ function raster_advanced(T, V, cfg)::Matrix{T}
     flags = get_raster_flags(cfg)
 
     # Generate advanced 
-    advanced_data = compute_advanced_data(rasterdata, flags)
+    advanced_data = compute_advanced_data(rasterdata, flags, cfg)
 
     # Send to main kernel
     v, _ = advanced_kernel(advanced_data, flags, cfg)
@@ -30,8 +31,8 @@ function raster_advanced(T, V, cfg)::Matrix{T}
     v
 end
 
-function compute_advanced_data(data::RasData{T,V}, 
-                        flags)::AdvancedData{T,V} where {T,V}
+function compute_advanced_data(data::RasterData{T,V}, 
+                        flags)::AdvancedProblem{T,V} where {T,V}
 
     # Data
     cellmap = data.cellmap
@@ -41,7 +42,7 @@ function compute_advanced_data(data::RasData{T,V},
     hbmeta = data.hbmeta
     source_map = data.source_map
     
-    # Flags
+    # FlagsAMGSolver
     avg_res = flags.avg_res
     four_neighbors = flags.four_neighbors
     policy = flags.policy
@@ -58,9 +59,11 @@ function compute_advanced_data(data::RasData{T,V},
     sources, grounds, finite_grounds = 
             get_sources_and_grounds(data, flags, G, nodemap)
 
-    AdvancedData(G, cc, nodemap, polymap, hbmeta,
+    solver = get_solver(cfg)
+
+    AdvancedProblem(G, cc, nodemap, polymap, hbmeta,
                 sources, grounds, source_map, 
-                finite_grounds, V(-1), V(0), cellmap)
+                finite_grounds, V(-1), V(0), cellmap, solver)
 end
 
 function get_sources_and_grounds(data, flags, G, nodemap)
@@ -142,21 +145,21 @@ function resolve_conflicts(sources::Vector{T},
     sources, grounds, finitegrounds
 end
 
-function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Tuple{Matrix{T},Matrix{T}} where {T,V}
+function advanced_kernel(prob::AdvancedProblem{T,V,S}, flags, cfg)::Tuple{Matrix{T},Matrix{T}} where {T,V,S}
 
     # Data 
-    G = data.G
-    nodemap = data.nodemap
-    polymap = data.polymap
-    hbmeta = data.hbmeta
-    sources = data.sources
-    grounds = data.grounds
-    finitegrounds = data.finite_grounds
-    cc = data.cc
-    src = data.src
-    check_node = data.check_node
-    source_map = data.source_map # Need it for one to all mode
-    cellmap = data.cellmap
+    G = prob.G
+    nodemap = prob.nodemap
+    polymap = prob.polymap
+    hbmeta = prob.hbmeta
+    sources = prob.sources
+    grounds = prob.grounds
+    finitegrounds = prob.finite_grounds
+    cc = prob.cc
+    src = prob.src
+    check_node = prob.check_node
+    source_map = prob.source_map # Need it for one to all mode
+    cellmap = prob.cellmap
 
     # Flags
     is_raster = flags.is_raster
@@ -195,7 +198,7 @@ function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Tuple{Matrix{T},M
             f_local = finitegrounds
         end
     
-        voltages = multiple_solver(cfg, a_local, s_local, g_local, f_local)
+        voltages = multiple_solver(cfg, S, a_local, s_local, g_local, f_local)
         local_nodemap = construct_local_node_map(nodemap, c, polymap)
         solver_called = true
 
@@ -262,7 +265,7 @@ function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Tuple{Matrix{T},M
     return volt, outcurr
 end
 
-function multiple_solver(cfg, a::SparseMatrixCSC{T,V}, sources, grounds, finitegrounds) where {T,V}
+function multiple_solver(cfg, solver::S, a::SparseMatrixCSC{T,V}, sources, grounds, finitegrounds) where {T,V,S}
     
     asolve = deepcopy(a)
     if finitegrounds[1] != -9999
@@ -278,10 +281,7 @@ function multiple_solver(cfg, a::SparseMatrixCSC{T,V}, sources, grounds, finiteg
     deleteat!(r, dst_del)
     asolve = asolve[r, r]
 
-    t1 = @elapsed M = aspreconditioner(smoothed_aggregation(asolve))
-    csinfo("Time taken to construct preconditioner = $t1 seconds")
-    t1 = @elapsed volt = solve_linear_system(cfg, asolve, sources, M)
-    csinfo("Time taken to solve linear system = $t1 seconds")
+    volt = multiple_solve(solver, asolve, sources)
 
     # Replace the inf with 0
     voltages = zeros(eltype(a), length(volt) + length(infgrounds))
@@ -296,6 +296,28 @@ function multiple_solver(cfg, a::SparseMatrixCSC{T,V}, sources, grounds, finiteg
         end
     end
     voltages
+end
+
+function multiple_solve(s::AMGSolver, matrix, sources)
+    t1 = @elapsed M = aspreconditioner(smoothed_aggregation(matrix))
+    csinfo("Time taken to construct preconditioner = $t1 seconds")
+    t1 = @elapsed volt = solve_linear_system(cfg, matrix, sources, M)
+    csinfo("Time taken to solve linear system = $t1 seconds")
+    volt
+end
+
+function multiple_solve(s::CholmodSolver, matrix, sources)
+    factor = construct_cholesky_factor(matrix, s)
+    t1 = @elapsed volt = solve_linear_system(factor, matrix, sources)
+    csinfo("Time taken to solve linear system = $t1 seconds")
+    volt
+end
+
+function multiple_solve(s::MKLPardisoSolver, matrix, sources)
+    factor = construct_cholesky_factor(matrix, s)
+    t1 = @elapsed volt = solve_linear_system(factor, matrix, sources)
+    csinfo("Time taken to solve linear system = $t1 seconds")
+    volt
 end
 
 struct FullGraph{T,V}

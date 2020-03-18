@@ -54,7 +54,7 @@ function get_raster_flags(cfg)
                 four_neighbors, avg_res, solver, o)
 end
 
-function _pt_file_no_polygons_path(rasterdata::RasData{T,V}, 
+function _pt_file_no_polygons_path(rasterdata::RasterData{T,V}, 
                     flags, cfg)::Matrix{T} where {T,V}
 
     graphdata = compute_graph_data_no_polygons(rasterdata, flags)
@@ -67,7 +67,7 @@ function _pt_file_no_polygons_path(rasterdata::RasData{T,V},
     r
 end
 
-function _pt_file_polygons_path(rasterdata::RasData{T,V}, 
+function _pt_file_polygons_path(rasterdata::RasterData{T,V}, 
                         flags, cfg)::Matrix{T} where {T,V}
 
     # get unique list of points
@@ -132,8 +132,8 @@ function calc_num_pairs(pts)
     n
 end
 
-function compute_graph_data_polygons(rasterdata::RasData{T,V}, 
-                            flags, pt1, pt2, cum)::GraphData{T,V} where {T,V}
+function compute_graph_data_polygons(rasterdata::RasterData{T,V}, 
+                            flags, pt1, pt2, cum)::GraphProblem{T,V,W} where {T,V,W}
 
     # Data
     gmap = rasterdata.cellmap
@@ -168,27 +168,15 @@ function compute_graph_data_polygons(rasterdata::RasData{T,V},
 
     # Exclude pairs array
     exclude_pairs = Tuple{V,V}[]
+
+    solver = get_solver(cfg)
     
-    GraphData(G, cc, points, [pt1, pt2], 
-            exclude_pairs, nodemap, newpoly, hbmeta, gmap, cum)
+    GraphProblem(G, cc, points, [pt1, pt2], 
+            exclude_pairs, nodemap, newpoly, hbmeta, gmap, cum, solver)
 end
 
-#=function compute_graph_data(rasterdata, flags)
-    
-    points_rc = rasterdata.points_rc
-
-    pt_file_contains_polygons = 
-            length(points_rc[1]) != length(unique(points_rc[3]))
-
-    if !pt_file_contains_polygons
-        graphdata = _pairwise_no_polygons(rasterdata, flags)
-    end
-
-    graphdata
-end=#
-
-function compute_graph_data_no_polygons(data::RasData{T,V}, 
-                    flags)::GraphData{T,V} where {T,V}
+function compute_graph_data_no_polygons(data::RasterData{T,V}, 
+                    flags)::GraphProblem{T,V,W} where {T,V,W}
 
     # Data
     cellmap = data.cellmap
@@ -225,9 +213,11 @@ function compute_graph_data_no_polygons(data::RasData{T,V},
     # Cumulative current maps
     cum = initialize_cum_maps(cellmap, write_max_cur_maps)
 
-    GraphData(G, cc, points, points_rc[3], 
+    solver = get_solver(cfg)
+
+    GraphProblem(G, cc, points, points_rc[3], 
                 exclude_pairs, nodemap, polymap, 
-                hbmeta, cellmap, cum)
+                hbmeta, cellmap, cum, solver)
 end
 Base.isempty(t::IncludeExcludePairs) = t.mode == :undef
 
@@ -258,55 +248,6 @@ function construct_node_map(gmap, polymap::Matrix{V}) where V
     if isempty(polymap)
         return nodemap
     end
-
-    #=d = Dict{Int, Vector{Int}}()
-    #=for i in unique(polymap)
-        d[i] = find(x -> x == i, polymap)
-    end=#
-    m, n = size(polymap)
-    I, J, V = findnz(polymap)
-    for (i,v) in enumerate(V)
-        if v != -9999
-            if haskey(d, v)
-                push!(d[v], sub2ind((m, n), I[i], J[i]))
-            else
-                d[v] = [sub2ind((m, n), I[i], J[i])]
-            end
-        end
-    end
-    d[0] = find(x -> x == 0, polymap)
-    k = 1
-    for i in find(gmap)
-        if i in d[0]
-            nodemap[i] = k
-            k += 1
-        else
-            for key in keys(d)
-                if i in d[key]
-                    if i == first(d[key])
-                        nodemap[i] = k
-                        k += 1
-                    else
-                        f = first(d[key])
-                        if polymap[f] != 0 && nodemap[f] == 0
-                            nodemap[i] = k
-                            nodemap[f] = k
-                            k += 1
-                        else
-                            nodemap[i] = nodemap[f]
-                        end
-                    end
-                end
-            end
-        end
-    end
-    for i in eachindex(polymap)
-        if polymap[i] != 0 && nodemap[i] == 0
-            val::Float64 = polymap[i]
-            index::INT = findfirst(x -> x == val, polymap)
-            nodemap[i] = nodemap[index]
-        end
-    end=#
 
     idx = gmap .> 0 
     polymap_pruned = zeros(V, size(gmap))

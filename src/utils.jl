@@ -458,3 +458,18 @@ function (p::MKLPardisoFactorize)(x,A,b,update_matrix=false;kwargs...)
     Pardiso.set_phase!(p.ps, Pardiso.SOLVE_ITERATIVE_REFINE)
     Pardiso.pardiso(p.ps, x, A, b)
 end
+
+# Testing utilities
+function change_to_test_path()
+    origpath = pwd()
+    pkgpath = Base.pathof(Circuitscape)
+    cd(joinpath(dirname(pkgpath), "..", "test"))
+    origpath
+end
+
+function runtest(str)
+    origpath = change_to_test_path()
+    prob = test_problem(str)
+    compute(prob)
+    cd(origpath)
+end

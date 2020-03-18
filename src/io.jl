@@ -29,7 +29,7 @@ function RasterMeta()
     RasterMeta(0,0,0,0,0,0,0)
 end
 
-struct RasData{T,V} <: Data
+struct RasterData{T,V} <: Data
     cellmap::Matrix{T}
     polymap::Matrix{V}
     source_map::Matrix{T}
@@ -375,7 +375,7 @@ function get_network_data(T, V, cfg)::NetworkData{T,V}
     NetworkData((i,j,v), fp, source_map, ground_map)
 end
 
-function load_raster_data(T, V, cfg)::RasData{T,V}
+function load_raster_data(T, V, cfg)::RasterData{T,V}
 
     # Habitat file
     hab_file = cfg["habitat_file"]
@@ -457,7 +457,7 @@ function load_raster_data(T, V, cfg)::RasData{T,V}
         strengths = Matrix{T}(undef, 0,0)
     end
 
-    RasData(cellmap, polymap, source_map, ground_map, points_rc, strengths,
+    RasterData(cellmap, polymap, source_map, ground_map, points_rc, strengths,
                     included_pairs, hbmeta)
 end
 
