@@ -151,10 +151,10 @@ function prune_points!(points_rc, point_ids::Vector{V}) where V
     for (i,p) in enumerate(points_rc[3])
         if p in point_ids
             continue
-        end
         else
             #for it in 1:3 deleteat!(points_rc[it], i) end
             push!(rmv, i)
+        end
     end
     for i in 1:3 deleteat!(points_rc[i], rmv) end
 end
