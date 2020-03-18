@@ -9,6 +9,7 @@ import Circuitscape: compute_single, compute_cholmod, compute_mklpardiso,
     include("internal.jl")
 end
 
-for f in (compute, compute_cholmod, compute_parallel)
+#for f in (compute, compute_cholmod, compute_parallel)
+for f in (compute,)
     runtests(f)
 end
