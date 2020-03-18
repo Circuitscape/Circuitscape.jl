@@ -133,6 +133,8 @@ function onetoall_kernel(data::RasterData{T,V}, flags, cfg)::Matrix{T} where {T,
 
         cum.cum_curr[mycsid()] .+= curr
         flags.outputflags.write_max_cur_maps && (cum.max_curr[mycsid()] .= max.(cum.max_curr[mycsid()], curr))
+
+        GC.gc()
     end
 
     pmap(x -> f(x), 1:num_points_to_solve)
