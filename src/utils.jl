@@ -296,7 +296,7 @@ function runtests(f = compute)
     end
     end
 
-    GC.gc()
+
 
     @testset "Raster Pairwise" begin
     # Raster pairwise tests
@@ -343,10 +343,10 @@ function runtests(f = compute)
         @test sum(abs2, x - r) < tol
         compare_all_output("oneToAllVerify$(i)", is_single)
         @info("Test oneToAllVerify$i passed")
+        GC.gc()
     end
     end
 
-    GC.gc()
 
     @testset "Raster All to One" begin
     # Raster all to one test
