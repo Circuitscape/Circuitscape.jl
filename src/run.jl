@@ -30,7 +30,7 @@ function compute(path::String)
     end
     t = @elapsed r = _compute(T, V, cfg)
     csinfo("Time taken to complete job = $t")
-    is_parallel && rmprocs(workers())
+    is_parallel && wait(rmprocs(workers()))
     r
 end
 
@@ -72,6 +72,6 @@ function compute(dict)
     end
     t = @elapsed r = _compute(T, V, cfg)
     csinfo("Time taken to complete job = $t")
-    is_parallel && rmprocs(workers())
+    is_parallel && wait(rmprocs(workers()))
     r
 end
