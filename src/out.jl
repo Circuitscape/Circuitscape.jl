@@ -63,28 +63,25 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
 
         # !write_cum_cur_map_only && 
         write_currents(node_currents_array, branch_currents_array, name, cfg)
+
+        return node_currents_array
     else
 
         cmap = node_currents
-        cum_curr = output.cum.cum_curr
-        max_curr = output.cum.max_curr
+        #cum_curr = output.cum.cum_curr
+        #max_curr = output.cum.max_curr
 
         # Process the current map
         process_grid!(cmap, cellmap, hbmeta, log_transform = log_transform, 
                             set_null_to_nodata = set_null_currents_to_nodata)
 
-        # Accumulate by default
-        cum_curr[mycsid()] .+= cmap
-
-        # Max current if user asks for it
-        if write_max_cur_maps 
-            max_curr[mycsid()] .= max.(max_curr[mycsid()], cmap)
-        end
-
         # Write current maps
-        !write_cum_cur_map_only &&
-                        write_aagrid(cmap, name, cfg, hbmeta)
+        #!write_cum_cur_map_only &&
+        #                write_aagrid(cmap, name, cfg, hbmeta)
 
+        @show typeof(cmap)
+        
+        return cmap
    end
 end
 

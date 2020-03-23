@@ -13,6 +13,8 @@ using Distributed
 using DelimitedFiles
 using Logging
 using Dates
+using Base.Threads
+import Base.Threads.@spawn
 
 include("consts.jl")
 include("config.jl")
