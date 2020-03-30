@@ -163,7 +163,6 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
                     v = Vector{Vector{T}}(undef, nthreads())
                     current = [zeros(T, size(matrix, 1)) for _ in 1:nthreads()]
                     r = zeros(T, nthreads())
-                    orig_points_c_j = 
 
                     for c_j in J
                         if (c_i, c_j) in exclude
@@ -173,13 +172,15 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
                         # Solve system
                         log && csinfo("Solving pair $(d[(pi,pj)]) of $num")
 
-                        function f()
+                        function f(matrix, P, v, current)
 
                             # Initialize currents
                             current[threadid()][comp_i] = -1
                             current[threadid()][comp_j] = 1
 
-                            t2 = @elapsed v[threadid()] = solve_linear_system(cfg, matrix, current[threadid()], P)
+                            # t2 = @elapsed v[threadid()] = solve_linear_system(cfg, matrix, current[threadid()], P)
+                            t2 = @elapsed v[threadid()] = cg(matrix, current[threadid()], Pl=P, maxiter = 100_000, tol = 1e-6)
+                            push!(Main.foo, (matrix, current[threadid()], v[threadid()], P, 1))
                             csinfo("Time taken to solve linear system = $t2 seconds")
                             v[threadid()] .= v[threadid()] .- v[threadid()][comp_i]
 
@@ -188,15 +189,15 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
 
                             # Return resistance value
                             if get_shortcut_resistances
-                                resistances[c_i, c_j] = r
-                                resistances[c_j, c_i] = r
+                                resistances[c_i, c_j] = r[threadid()]
+                                resistances[c_j, c_i] = r[threadid()]
                             end
                             output = Output(points, v[threadid()], (orig_pts[c_i], orig_pts[c_j]),
                                             (comp_i, comp_j), r[threadid()], V(c_j))
                             postprocess(output, component_data, flags, shortcut, cfg)
                         end
 
-                        t = @spawn f()
+                        t = @spawn f(matrix, P, v, current)
                         push!(l, t)
                     end
                 end
@@ -553,10 +554,10 @@ function sum_off_diag(G, i)
  end
 
 function solve_linear_system(cfg, 
-            G::SparseMatrixCSC{T,V}, 
+            _G::SparseMatrixCSC{T,V}, 
             curr::Vector{T}, M)::Vector{T} where {T,V} 
-    v = cg(G, curr, Pl = M, tol = T(1e-6), maxiter = 100_000)
-    push!(Main.foo, (G, curr, M, v))
+    v = cg(_G, curr, Pl = M, tol = T(1e-6), maxiter = 100_000)
+    push!(Main.foo, (_G, curr, M, v))
     v
 end
 
