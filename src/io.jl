@@ -70,7 +70,7 @@ function read_cellmap(habitat_file::String, is_res::Bool, ::Type{T}) where {T}
     if is_geotiff(habitat_file)
         cell_map, rastermeta = read_geotiff(T, habitat_file)
     else
-        cell_map, rastermeta = _ascii_grid_reader(T, habitat_file)
+        cell_map, rastermeta = read_ascii_grid(T, habitat_file)
     end
 
     gmap = similar(cell_map)
@@ -154,6 +154,10 @@ function is_geotiff(filename)
     endswith(filename,"tif") | endswith(filename,"tiff")
 end
 
+function is_aagrid(filename)
+    endswith(filename,"asc")
+end
+
 function read_geotiff(T, f)
     gt=GeoArrays.read(f)
     ncols = size(gt,1)
@@ -165,13 +169,29 @@ function read_geotiff(T, f)
     affine_map = gt.f
     file_type = FILE_TYPE_GEOTIFF
     nodata = -Inf
-    Array{T}(permutedims(gt.A[:,:,1])), RasterMeta(ncols, nrows, xll, yll, cellsize, nodata, file_type,crs, affine_map)
+    Array{T}(permutedims(gt.A[:,:,1])), RasterMeta(ncols, nrows, xll, yll, cellsize, nodata, file_type, crs, affine_map)
+end
+
+function read_ascii_grid(T, f)
+    gt=GeoArrays.read(f)
+    ncols = size(gt,1)
+    nrows = size(gt,2)
+    xll = gt.f.translation[1]
+    yll= gt.f.translation[2]-gt.f.linear[1,1]-(gt.f.linear[1,1]*(size(gt,2)-1))
+    cellsize = gt.f.linear[1,1]
+    crs = gt.crs
+    affine_map = gt.f
+    file_type = FILE_TYPE_AAGRID
+    nodata = -Inf
+    Array{T}(permutedims(gt.A[:,:,1])), RasterMeta(ncols, nrows, xll, yll, cellsize, nodata, file_type, crs, affine_map)
 end
 
 function _guess_file_type(filename, f)
 
     if is_geotiff(filename)
         filetype = FILE_TYPE_GEOTIFF
+    else if is_aagrid(filename)
+        filetype = FILE_TYPE_AAGRID
     else
         hdr = readline(f)
         seek(f, 0)
@@ -198,7 +218,7 @@ function read_polymap(T, file::String, habitatmeta;
     if is_geotiff(file)
         polymap, rastermeta = read_geotiff(T, file)
     else
-        polymap, rastermeta = _ascii_grid_reader(T, file)
+        polymap, rastermeta = read_ascii_grid(T, file)
     end
 
     ind = findall(x -> x == rastermeta.nodata, polymap)
@@ -206,7 +226,7 @@ function read_polymap(T, file::String, habitatmeta;
         polymap[ind] .= nodata_as
     end
 
-    if(is_geotiff(file))
+    if(is_geotiff(file) || is_aagrid(file))
         if rastermeta.yllcorner != habitatmeta.yllcorner
             cswarn("yllcorner is not the same")
         elseif rastermeta.xllcorner != habitatmeta.xllcorner
