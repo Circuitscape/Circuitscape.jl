@@ -190,7 +190,7 @@ function _guess_file_type(filename, f)
 
     if is_geotiff(filename)
         filetype = FILE_TYPE_GEOTIFF
-    else if is_aagrid(filename)
+    elseif is_aagrid(filename)
         filetype = FILE_TYPE_AAGRID
     else
         hdr = readline(f)
