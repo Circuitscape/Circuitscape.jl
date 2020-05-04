@@ -217,7 +217,7 @@ function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Tuple{Matrix{T},M
         if !is_raster
             write_volt_maps(name, voltages, FullGraph(G, cellmap), flags, cfg)
         else
-            write_aagrid(outvolt, name, cfg, hbmeta, cellmap, voltage = true)
+            write_grid(outvolt, name, cfg, hbmeta, cellmap, voltage = true)
         end
     end
 
@@ -225,7 +225,7 @@ function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Tuple{Matrix{T},M
         if !is_raster
             write_cur_maps(name, voltages, FullGraph(G, cellmap), finitegrounds, flags, cfg)
         else
-            write_aagrid(outcurr, name, cfg, hbmeta, cellmap)
+            write_grid(outcurr, name, cfg, hbmeta, cellmap)
         end
     end
 

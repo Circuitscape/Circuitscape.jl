@@ -23,10 +23,13 @@ struct RasterMeta
     yllcorner::Float64
     cellsize::Float64
     nodata::Float64
-    file_type::Int
+    transform::Array{Float64, 1}
+    wkt::String
 end
+
+# TODO check this is working with the new RasterMeta struct -VL
 function RasterMeta()
-    RasterMeta(0,0,0,0,0,0,0)
+    RasterMeta(0,0,0,0,0,0,[0.0],"")
 end
 
 struct RasData{T,V} <: Data
@@ -41,7 +44,7 @@ struct RasData{T,V} <: Data
 end
 
 function load_graph(V, gpath::String, ::Type{T}) where {T}
-    g = readdlm(gpath, T)
+    g = readdlm(gpath, T) # Is this an asc? no
     i = zeros(V, size(g, 1))
     j = zeros(V, size(g, 1))
     v = zeros(T, size(g, 1))
@@ -65,7 +68,7 @@ end
 
 function read_cellmap(habitat_file::String, is_res::Bool, ::Type{T}) where {T}
 
-    cell_map, rastermeta = _ascii_grid_reader(T, habitat_file)
+    cell_map, rastermeta = _grid_reader(T, habitat_file)
 
     gmap = similar(cell_map)
     ind = findall(x -> x == -9999, cell_map)
@@ -85,32 +88,51 @@ function read_cellmap(habitat_file::String, is_res::Bool, ::Type{T}) where {T}
     gmap, rastermeta
 end
 
-function _ascii_grid_reader(T, file)
-    f = endswith(file, ".gz") ? GZip.open(file, "r") : open(file, "r")
-    rastermeta = _ascii_grid_read_header(file, f)
-    c = Matrix{T}(undef,0,0)
-    ss = 6
-    if rastermeta.nodata == -Inf
-        ss = 5
-    end
-    try
-        c = readdlm(f, T; skipstart = ss)
-    catch
-        seek(f, 0)
-        try
-            d = readdlm(f; skipstart = ss)
-            d = d[:, 1:end-1]
-            c = map(T, d)
-        catch
-            error("Failed to read habitat map. There may be errors in your file.")
+function _grid_reader(T, file) # make a wrapper around read_raster to return rastermeta as well
+    #=if endswith(file, ".gz") ?
+        f = GZip.open(file, "r")
+        rastermeta = _ascii_grid_read_header(file, f)
+        c = Matrix{T}(undef,0,0)
+        ss = 6
+        if rastermeta.nodata == -Inf
+            ss = 5
         end
-    end
-    map!(x -> x == rastermeta.nodata ? -9999. : x , c, c)
-    close(f)
-    c, rastermeta
+        try
+            c = readdlm(f, T; skipstart = ss)
+        catch
+            seek(f, 0)
+            try
+                d = readdlm(f; skipstart = ss)
+                d = d[:, 1:end-1]
+                c = map(T, d)
+            catch
+                error("Failed to read habitat map. There may be errors in your file.")
+            end
+        end
+        map!(x -> x == rastermeta.nodata ? -9999. : x , c, c)
+        close(f)
+        return c, rastermeta
+    else=#
+    c, wkt, transform = read_raster(file, T)
+
+    rastermeta = get_raster_meta(c, wkt, transform)
+
+    return c, rastermeta
+
 end
 
-function _ascii_grid_read_header(habitat_file, f)
+function get_raster_meta(habitat_file, wkt, transform)
+    dims = size(habitat_file)
+    ncols = dims[2]
+    nrows = dims[1]
+    xllcorner = transform[1]
+    yllcorner = nrows - transform[4]
+    cellsize = transform[2]
+    nodata = -9999 # set in read_raster (overwrites old nodata val)
+    RasterMeta(ncols, nrows, xllcorner, yllcorner, cellsize, nodata, transform, wkt)
+end
+
+#=function _ascii_grid_read_header(habitat_file, f)
     file_type = _guess_file_type(habitat_file, f)
     ncols = parse(Int, split(readline(f))[2])
     nrows = parse(Int, split(readline(f))[2])
@@ -124,7 +146,7 @@ function _ascii_grid_read_header(habitat_file, f)
     end
     seek(f, 0)
     RasterMeta(ncols, nrows, xllcorner, yllcorner, cellsize, nodata, file_type)
-end
+end=#
 
 #=function _guess_file_type(filename, f)
     s = readline(f)
@@ -143,6 +165,7 @@ end
     end
 
 end=#
+
 
 function _guess_file_type(filename, f)
 
@@ -165,9 +188,9 @@ function _guess_file_type(filename, f)
 end
 
 function read_polymap(T, file::String, habitatmeta;
-                            nodata_as = 0, resample = true)
+                      nodata_as = 0, resample = true) # TODO remove unused argument -VL
 
-    polymap, rastermeta = _ascii_grid_reader(T, file)
+    polymap, rastermeta = _grid_reader(T, file)
 
     ind = findall(x -> x == rastermeta.nodata, polymap)
     if nodata_as != -1
@@ -209,7 +232,6 @@ function read_point_map(V, file, habitatmeta)
         J = _points_rc[:,3]
         v = _points_rc[:,1]
         i  = ceil.(V, habitatmeta.nrows .- (J .- habitatmeta.yllcorner) ./ habitatmeta.cellsize)
-        j = ceil.(V, (I .- habitatmeta.xllcorner) ./ habitatmeta.cellsize)
     else
         _I = findall(!iszero, _points_rc)
         (i,j,v) =  (getindex.(_I, 1), getindex.(_I, 2), _points_rc[_I])
@@ -468,7 +490,7 @@ function update!(cellmap::Matrix{T}, m::String, hbmeta) where {T}
 end
 
 # Inspired by GeoArrays.read()
-function read_raster(path::AbstractString)
+function read_raster(path::AbstractString, T)
     raw = ArchGDAL.unsafe_read(path)
     transform = ArchGDAL.getgeotransform(raw)
     wkt = ArchGDAL.getproj(raw)
@@ -489,8 +511,7 @@ function read_raster(path::AbstractString)
     array_t[isnan.(array_t)] .= -9999.0
 
     # Transpose the array -- ArchGDAL returns a x by y array, need y by x
-    # also want to start off with 64 bit float
-    array = convert(Array{Float64}, permutedims(array_t, [2, 1]))
+    array = convert(Array{T}, permutedims(array_t, [2, 1]))
 
     # Close connection to dataset
     ArchGDAL.destroy(raw)
@@ -521,7 +542,7 @@ function write_raster(fn_prefix::AbstractString,
     # Append file extention to filename
     fn = string(fn_prefix, ext)
 
-    # Create raster in memory
+    # Create raster in memory *NEEDED* because no create driver for .asc
     ArchGDAL.create(fn_prefix,
                     driver = ArchGDAL.getdriver("MEM"),
                     width = width,
