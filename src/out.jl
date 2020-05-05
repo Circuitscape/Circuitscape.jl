@@ -483,3 +483,52 @@ function write_cum_maps(cum, cellmap::Matrix{T}, cfg, hbmeta, write_max, write_c
     end
 
 end
+
+# Write a single band raster, either in .tif or .asc format,
+# inspired by GeoArrays.write()
+function write_raster(fn_prefix::AbstractString,
+                      array,
+                      wkt::AbstractString,
+                      transform,
+                      file_format::String)
+    # transponse array back to columns by rows
+    array_t = permutedims(array, [2, 1])
+
+    width, height = size(array_t)
+
+    # Define extension and driver based in file_format
+    file_format == "tif" ? (ext = ".tif"; driver = "GTiff") :
+            (ext = ".asc"; driver = "AAIGrid")
+
+    file_format == "tif" ? (options = ["COMPRESS=DEFLATE","TILED=YES"]) :
+                           (options = [])
+
+    # Append file extention to filename
+    fn = string(fn_prefix, ext)
+
+    # Create raster in memory *NEEDED* because no create driver for .asc
+    ArchGDAL.create(fn_prefix,
+                    driver = ArchGDAL.getdriver("MEM"),
+                    width = width,
+                    height = height,
+                    nbands = 1,
+                    dtype = eltype(array_t),
+                    options = options) do dataset
+        band = ArchGDAL.getband(dataset, 1)
+        # Write data to band
+        ArchGDAL.write!(band, array_t)
+
+        # Write nodata and projection info
+        ArchGDAL.setnodatavalue!(band, -9999.0)
+        ArchGDAL.setgeotransform!(dataset, transform)
+        ArchGDAL.setproj!(dataset, wkt)
+
+        # Copy memory object to disk (necessary because ArchGDAL.create
+        # does not support creation of ASCII rasters)
+        ArchGDAL.copy(dataset,
+                      filename = fn,
+                      driver = ArchGDAL.getdriver(driver),
+                      options = options)
+    end
+
+end

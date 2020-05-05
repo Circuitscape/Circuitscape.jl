@@ -27,7 +27,6 @@ struct RasterMeta
     wkt::String
 end
 
-# TODO check this is working with the new RasterMeta struct -VL
 function RasterMeta()
     RasterMeta(0,0,0,0,0,0,[0.0],"")
 end
@@ -88,31 +87,7 @@ function read_cellmap(habitat_file::String, is_res::Bool, ::Type{T}) where {T}
     gmap, rastermeta
 end
 
-function _grid_reader(T, file) # make a wrapper around read_raster to return rastermeta as well
-    #=if endswith(file, ".gz") ?
-        f = GZip.open(file, "r")
-        rastermeta = _ascii_grid_read_header(file, f)
-        c = Matrix{T}(undef,0,0)
-        ss = 6
-        if rastermeta.nodata == -Inf
-            ss = 5
-        end
-        try
-            c = readdlm(f, T; skipstart = ss)
-        catch
-            seek(f, 0)
-            try
-                d = readdlm(f; skipstart = ss)
-                d = d[:, 1:end-1]
-                c = map(T, d)
-            catch
-                error("Failed to read habitat map. There may be errors in your file.")
-            end
-        end
-        map!(x -> x == rastermeta.nodata ? -9999. : x , c, c)
-        close(f)
-        return c, rastermeta
-    else=#
+function _grid_reader(T, file)
     c, wkt, transform = read_raster(file, T)
 
     rastermeta = get_raster_meta(c, wkt, transform)
@@ -131,41 +106,6 @@ function get_raster_meta(habitat_file, wkt, transform)
     nodata = -9999 # set in read_raster (overwrites old nodata val)
     RasterMeta(ncols, nrows, xllcorner, yllcorner, cellsize, nodata, transform, wkt)
 end
-
-#=function _ascii_grid_read_header(habitat_file, f)
-    file_type = _guess_file_type(habitat_file, f)
-    ncols = parse(Int, split(readline(f))[2])
-    nrows = parse(Int, split(readline(f))[2])
-    xllcorner = parse(Float64, split(readline(f))[2])
-    yllcorner = parse(Float64, split(readline(f))[2])
-    cellsize = parse(Float64, split(readline(f))[2])
-    nodata = -Inf
-    s = split(readline(f))
-    if occursin("NODATA", s[1]) || occursin("nodata", s[1])
-        nodata = parse(Float64, s[2])
-    end
-    seek(f, 0)
-    RasterMeta(ncols, nrows, xllcorner, yllcorner, cellsize, nodata, file_type)
-end=#
-
-#=function _guess_file_type(filename, f)
-    s = readline(f)
-    seek(f, 0)
-
-    if startswith(s, "min")
-        return PAIRS_AAGRID
-    elseif startswith(s, "mode")
-        return PAIRS_LIST
-    elseif occursin(".asc", filename)
-        return AAGRID
-    elseif endswith(filename, ".txt")
-        return TXTLIST
-    else
-        throw("Check file format")
-    end
-
-end=#
-
 
 function _guess_file_type(filename, f)
 
@@ -521,53 +461,3 @@ function read_raster(path::AbstractString, T)
 
     array, wkt, transform # wkt and transform are needed later for write_raster
 end
-
-# Write a single band raster, either in .tif or .asc format,
-# inspired by GeoArrays.write()
-function write_raster(fn_prefix::AbstractString,
-                      array,
-                      wkt::AbstractString,
-                      transform,
-                      file_format::String)
-    # transponse array back to columns by rows
-    array_t = permutedims(array, [2, 1])
-
-    width, height = size(array_t)
-
-    # Define extension and driver based in file_format
-    file_format == "tif" ? (ext = ".tif"; driver = "GTiff") :
-            (ext = ".asc"; driver = "AAIGrid")
-
-    file_format == "tif" ? (options = ["COMPRESS=DEFLATE","TILED=YES"]) :
-                           (options = [])
-
-    # Append file extention to filename
-    fn = string(fn_prefix, ext)
-
-    # Create raster in memory *NEEDED* because no create driver for .asc
-    ArchGDAL.create(fn_prefix,
-                    driver = ArchGDAL.getdriver("MEM"),
-                    width = width,
-                    height = height,
-                    nbands = 1,
-                    dtype = eltype(array_t),
-                    options = options) do dataset
-        band = ArchGDAL.getband(dataset, 1)
-        # Write data to band
-        ArchGDAL.write!(band, array_t)
-
-        # Write nodata and projection info
-        ArchGDAL.setnodatavalue!(band, -9999.0)
-        ArchGDAL.setgeotransform!(dataset, transform)
-        ArchGDAL.setproj!(dataset, wkt)
-
-        # Copy memory object to disk (necessary because ArchGDAL.create
-        # does not support creation of ASCII rasters)
-        ArchGDAL.copy(dataset,
-                      filename = fn,
-                      driver = ArchGDAL.getdriver(driver),
-                      options = options)
-    end
-
-end
-
