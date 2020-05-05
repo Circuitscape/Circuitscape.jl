@@ -44,7 +44,7 @@ struct RasData{T,V} <: Data
 end
 
 function load_graph(V, gpath::String, ::Type{T}) where {T}
-    g = readdlm(gpath, T) # Is this an asc? no
+    g = readdlm(gpath, T)
     i = zeros(V, size(g, 1))
     j = zeros(V, size(g, 1))
     v = zeros(T, size(g, 1))
@@ -232,6 +232,7 @@ function read_point_map(V, file, habitatmeta)
         J = _points_rc[:,3]
         v = _points_rc[:,1]
         i  = ceil.(V, habitatmeta.nrows .- (J .- habitatmeta.yllcorner) ./ habitatmeta.cellsize)
+        j = ceil.(V, (I .- habitatmeta.xllcorner) ./ habitatmeta.cellsize)
     else
         _I = findall(!iszero, _points_rc)
         (i,j,v) =  (getindex.(_I, 1), getindex.(_I, 2), _points_rc[_I])
@@ -265,6 +266,7 @@ function read_point_map(V, file, habitatmeta)
     close(f)
     V.(i), V.(j), V.(v)
 end
+
 
 function read_source_and_ground_maps(T, V, source_file, ground_file, habitatmeta,
                                         is_res)
