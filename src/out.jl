@@ -222,27 +222,6 @@ end
 function _get_branch_currents_posneg(G::SparseMatrixCSC{T,V},
                                 v::Vector{T}, pos) where {T,V}
 
-    #=I,J,V = findnz(G)
-    mask = I .< J
-    @show sum(mask)
-    vdiff = zeros(T, sum(mask))
-    if pos
-        vdiff = v[I[mask]] - v[J[mask]]
-        #for (i,v) in enumerate(find(mask))
-        #    vdiff[i] = v[I[v]] - v[J[v]]
-        #end
-    else
-        vdiff = v[J[mask]] - v[I[mask]]
-        #for (i,v) in enumerate(find(mask))
-        #    vdiff[i] = v[J[v]] - v[I[v]]
-        #end
-    end
-    map!(x -> x < 0 ? -x : 0, V, V)
-
-    branch_currents = vdiff .* V[mask]
-    maxcur = maximum(branch_currents)
-    map!(x -> abs(x / maxcur) < 1e-8 ? 0 : x, branch_currents, branch_currents)=#
-
     n = count_upper(G)
     b = zeros(T, n)
     k = 1
@@ -279,8 +258,6 @@ function _get_branch_currents_posneg(G::SparseMatrixCSC{T,V},
         end
     end
 
-    # @show sum(abs2, b - branch_currents)
-    # branch_currents
     b
 end
 
