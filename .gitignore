@@ -4,5 +4,4 @@
 *.jld
 *.tmp
 Manifest.toml
-run-juno.sh
 temp/
