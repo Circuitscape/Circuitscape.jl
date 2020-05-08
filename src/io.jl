@@ -432,7 +432,7 @@ function update!(cellmap::Matrix{T}, m::String, hbmeta) where {T}
 end
 
 # Inspired by GeoArrays.read()
-function read_raster(path::AbstractString, T)
+function read_raster(path::String, T)
     raw = ArchGDAL.unsafe_read(path)
     transform = ArchGDAL.getgeotransform(raw)
     wkt = ArchGDAL.getproj(raw)

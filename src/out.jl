@@ -463,9 +463,9 @@ end
 
 # Write a single band raster, either in .tif or .asc format,
 # inspired by GeoArrays.write()
-function write_raster(fn_prefix::AbstractString,
-                      array,
-                      wkt::AbstractString,
+function write_raster(fn_prefix::String,
+                      array::Matrix{T} where T <: Number,
+                      wkt::String,
                       transform,
                       file_format::String)
     # transponse array back to columns by rows
