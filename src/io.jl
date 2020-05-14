@@ -88,6 +88,8 @@ function read_cellmap(habitat_file::String, is_res::Bool, ::Type{T}) where {T}
 end
 
 function _grid_reader(T, file)
+    endswith(file, ".gz") ? file = "/vsigzip/$(file)" : ()
+
     c, wkt, transform = read_raster(file, T)
 
     rastermeta = get_raster_meta(c, wkt, transform)
@@ -108,21 +110,23 @@ function get_raster_meta(habitat_file, wkt, transform)
 end
 
 function _guess_file_type(filename, f)
+    hdr = readline(f)
+    seek(f, 0) #TODO I think this is not necessary? -VL
 
-    if endswith(filename,"tif") || endswith(filename,"tiff")
-        filetype = FILE_TYPE_GEOTIFF
+    if startswith(hdr, FILE_HDR_NPY)
+        filetype = FILE_TYPE_NPY
+    elseif startswith(lowercase(hdr), FILE_HDR_AAGRID)
+        filetype = FILE_TYPE_AAGRID
+    elseif startswith(hdr, FILE_HDR_INCL_PAIRS_AAGRID)
+        filetype = FILE_TYPE_INCL_PAIRS_AAGRID
+    elseif startswith(hdr, FILE_HDR_INCL_PAIRS)
+        filetype = FILE_TYPE_INCL_PAIRS
     else
-        hdr = readline(f)
-        seek(f, 0)
-
-        if startswith(hdr, FILE_HDR_NPY)
-            filetype = FILE_TYPE_NPY
-        elseif startswith(lowercase(hdr), FILE_HDR_AAGRID)
-            filetype = FILE_TYPE_AAGRID
-        elseif startswith(hdr, FILE_HDR_INCL_PAIRS_AAGRID)
-            filetype = FILE_TYPE_INCL_PAIRS_AAGRID
-        elseif startswith(hdr, FILE_HDR_INCL_PAIRS)
-            filetype = FILE_TYPE_INCL_PAIRS
+        f2 = endswith(filename, "gz") ? GZip.open(filename, "r") : open(filename, "r")
+        bytes = read(f2, 4)
+        close(f2)
+        if bytes[3] == 0x2a && bytes[4] == 0x00
+            filetype = FILE_TYPE_GEOTIFF
         else
             filetype = FILE_TYPE_TXTLIST
         end
@@ -217,7 +221,7 @@ function read_source_and_ground_maps(T, V, source_file, ground_file, habitatmeta
     ground_map = Matrix{T}(undef,0,0)
     source_map = Matrix{T}(undef,0,0)
 
-    f = endswith(ground_file, "gz") ? Gzip.open(ground_file, "r") : open(ground_file, "r")
+    f = endswith(ground_file, "gz") ? GZip.open(ground_file, "r") : open(ground_file, "r")
     filetype = _guess_file_type(ground_file, f)
 
     if filetype == FILE_TYPE_AAGRID || filetype == FILE_TYPE_GEOTIFF
@@ -230,7 +234,7 @@ function read_source_and_ground_maps(T, V, source_file, ground_file, habitatmeta
     end
     close(f)
 
-    f = endswith(source_file, "gz") ? Gzip.open(source_file, "r") : open(source_file, "r")
+    f = endswith(source_file, "gz") ? GZip.open(source_file, "r") : open(source_file, "r")
     filetype = _guess_file_type(source_file, f)
 
     if filetype == FILE_TYPE_AAGRID || filetype == FILE_TYPE_GEOTIFF
@@ -257,7 +261,7 @@ end
 
 function read_included_pairs(V, filename)
 
-    f = endswith(filename, "gz") ? Gzip.open(filename, "r") : open(filename, "r")
+    f = endswith(filename, "gz") ? GZip.open(filename, "r") : open(filename, "r")
     filetype = _guess_file_type(filename, f)
     minval = 0
     maxval = 0
