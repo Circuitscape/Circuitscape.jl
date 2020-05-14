@@ -101,7 +101,7 @@ function get_raster_meta(habitat_file, wkt, transform)
     ncols = dims[2]
     nrows = dims[1]
     xllcorner = transform[1]
-    yllcorner = nrows - transform[4]
+    yllcorner = transform[4]  - (nrows * transform[2])
     cellsize = transform[2]
     nodata = -9999 # set in read_raster (overwrites old nodata val)
     RasterMeta(ncols, nrows, xllcorner, yllcorner, cellsize, nodata, transform, wkt)
