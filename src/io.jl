@@ -112,8 +112,14 @@ end
 function _guess_file_type(filename, f)
     hdr = readline(f)
     seek(f, 0) #TODO I think this is not necessary? -VL
+    
+    f2 = endswith(filename, "gz") ? GZip.open(filename, "r") : open(filename, "r")
+    bytes = read(f2, 4)
+    close(f2)
 
-    if startswith(hdr, FILE_HDR_NPY)
+    if bytes[3] == 0x2a && bytes[4] == 0x00
+        filetype = FILE_TYPE_GEOTIFF
+    elseif startswith(hdr, FILE_HDR_NPY)
         filetype = FILE_TYPE_NPY
     elseif startswith(lowercase(hdr), FILE_HDR_AAGRID)
         filetype = FILE_TYPE_AAGRID
@@ -122,14 +128,7 @@ function _guess_file_type(filename, f)
     elseif startswith(hdr, FILE_HDR_INCL_PAIRS)
         filetype = FILE_TYPE_INCL_PAIRS
     else
-        f2 = endswith(filename, "gz") ? GZip.open(filename, "r") : open(filename, "r")
-        bytes = read(f2, 4)
-        close(f2)
-        if bytes[3] == 0x2a && bytes[4] == 0x00
-            filetype = FILE_TYPE_GEOTIFF
-        else
-            filetype = FILE_TYPE_TXTLIST
-        end
+        filetype = FILE_TYPE_TXTLIST
     end
     return filetype
 end
