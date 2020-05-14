@@ -290,7 +290,6 @@ function process_grid!(cmap, cellmap, hbmeta; log_transform = false,
 
 end
 
-# Update this with write_raster
 function write_grid(cmap, name, cfg, hbmeta;
                         voltage = false, cum = false,
                         max = false)
