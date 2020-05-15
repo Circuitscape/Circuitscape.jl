@@ -5,3 +5,4 @@
 *.tmp
 Manifest.toml
 temp/
+**/*.properties
