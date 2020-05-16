@@ -112,7 +112,7 @@ end
 function _guess_file_type(filename, f)
     hdr = readline(f)
     seek(f, 0) #TODO I think this is not necessary? -VL
-    
+
     f2 = endswith(filename, "gz") ? GZip.open(filename, "r") : open(filename, "r")
     bytes = read(f2, 4)
     close(f2)
@@ -262,6 +262,7 @@ function read_included_pairs(V, filename)
 
     f = endswith(filename, "gz") ? GZip.open(filename, "r") : open(filename, "r")
     filetype = _guess_file_type(filename, f)
+    close(f)
     minval = 0
     maxval = 0
     mode = :undef
