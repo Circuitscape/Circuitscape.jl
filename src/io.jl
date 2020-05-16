@@ -268,7 +268,7 @@ function read_included_pairs(V, filename)
     mode = :undef
 
     if filetype == FILE_TYPE_INCL_PAIRS_AAGRID
-        open(filename, "r") do fV
+        open(filename, "r") do f
             minval = parse(Float64, split(readline(f))[2])
             maxval = parse(Float64, split(readline(f))[2])
         end
