@@ -169,7 +169,7 @@ function accumulate_current_maps(path, f)
     for file in cmap_list
         csinfo("Accumulating $file")
         cmap_path = joinpath(dir, file)
-        cmap = readdlm(cmap_path; skipstart = 6, use_mmap = false)
+        cmap = readdlm(cmap_path, skipstart = 6)
         f_in_place!(accum, cmap, f)
     end
     for i in eachindex(accum)
@@ -262,7 +262,7 @@ function runtests(f = compute)
     for i = 1:3
         @info("Testing sgNetworkVerify$i")
         r = f("input/network/sgNetworkVerify$(i).ini")
-        x = readdlm("output_verify/sgNetworkVerify$(i)_resistances.out"; use_mmap = false)
+        x = readdlm("output_verify/sgNetworkVerify$(i)_resistances.out")
         valx = x[2:end, 2:end]
         valr = r[2:end, 2:end]
         @test sum(abs2, valx - valr) < tol
@@ -279,7 +279,7 @@ function runtests(f = compute)
     for i = 1:3
         @info("Testing mgNetworkVerify$i")
         r = f("input/network/mgNetworkVerify$(i).ini")
-        x = readdlm("output_verify/mgNetworkVerify$(i)_voltages.txt"; use_mmap = false)
+        x = readdlm("output_verify/mgNetworkVerify$(i)_voltages.txt")
         @. x[:,1] = x[:,1] + 1
         @test sum(abs2, x - r) < tol
         compare_all_output("mgNetworkVerify$(i)", is_single)
@@ -303,8 +303,8 @@ function runtests(f = compute)
 
         @info("Testing sgVerify$i")
         r = f("input/raster/pairwise/$i/sgVerify$(i).ini")
-        x = readdlm("output_verify/sgVerify$(i)_resistances.out"; use_mmap = false)
-        _x = readdlm("output/sgVerify$(i)_resistances.out"; use_mmap = false)
+        x = readdlm("output_verify/sgVerify$(i)_resistances.out")
+        _x = readdlm("output/sgVerify$(i)_resistances.out")
         # x = x[2:end, 2:end]
         @test sum(abs2, _x - r) < tol
         @test sum(abs2, x - r) < tol
@@ -318,7 +318,7 @@ function runtests(f = compute)
     for i in 1:5
         @info("Testing mgVerify$i")
         r = f("input/raster/advanced/$i/mgVerify$(i).ini")
-        x = readdlm("output_verify/mgVerify$(i)_voltmap.asc"; skipstart = 6, use_mmap = false)
+        x = readdlm("output_verify/mgVerify$(i)_voltmap.asc"; skipstart = 6)
         @test sum(abs2, x - r) < 1e-4
         # compare_all_output("mgVerify$(i)")
         @info("Test mgVerify$i passed")
@@ -330,7 +330,7 @@ function runtests(f = compute)
     for i in 1:13
         @info("Testing oneToAllVerify$i")
         r = f("input/raster/one_to_all/$i/oneToAllVerify$(i).ini")
-        x = readdlm("output_verify/oneToAllVerify$(i)_resistances.out"; use_mmap = false)
+        x = readdlm("output_verify/oneToAllVerify$(i)_resistances.out")
         # x = x[:,2]
         @test sum(abs2, x - r) < tol
         compare_all_output("oneToAllVerify$(i)", is_single)
@@ -343,7 +343,7 @@ function runtests(f = compute)
     for i in 1:12
         @info("Testing allToOneVerify$i")
         r = f("input/raster/all_to_one/$i/allToOneVerify$(i).ini")
-        x = readdlm("output_verify/allToOneVerify$(i)_resistances.out"; use_mmap = false)
+        x = readdlm("output_verify/allToOneVerify$(i)_resistances.out")
         # x = x[:,2]
 
         @test sum(abs2, x - r) < tol
@@ -378,14 +378,14 @@ function compare_all_output(str, is_single = false)
             # Branch currents
             if occursin("branch", f)
                 r = read_branch_currents("output/$f")
-                x = !startswith(f, "mg") ? get_network_comp(list_to_comp, f) : readdlm("output_verify/$f"; use_mmap = false)
+                x = !startswith(f, "mg") ? get_network_comp(list_to_comp, f) : readdlm("output_verify/$f")
                 @test compare_branch(r, x, tol)
                 @info("Test $f passed")
 
             # Node currents
             else
                 r = read_node_currents("output/$f")
-                x = !startswith(f, "mg") ? get_network_comp(list_to_comp, f) : readdlm("output_verify/$f"; use_mmap = false)
+                x = !startswith(f, "mg") ? get_network_comp(list_to_comp, f) : readdlm("output_verify/$f")
                 @test compare_node(r, x, tol)
                 @info("Test $f passed")
             end
@@ -396,10 +396,10 @@ end
 
 list_of_files(str, pref) = readdir(pref) |> y -> filter(x -> startswith(x, "$(str)_"), y)
 generate_lists(str) = list_of_files(str, "output/"), list_of_files(str, "output_verify/")
-read_branch_currents(str) = readdlm(str; use_mmap = false)
-read_node_currents(str) = readdlm(str; use_mmap = false)
+read_branch_currents(str) = readdlm(str)
+read_node_currents(str) = readdlm(str)
 
-read_aagrid(file) = readdlm(file; skipstart = 6, use_mmap = false) # Will change to 6
+read_aagrid(file) = readdlm(file, skipstart = 6) # Will change to 6
 
 compare_aagrid(r::Matrix{T}, x::Matrix{T}, tol = 1e-6) where T = sum(abs2, x - r) < tol
 
@@ -408,7 +408,7 @@ function get_comp(list_to_comp, f)
     if f in list_to_comp
         outfile = "output_verify/$f"
     end
-    readdlm(outfile; use_mmap = false, skipstart = 6)
+    readdlm(outfile; skipstart = 6)
 end
 
 function get_network_comp(list_to_comp, f)
@@ -419,7 +419,7 @@ function get_network_comp(list_to_comp, f)
         end
     end
     @assert isfile("output_verify/$f")
-    readdlm("output_verify/$f"; use_mmap = false)
+    readdlm("output_verify/$f")
 end
 
 function compare_branch(r, x, tol = 1e-6)

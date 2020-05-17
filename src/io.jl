@@ -43,7 +43,7 @@ struct RasData{T,V} <: Data
 end
 
 function load_graph(V, gpath::String, ::Type{T}) where {T}
-    g = readdlm(gpath, T; use_mmap = false)
+    g = readdlm(gpath, T)
     i = zeros(V, size(g, 1))
     j = zeros(V, size(g, 1))
     v = zeros(T, size(g, 1))
@@ -55,10 +55,10 @@ function load_graph(V, gpath::String, ::Type{T}) where {T}
     i,j,v
 end
 
-read_focal_points(V, path::String) = V.(vec(readdlm(path; use_mmap = false)) .+ 1)
+read_focal_points(V, path::String) = V.(vec(readdlm(path)) .+ 1)
 
 function read_point_strengths(T, path::String, inc = true)
-    a = readdlm(path, T; use_mmap = false)
+    a = readdlm(path, T)
     if inc
         @. a[:,1] = a[:,1] + 1
     end
@@ -167,7 +167,7 @@ function read_point_map(V, file, habitatmeta)
 
     f = endswith(file, ".gz") ? GZip.open(file, "r") : open(file, "r")
     filetype = _guess_file_type(file, f)
-    _points_rc = filetype == FILE_TYPE_TXTLIST ? readdlm(file; use_mmap = false) :
+    _points_rc = filetype == FILE_TYPE_TXTLIST ? readdlm(file) :
                         read_polymap(V, file, habitatmeta)
 
     i = V[]
@@ -227,7 +227,7 @@ function read_source_and_ground_maps(T, V, source_file, ground_file, habitatmeta
         ground_map = read_polymap(T, ground_file, habitatmeta; nodata_as = -1)
         ground_map = map(T, ground_map)
     else
-        rc = readdlm(ground_file, V; use_mmap = false)
+        rc = readdlm(ground_file, V)
         ground_map = -9999 * ones(T, habitatmeta.nrows, habitatmeta.ncols)
         ground_map[rc[:,2], rc[:,3]] = rc[:,1]
     end
@@ -240,7 +240,7 @@ function read_source_and_ground_maps(T, V, source_file, ground_file, habitatmeta
         source_map = read_polymap(T, source_file, habitatmeta)
         source_map = map(T, source_map)
     else
-        rc = readdlm(source_file, V; use_mmap = false)
+        rc = readdlm(source_file, V)
         source_map = -9999 * ones(T, habitatmeta.nrows, habitatmeta.ncols)
         source_map[rc[:,2], rc[:,3]] = rc[:,1]
     end
@@ -272,7 +272,7 @@ function read_included_pairs(V, filename)
             minval = parse(Float64, split(readline(f))[2])
             maxval = parse(Float64, split(readline(f))[2])
         end
-        included_pairs = readdlm(filename; skipstart=2, use_mmap = false)
+        included_pairs = readdlm(filename, skipstart=2)
         point_ids = V.(included_pairs[:,1])
         deleteat!(point_ids, 1)
         included_pairs = included_pairs[2:end, 2:end]
@@ -285,7 +285,7 @@ function read_included_pairs(V, filename)
         open(filename, "r") do f
             mode = Symbol(split(readline(f))[2])
         end
-        included_pairs = readdlm(filename; skipstart = 1, use_mmap = false)
+        included_pairs = readdlm(filename, skipstart = 1)
         if size(included_pairs, 1) == 1
             pl = zeros(V, 1,2)
             pl[1,:] = included_pairs
