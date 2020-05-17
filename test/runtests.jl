@@ -3,7 +3,7 @@ using Test
 import Circuitscape: compute_single, compute_cholmod, compute_parallel,
                      runtests
 
-filename = "test/input/raster/all_to_one/12/include_matrix.txt"
+filename = "input/raster/all_to_one/12/include_matrix.txt"
 
 f = endswith(filename, "gz") ? GZip.open(filename, "r") : open(filename, "r")
 filetype = Circuitscape._guess_file_type(filename, f)
