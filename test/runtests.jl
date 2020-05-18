@@ -10,4 +10,5 @@ end
 
 for f in (compute, compute_single, compute_cholmod, compute_parallel)
     runtests(f)
+    GC.gc()
 end
