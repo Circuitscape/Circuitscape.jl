@@ -114,10 +114,10 @@ function _guess_file_type(filename, f)
     seek(f, 0) #TODO I think this is not necessary? -VL
 
     f2 = endswith(filename, "gz") ? GZip.open(filename, "r") : open(filename, "r")
-    bytes = read(f2, 4)
+    bytes = read(f2, 4)[3:4]
     close(f2)
 
-    if bytes[3] == 0x2a && bytes[4] == 0x00
+    if bytes == [0x2a, 0x00]
         filetype = FILE_TYPE_GEOTIFF
     elseif startswith(hdr, FILE_HDR_NPY)
         filetype = FILE_TYPE_NPY
