@@ -297,11 +297,6 @@ function runtests(f = compute)
                     continue
                 end
 
-                # skip sgVerify11 on Mac, weird Mac stuff...
-                if i == 11 && Sys.isapple()
-                    continue
-                end
-
                 @info("Testing sgVerify$i")
                 r = f("input/raster/pairwise/$i/sgVerify$(i).ini")
                 x = readdlm("output_verify/sgVerify$(i)_resistances.out")
