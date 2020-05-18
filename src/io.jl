@@ -464,7 +464,6 @@ function read_raster(path::String, T)
 
     # Close connection to dataset
     ArchGDAL.destroy(raw)
-    ArchGDAL.destroy(band)
 
     array, wkt, transform # wkt and transform are needed later for write_raster
 end
