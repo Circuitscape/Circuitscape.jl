@@ -270,7 +270,6 @@ function runtests(f = compute)
                 @test pts_x .+ 1 == pts_r
                 compare_all_output("sgNetworkVerify$(i)", is_single)
                 @info("Test sgNetworkVerify$i passed")
-                GC.gc()
             end
         end
 
@@ -284,7 +283,6 @@ function runtests(f = compute)
                 @test sum(abs2, x - r) < tol
                 compare_all_output("mgNetworkVerify$(i)", is_single)
                 @info("Test mgNetworkVerify$i passed")
-                GC.gc()
             end
         end
 
@@ -306,7 +304,6 @@ function runtests(f = compute)
                 @test sum(abs2, x - r) < tol
                 compare_all_output("sgVerify$(i)", is_single)
                 @info("Test sgVerify$i passed")
-                GC.gc()
             end
         end
 
@@ -319,7 +316,6 @@ function runtests(f = compute)
                 @test sum(abs2, x - r) < 1e-4
                 # compare_all_output("mgVerify$(i)")
                 @info("Test mgVerify$i passed")
-                GC.gc()
             end
         end
 
@@ -333,7 +329,6 @@ function runtests(f = compute)
                 @test sum(abs2, x - r) < tol
                 compare_all_output("oneToAllVerify$(i)", is_single)
                 @info("Test oneToAllVerify$i passed")
-                GC.gc()
             end
         end
 
@@ -347,7 +342,6 @@ function runtests(f = compute)
 
                 @test sum(abs2, x - r) < tol
                 @info("Test allToOneVerify$i passed")
-                GC.gc()
             end
         end
     end
