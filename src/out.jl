@@ -501,10 +501,10 @@ function write_raster(fn_prefix::String,
 
         # Copy memory object to disk (necessary because ArchGDAL.create
         # does not support creation of ASCII rasters)
-        ArchGDAL.copy(dataset,
-                      filename = fn,
-                      driver = ArchGDAL.getdriver(driver),
-                      options = options)
+        ArchGDAL.destroy(ArchGDAL.copy(dataset,
+                                       filename = fn,
+                                       driver = ArchGDAL.getdriver(driver),
+                                       options = options))
     end
 
 end
