@@ -68,7 +68,7 @@ function init_config()
     a["log_level"] = "INFO"
     a["cholmod_batch_size"] = "1000"
     a["use_64bit_indexing"] = "true"
-
+    a["write_as_tif"] = "false"
     a
 end
 
@@ -137,4 +137,4 @@ function write_config(cfg)
         """)
     end
 end
-    
+
