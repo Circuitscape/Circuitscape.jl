@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.14159265-2.6-1.40.20 (TeX Live 2019/Debian) (preloaded format=pdflatex 2020.6.2)  2 JUN 2020 01:45
+This is pdfTeX, Version 3.14159265-2.6-1.40.20 (TeX Live 2019/Debian) (preloaded format=pdflatex 2020.6.2)  2 JUN 2020 01:59
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -526,12 +526,10 @@ Underfull \hbox (badness 10000) has occurred while \output is active
  []
 
 [2 <./res.pdf>]
-
-LaTeX Warning: Citation `iterativesolversjl' on page 3 undefined on input line 
-93.
-
-
-LaTeX Warning: Citation `amgjl' on page 3 undefined on input line 93.
+Overfull \hbox (14.8554pt too wide) in paragraph at lines 93--93
+$[]$[][]\T1/cmtt/m/n/8 https://github.com/JuliaLinearAlgebra/AlgebraicMultigrid
+.jl| 
+ []
 
 
 Overfull \vbox (2.39996pt too high) has occurred while \output is active []
@@ -542,7 +540,7 @@ Underfull \hbox (badness 10000) has occurred while \output is active
  []
 
 [3]
-<bench.pdf, id=203, 447.77588pt x 296.68942pt>
+<bench.pdf, id=209, 447.77588pt x 296.68942pt>
 File: bench.pdf Graphic file (type pdf)
 <use bench.pdf>
 Package pdftex.def Info: bench.pdf  used on input line 127.
@@ -629,35 +627,32 @@ Package atveryend Info: Executing hook `AtVeryEndDocument' on input line 165.
 Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 165.
 Package rerunfilecheck Info: File `paper.out' has not changed.
 (rerunfilecheck)             Checksum: 4100297BEC46BF488C99922847853369;1002.
-
-
-LaTeX Warning: There were undefined references.
-
 Package atveryend Info: Empty hook `AtVeryVeryEnd' on input line 165.
  ) 
 Here is how much of TeX's memory you used:
- 9507 strings out of 483183
- 137982 string characters out of 5966293
- 427092 words of memory out of 5000000
- 24235 multiletter control sequences out of 15000+600000
- 583827 words of font info for 118 fonts, out of 8000000 for 9000
+ 9512 strings out of 483183
+ 138035 string characters out of 5966293
+ 426092 words of memory out of 5000000
+ 24237 multiletter control sequences out of 15000+600000
+ 586862 words of font info for 121 fonts, out of 8000000 for 9000
  14 hyphenation exceptions out of 8191
- 44i,14n,48p,1991b,607s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 44i,14n,48p,2001b,607s stack positions out of 5000i,500n,10000p,200000b,80000s
  </home/ranjan/.texlive2019/texmf-var/fonts/pk/ljfour/jknappen/ec/ectt0900.60
-0pk>{/usr/share/texlive/texmf-dist/fonts/enc/dvips/base/8r.enc}</usr/share/texl
-ive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/share/texlive/tex
-mf-dist/fonts/type1/public/amsfonts/cm/cmmi9.pfb></usr/share/texlive/texmf-dist
-/fonts/type1/public/amsfonts/cm/cmr6.pfb></usr/share/texlive/texmf-dist/fonts/t
-ype1/public/amsfonts/cm/cmr8.pfb></usr/share/texlive/texmf-dist/fonts/type1/pub
-lic/amsfonts/cm/cmr9.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsf
-onts/cm/cmsy10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/c
-m/cmsy8.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></u
-sr/share/texlive/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></usr/share/texliv
-e/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
-Output written on paper.pdf (6 pages, 803764 bytes).
+0pk> </home/ranjan/.texlive2019/texmf-var/fonts/pk/ljfour/jknappen/ec/ectt0800.
+600pk>{/usr/share/texlive/texmf-dist/fonts/enc/dvips/base/8r.enc}</usr/share/te
+xlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/share/texlive/t
+exmf-dist/fonts/type1/public/amsfonts/cm/cmmi9.pfb></usr/share/texlive/texmf-di
+st/fonts/type1/public/amsfonts/cm/cmr6.pfb></usr/share/texlive/texmf-dist/fonts
+/type1/public/amsfonts/cm/cmr8.pfb></usr/share/texlive/texmf-dist/fonts/type1/p
+ublic/amsfonts/cm/cmr9.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/am
+sfonts/cm/cmsy10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts
+/cm/cmsy8.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/times/utmb8a.pfb><
+/usr/share/texlive/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></usr/share/texl
+ive/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
+Output written on paper.pdf (6 pages, 810906 bytes).
 PDF statistics:
- 357 PDF objects out of 1000 (max. 8388607)
- 288 compressed objects within 3 object streams
- 79 named destinations out of 1000 (max. 500000)
+ 400 PDF objects out of 1000 (max. 8388607)
+ 302 compressed objects within 4 object streams
+ 81 named destinations out of 1000 (max. 500000)
  157 words of extra memory for PDF output out of 10000 (max. 10000000)
 
