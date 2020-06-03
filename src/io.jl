@@ -452,7 +452,7 @@ function read_raster(path::String, T)
     array_t = ArchGDAL.read(band)
 
     # Extract no data value and overwrite with Circuitscape/Omniscape default
-    nodata_val = ArchGDAL.getnodatavalue(band)
+    nodata_val = convert(eltype(array_t), ArchGDAL.getnodatavalue(band))
 
     array_t[array_t .== nodata_val] .= -9999.0
 
