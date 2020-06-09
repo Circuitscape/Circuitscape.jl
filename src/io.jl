@@ -451,19 +451,30 @@ function read_raster(path::String, T)
     # Extract the array
     array_t = ArchGDAL.read(band)
 
-    # Extract no data value and overwrite with Circuitscape/Omniscape default
-    nodata_val = convert(eltype(array_t), ArchGDAL.getnodatavalue(band))
+    # This handles UInt tiff rasters that can still have negative NoData values
+    # Need to convert the NoData value to Int64 in these cases
+    if eltype(array_t) <: Integer
+        ras_type = Int64
+    else
+        ras_type = eltype(array_t)
+    end
 
-    array_t[array_t .== nodata_val] .= -9999.0
-
-    # Line to handle NaNs in datasets read from tifs
-    array_t[isnan.(array_t)] .= -9999.0
+    # Extract no data value, first converting it to the proper type (based on
+    # the raster). Then, need to convert to T. Weird, yes,
+    # but it's the only way I could get it to work for all raster types...
+    nodata_val = convert(T, convert(ras_type, ArchGDAL.getnodatavalue(band)))
 
     # Transpose the array -- ArchGDAL returns a x by y array, need y by x
     array = convert(Array{T}, permutedims(array_t, [2, 1]))
+
+    array[array .== nodata_val] .= -9999.0
+
+    # Line to handle NaNs in datasets read from tifs
+    array[isnan.(array)] .= -9999.0
 
     # Close connection to dataset
     ArchGDAL.destroy(raw)
 
     array, wkt, transform # wkt and transform are needed later for write_raster
 end
+
