@@ -450,6 +450,9 @@ function read_raster(path::String, T)
 
     # Extract the array
     array_t = ArchGDAL.read(band)
+
+    # This handles UInt tiff rasters that can still have negative NoData values
+    # Need to convert the NoData value to Int64 in these cases
     if eltype(array_t) <: Integer
         ras_type = Int64
     else
