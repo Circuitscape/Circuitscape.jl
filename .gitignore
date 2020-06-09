@@ -6,3 +6,4 @@
 Manifest.toml
 temp/
 **/*.properties
+local
