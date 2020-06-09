@@ -456,8 +456,10 @@ function read_raster(path::String, T)
         ras_type = eltype(array_t)
     end
 
-    # Extract no data value and overwrite with Circuitscape/Omniscape default
-    nodata_val = convert(ras_type, ArchGDAL.getnodatavalue(band))
+    # Extract no data value, first converting it to the proper type (based on
+    # the raster). Then, need to convert to T. Weird, yes,
+    # but it's the only way I could get it to work for all raster types...
+    nodata_val = convert(T, convert(ras_type, ArchGDAL.getnodatavalue(band)))
 
     # Transpose the array -- ArchGDAL returns a x by y array, need y by x
     array = convert(Array{T}, permutedims(array_t, [2, 1]))
