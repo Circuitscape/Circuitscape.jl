@@ -20,7 +20,7 @@ SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
-AlgebraicMultigrid = "0.2"
+AlgebraicMultigrid = "0.3"
 ArchGDAL = "0.4"
 GZip = "0.5.1"
 IterativeSolvers = "0.8"
