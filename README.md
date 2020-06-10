@@ -102,7 +102,7 @@ julia> Pkg.add("Circuitscape")
 If you want the latest development version, you can additionally do: 
 
 ```julia
-julia> Pkg.checkout("Circuitscape")
+julia> Pkg.add(PackageSpec(name="Circuitscape", rev="master"))
 ```
 
 Check if all the tests are passing by doing the following:
