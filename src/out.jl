@@ -307,7 +307,7 @@ function write_grid(cmap, name, cfg, hbmeta;
     pref = split(cfg["output_file"], ".out")[1]
     filename = "$(pref)_$(str)$(name)"
 
-    cfg["write_as_tif"] == "true" ? (file_format = "tif") :
+    cfg["write_as_tif"] in TRUELIST ? (file_format = "tif") :
             (file_format = "asc")
 
     write_raster(filename,
@@ -347,7 +347,7 @@ function write_grid(cmap, name, cfg, hbmeta, cellmap;
 
     filename = "$(pref)_$(str)$(name)"
 
-    cfg["write_as_tif"] == "true" ? (file_format = "tif") :
+    cfg["write_as_tif"] in TRUELIST ? (file_format = "tif") :
             (file_format = "asc")
 
     write_raster(filename,
