@@ -1,6 +1,7 @@
 # __precompile__(false)
 module Circuitscape
 using AlgebraicMultigrid
+using ArchGDAL
 using SimpleWeightedGraphs
 using LightGraphs
 using IterativeSolvers
@@ -27,5 +28,9 @@ include("raster/advanced.jl")
 include("network/advanced.jl")
 include("raster/onetoall.jl")
 include("run.jl")
+include("INIBuilder/INIBuilder.jl")
+
+using .INIBuilder
+export start
 
 end

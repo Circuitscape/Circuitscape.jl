@@ -1,0 +1,24 @@
+title: "Circuitscape in Julia: High Performance Connectivity Modelling to Support Conservation Decisions"
+keywords:
+  - landscape ecology 
+  - computational ecology
+  - julia programming language 
+authors:
+  - name: Ranjan Anantharaman    
+    orcid: 0000-0002-4409-3937 
+    affiliation: 1
+  - name: Kimberly Hall
+    affiliation: 2
+  - name: Viral B. Shah
+    affiliation: 3
+  - name: Alan Edelman
+    affiliation: 1, 3
+affiliations:
+  - name: Massachusetts Institute of Technology
+    index: 1
+  - name: The Nature Conservancy
+    index: 2
+  - name: Julia Computing
+    index: 3
+date: 30 August 2019
+bibliography: ref.bib

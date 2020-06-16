@@ -221,7 +221,12 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
             f(1)
             update_shortcut_resistances!(idx, shortcut, resistances, points, comp)
         else
-            X = mapf(x ->f(x), 1:size(csub,1))
+            is_parallel = cfg["parallelize"] in TRUELIST
+            if is_parallel
+                X = pmap(x ->f(x), 1:size(csub,1))
+            else
+                X = map(x ->f(x), 1:size(csub,1))
+            end
 
             # Set all resistances
             for x in X
@@ -422,9 +427,13 @@ function _cholmod_solver_path(data::GraphData{T,V}, flags,
                     lhs[j,i] = lhs[j,i] - v
                 end
             end
-
-
-            mapf(x -> f(x, rng, lhs), 1:length(rng))
+            is_parallel = cfg["parallelize"] in TRUELIST
+            if is_parallel
+                X = pmap(x -> f(x, rng, lhs), 1:length(rng))
+            else
+                X = map(x -> f(x, rng, lhs), 1:length(rng))
+            end
+                    
             for (i,v) in enumerate(rng)
                 coords = cholmod_batch[v].points_idx
                 r = lhs[cholmod_batch[v].cc_idx[2], i] - 

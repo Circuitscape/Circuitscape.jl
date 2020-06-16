@@ -1,0 +1,289 @@
+% \iffalse meta-comment
+%<=*COPYRIGHT>
+%% Copyright (C) 2011-2012 by Martin Scharrer <martin@scharrer-online.de>
+%% ----------------------------------------------------------------------
+%% This work may be distributed and/or modified under the
+%% conditions of the LaTeX Project Public License, either version 1.3
+%% of this license or (at your option) any later version.
+%% The latest version of this license is in
+%%   http://www.latex-project.org/lppl.txt
+%% and version 1.3 or later is part of all distributions of LaTeX
+%% version 2005/12/01 or later.
+%%
+%% This work has the LPPL maintenance status `maintained'.
+%%
+%% The Current Maintainer of this work is Martin Scharrer.
+%%
+%% This work consists of the files ifoddpage.dtx and ifoddpage.ins
+%% and the derived filebase ifoddpage.sty.
+%%
+%<=/COPYRIGHT>
+% \fi
+%
+% \iffalse
+%<*driver>
+\ProvidesFile{ifoddpage.dtx}[%
+%<=*DATE>
+    2016/04/23
+%<=/DATE>
+%<=*VERSION>
+    v1.1
+%<=/VERSION>
+    DTX file for ifoddpage package]
+\documentclass{ydoc}
+\GetFileInfo{ifoddpage.dtx}
+\usepackage{ifoddpage}[\filedate]
+\EnableCrossrefs
+\CodelineIndex
+\RecordChanges
+\begin{document}
+  \DocInput{ifoddpage.dtx}
+  \PrintChanges
+  \PrintIndex
+\end{document}
+%</driver>
+% \fi
+%
+% \CheckSum{90}
+%
+% \CharacterTable
+%  {Upper-case    \A\B\C\D\E\F\G\H\I\J\K\L\M\N\O\P\Q\R\S\T\U\V\W\X\Y\Z
+%   Lower-case    \a\b\c\d\e\f\g\h\i\j\k\l\m\n\o\p\q\r\s\t\u\v\w\x\y\z
+%   Digits        \0\1\2\3\4\5\6\7\8\9
+%   Exclamation   \!     Double quote  \"     Hash (number) \#
+%   Dollar        \$     Percent       \%     Ampersand     \&
+%   Acute accent  \'     Left paren    \(     Right paren   \)
+%   Asterisk      \*     Plus          \+     Comma         \,
+%   Minus         \-     Point         \.     Solidus       \/
+%   Colon         \:     Semicolon     \;     Less than     \<
+%   Equals        \=     Greater than  \>     Question mark \?
+%   Commercial at \@     Left bracket  \[     Backslash     \\
+%   Right bracket \]     Circumflex    \^     Underscore    \_
+%   Grave accent  \`     Left brace    \{     Vertical bar  \|
+%   Right brace   \}     Tilde         \~}
+%
+%
+% \changes{v1.0}{2011/09/13}{First version.}
+% \changes{v1.1}{2016/04/23}{Fixed misspelled macro name.}
+%
+%
+% \DoNotIndex{\newcommand,\newenvironment}
+%
+% \GetFileInfo{ifoddpage.dtx}
+% \author{Martin Scharrer}
+% \email{martin@scharrer.me}
+% \repository{https://bitbucket.org/martin_scharrer/ifoddpage}
+% \maketitle
+%
+% \section{Introduction}
+% Sometimes it is required to know if a macro is placed on an odd or even page.
+% Simply testing the value of the \texttt{page} counter is not reliable, because \TeX\ reads and processes often more material than fits on the currently processed
+% page in order to decide where to place the page break. Also moving material like floats can be placed on completely different pages than where the surrounding material
+% is placed. The only reliable way to determine the correct page number is to write it to the auxiliary file using a label and read it back in the next compiler run.
+% Labels use a so called \emph{whatsit}s (see \emph{The TeXBook}) to write the given code to the auxiliary file \emph{just when the material is shipped out}, i.e.\ a full page has
+% been filled and is written to the output file. This way ensures that the determined page number is always correct, but adds an overhead.
+%
+% This package implements the described technique. A macro must be used to generate and read-back the label before the conditional can be used.
+% A counter is used internally to provide unique names to the labels.
+%
+%
+% \section{Usage}
+% The following macros are provided for \LaTeX\ document authors:
+%
+% \DescribeMacro{\checkoddpage}
+% This macro checks if the current page is odd or even by placing a label to the auxiliary file and reading it back in.
+% This requires a second compiler run to work perfectly, but the code falls back to use the \texttt{page} counter value
+% if the label is not yet defined, i.e.\ the label was just added or no auxiliary file existed.
+% This fallback code might return wrong values for material just around page breaks, but
+% is better than using a constant.
+%
+% Note that this macro inserts an invisible element (a so called \emph{whatsit}) which is placed on the page.
+% It is possible that this happens to be at the very end of the last line of the page and any other code following it would then be placed
+% on the next page. Some code like |\checkoddpage \ifoddpage odd\else even\fi| might then place the first macro on the current, say even, page but
+% print `|even|' at the top of the next page which is odd. In order to avoid this both the check macro and the output text can be placed in the same
+% box (e.g.\ |\mbox|). If the full content can't be placed in a box, e.g.\ because line breaking is required a |\mbox| can also be substituded by
+% |\leavevmode| (to start a paragraph if required) and |\hbox| where the |{}| are replaced by |\bgroup| and |\egroup| so two alternative box ends can be specified:
+%
+% \begin{lstlisting}[gobble=2,numbers=none,basicstyle=\ttfamily]
+%    \leavevmode\hbox\bgroup
+%    \checkoddpage
+%    \ifoddpage
+%      odd\egroup\ more text
+%    \else
+%      even\egroup\ other text
+%    \fi
+% \end{lstlisting}
+%
+% \noindent
+% This boxes the \Macro\checkoddpage with the first word of both clauses. Note that in this case it the settings are local to the box scope and \Macro\ifoddpage should
+% be used outside of it again (without another \Macro\checkoddpage).
+%
+% \DescribeMacro{ifoddpage}
+% This \TeX\ conditional is set (locally) by \Macro\checkoddpage.
+% It is true if the current page is odd, or false if it is even. This is independent from whether the \texttt{oneside} or \texttt{twoside} mode is used.
+%
+% \DescribeMacro{ifoddpageoroneside}
+% This \TeX\ conditional is set (locally) by \Macro\checkoddpage.
+% Like the previous conditional it is true if the current page is odd, or false if it is even.
+% However, if the \texttt{oneside} mode is active it is always true.
+% This is useful for code which needs to check if the odd or even page layout is used, because in \texttt{oneside} mode the odd page layout is used for all pages.
+%
+% \par\medskip\par\noindent
+% The following macros are intended for package authors:
+%
+% \DescribeMacro{\@ifoddpage}{<true>}{<false>}
+% This \LaTeX\ macro uses \Macro{ifoddpage} and executes its first argument if that conditional is true but the second argument if it is false.
+% The \Macro\checkoddpage must be used closely beforehand to get correct results.
+%
+% \DescribeMacro{\@ifoddpageoroneside}{<true>}{<false>}
+% This \LaTeX\ macro uses \Macro{ifoddpageoroneside} and executes its first argument if that conditional is true but the second argument if it is false.
+% The \Macro\checkoddpage must be used closely beforehand to get correct results.
+%
+% \DescribeMacro{\oddpage@page}
+% This macro expands (using multiple steps) to a text representation of the page number for the last \Macro\checkoddpage.
+% It is used in this macro together with \Macro\ifodd to set the provided conditionals.
+%
+%
+% \section{Similar packages}
+% The \pkg{changepage} package and the \pkg{memoir} class also provide the core functionality of this package, i.e.\ they define \Macro\checkoddpage and \Macro\ifoddpage but no other of the mentioned macros.
+% That package uses this conditional internally in order to allow the user to change the page layout for odd or even pages, which is its main function.
+% The \pkg{ifoddpage} should work together with that package and class, but should be loaded last to ensure the correct functionality of \Macro{ifoddpageoroneside}.
+% It also uses labels if it is loaded using the \texttt{strict} option.
+% The \pkg{ifoddpage} has the following benefits over \pkg{changepage} (if the page layout doesn't have to be changed):
+%
+% \begin{itemize}
+%   \item Smaller code base, because no additional functionality is provided.
+%   \item The \Macro{ifoddpageoroneside} conditional is also provided which simplifies code which has to handle odd/even margins.
+%   \item The label code uses the same internal \LaTeX-core code as the normal \Macro\label and generates identical error, warning and info messages.
+%   \item The fallback page number is not constant (0) but the current \texttt{page} counter value is used, which is a good approximation.
+% \end{itemize}
+%
+% \StopEventually{}
+%
+% \clearpage
+% \section{Implementation}
+%
+% \iffalse
+%<*ifoddpage.sty>
+% \fi
+%    \begin{macrocode}
+%<!COPYRIGHT>
+\NeedsTeXFormat{LaTeX2e}[1999/12/01]
+\ProvidesPackage{ifoddpage}[%
+%<!DATE>
+%<!VERSION>
+%<*DRIVER>
+    2099/01/01 develop
+%</DRIVER>
+    Conditionals for odd/even page detection]
+%    \end{macrocode}
+%
+%
+%    \begin{macrocode}
+\newcount\c@checkoddpage
+%    \end{macrocode}
+%
+% \begin{macro}{\thecheckoddpage}
+%    \begin{macrocode}
+\def\thecheckoddpage{\number\c@checkoddpage}
+%    \end{macrocode}
+% \end{macro}
+%
+%    \begin{macrocode}
+\newif\ifoddpage
+\newif\ifoddpageoroneside
+\let\oddpage@checkpage\relax
+%    \end{macrocode}
+%
+% \begin{macro}{\oddpage@page}
+%    \begin{macrocode}
+\def\oddpage@page{1}
+%    \end{macrocode}
+% \end{macro}
+%
+%
+% \begin{macro}{\oddpage@label}
+%    \begin{macrocode}
+\def\oddpage@label{%
+    \@newl@bel{checkoddpage}%
+}%
+\write\@auxout{\noexpand\providecommand\noexpand\oddpage@label[2]{}}%
+%    \end{macrocode}
+% \end{macro}
+%
+%
+% \begin{macro}{\oddpage@checkpage}
+%    \begin{macrocode}
+\def\oddpage@checkpage#1{%
+    \@bsphack
+    \write\@auxout{\string\oddpage@label{#1}{\the\c@page}}%
+    \@esphack
+}%
+%    \end{macrocode}
+% \end{macro}
+%
+%
+% \begin{macro}{\oddpage@page}
+%    \begin{macrocode}
+\def\oddpage@page{%
+    \expandafter\ifx\csname checkoddpage@\thecheckoddpage\endcsname\relax
+        \the\c@page
+    \else
+        \csname checkoddpage@\thecheckoddpage\endcsname
+    \fi
+}%
+%    \end{macrocode}
+% \end{macro}
+%
+%
+% \begin{macro}{\checkoddpage}
+%    \begin{macrocode}
+\DeclareRobustCommand\checkoddpage{%
+    \stepcounter{checkoddpage}%
+    \expandafter\oddpage@checkpage\expandafter{\number\c@checkoddpage}%
+    \ifodd\oddpage@page\relax
+        \oddpagetrue
+        \oddpageoronesidetrue
+    \else
+        \oddpagefalse
+        \oddpageoronesidefalse
+    \fi
+    \if@twoside\else
+        \oddpageoronesidetrue
+    \fi
+}%
+%    \end{macrocode}
+% \end{macro}
+%
+%
+% \begin{macro}{\@ifoddpage}
+%    \begin{macrocode}
+\def\@ifoddpage{%
+    \ifoddpage
+        \expandafter\@firstoftwo
+    \else
+        \expandafter\@secondoftwo
+    \fi
+}
+%    \end{macrocode}
+% \end{macro}
+%
+%
+% \begin{macro}{\@ifoddpageoroneside}
+%    \begin{macrocode}
+\def\@ifoddpageoroneside{%
+    \iftwosideoddside
+        \expandafter\@firstoftwo
+    \else
+        \expandafter\@secondoftwo
+    \fi
+}
+%    \end{macrocode}
+% \end{macro}
+%
+% \iffalse
+%</ifoddpage.sty>
+% \fi
+%
+% \Finale
+% \endinput

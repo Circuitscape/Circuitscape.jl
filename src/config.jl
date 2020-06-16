@@ -69,6 +69,9 @@ function init_config()
     a["cholmod_batch_size"] = "1000"
     a["use_64bit_indexing"] = "false"
     a["meta_parallelize"] = "false" 
+    a["use_64bit_indexing"] = "true"
+    a["write_as_tif"] = "false"
+    a["meta_parallelize"] = "false"
 
     a
 end
@@ -138,4 +141,4 @@ function write_config(cfg)
         """)
     end
 end
-    
+

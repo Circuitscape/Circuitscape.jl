@@ -3,3 +3,7 @@
 *.jl.mem
 *.jld
 *.tmp
+Manifest.toml
+temp/
+**/*.properties
+local

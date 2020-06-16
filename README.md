@@ -6,8 +6,6 @@ Linux and OSX: [![Build Status](https://travis-ci.org/Circuitscape/Circuitscape.
 
 Windows: [![Build status](https://ci.appveyor.com/api/projects/status/4a8u8985hq2mt569?svg=true)](https://ci.appveyor.com/project/ranjanan/circuitscape-jl)
 
-**Users of Circuitscape on Julia v0.6 should now shift to Julia 1.0. Circuitscape on Julia v0.6 will no longer be supported.**
-
 Circuitscape is an open-source program that uses circuit theory to model connectivity 
 in heterogeneous landscapes. Its most common applications include modeling movement and gene flow 
 of plants and animals, as well as identifying areas important for connectivity conservation. 
@@ -104,7 +102,7 @@ julia> Pkg.add("Circuitscape")
 If you want the latest development version, you can additionally do: 
 
 ```julia
-julia> Pkg.checkout("Circuitscape")
+julia> Pkg.add(PackageSpec(name="Circuitscape", rev="master"))
 ```
 
 Check if all the tests are passing by doing the following:
@@ -128,3 +126,23 @@ If you have encounter any issues or would like to ask a question, please file
 a report [here](https://github.com/ranjanan/Circuitscape.jl/issues).
 Contributions in the form of 
 [pull requests](https://github.com/ranjanan/Circuitscape.jl/pulls) are also welcome! 
+
+## Notes on INI files 
+
+Circuitscape takes as input INI files, which contain paths to the raster map, sources, grounds,
+and other inputs, as well as flags for each run. If you're using the [GUI](https://circuitscape.org/downloads/)
+the INI file will automatically be generated for you and then fed into Circuitscape. But if you're 
+using the Julia prompt, then you must write one yourself. The easiest way to do this is to copy 
+an INI file [from the tests](https://github.com/Circuitscape/Circuitscape.jl/tree/master/test/input) and then modify it depending on your problem. 
+
+## Citation
+
+A preprint is available here: https://arxiv.org/abs/1906.03542. You can also use the following BibTeX entry to cite this package: 
+```bibtex
+@misc{1906.03542,
+Author = {Ranjan Anantharaman and Kimberly Hall and Viral Shah and Alan Edelman},
+Title = {Circuitscape in Julia: High Performance Connectivity Modelling to Support Conservation Decisions},
+Year = {2019},
+Eprint = {arXiv:1906.03542},
+}
+```
