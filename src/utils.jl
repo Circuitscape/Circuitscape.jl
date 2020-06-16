@@ -113,7 +113,7 @@ function compute_metaparallel(jobs::Vector{String}, n_procs = 1)
     cfg_list = Vector{Dict{String,String}}(undef,l)
     for (i,str) in enumerate(jobs)
         cfg = parse_config(str)
-        cfg["meta_parallelize"] = "true"
+        cfg["parallelize"] = "false"
         cfg_list[i] = cfg
     end
     @everywhere Core.eval(Main, :(using Circuitscape))
