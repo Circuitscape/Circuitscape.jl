@@ -440,6 +440,10 @@ end
 
 # Inspired by GeoArrays.read()
 function read_raster(path::String, T)
+    # Check if file exists (ArchGDAL error is cryptic)
+    check_path = endswith(path, ".gz") ? path[10:lastindex(path)] : path
+    !isfile(check_path) && error("the file \"$(check_path)\" does not exist")
+
     raw = ArchGDAL.unsafe_read(path)
     transform = ArchGDAL.getgeotransform(raw)
     wkt = ArchGDAL.getproj(raw)
@@ -461,7 +465,7 @@ function read_raster(path::String, T)
 
     # Extract no data value, first converting it to the proper type (based on
     # the raster). Then, need to convert to T. Weird, yes,
-    # but it's the only way I could get it to work for all raster types...
+    # but it's the only way I could get it to work for all raster types... -VL
     nodata_val = convert(T, convert(ras_type, ArchGDAL.getnodatavalue(band)))
 
     # Transpose the array -- ArchGDAL returns a x by y array, need y by x
