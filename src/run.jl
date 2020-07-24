@@ -21,15 +21,15 @@ function compute(path::String)
         T = Float64
     end
     V = cfg["use_64bit_indexing"] in TRUELIST ? Int64 : Int32
-    csinfo("Precision used: $(cfg["precision"])")
+    csinfo("Precision used: $(cfg["precision"])", cfg["suppress_messages"] in TRUELIST)
     is_parallel = cfg["parallelize"] in TRUELIST
     if is_parallel
         n = parse(Int, cfg["max_parallel"])
-        csinfo("Starting up Circuitscape to use $n processes in parallel")
+        csinfo("Starting up Circuitscape to use $n processes in parallel", cfg["suppress_messages"] in TRUELIST)
         myaddprocs(n)
     end
     t = @elapsed r = _compute(T, V, cfg)
-    csinfo("Time taken to complete job = $t")
+    csinfo("Time taken to complete job = $t", cfg["suppress_messages"] in TRUELIST)
     is_parallel && rmprocs(workers())
     r
 end
@@ -63,15 +63,15 @@ function compute(dict)
     write_config(cfg)
     T = cfg["precision"] in SINGLE ? Float32 : Float64
     V = cfg["use_64bit_indexing"] in TRUELIST ? Int64 : Int32
-    csinfo("Precision used: $(cfg["precision"])")
+    csinfo("Precision used: $(cfg["precision"])", cfg["suppress_messages"] in TRUELIST)
     is_parallel = cfg["parallelize"] in TRUELIST
-    if is_parallel 
+    if is_parallel
         n = parse(Int, cfg["max_parallel"])
-        csinfo("Starting up Circuitscape to use $n processes in parallel")
+        csinfo("Starting up Circuitscape to use $n processes in parallel", cfg["suppress_messages"] in TRUELIST)
         myaddprocs(n)
     end
     t = @elapsed r = _compute(T, V, cfg)
-    csinfo("Time taken to complete job = $t")
+    csinfo("Time taken to complete job = $t", cfg["suppress_messages"] in TRUELIST)
     is_parallel && rmprocs(workers())
     r
 end
