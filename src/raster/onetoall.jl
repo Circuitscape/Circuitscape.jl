@@ -25,9 +25,9 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
     use_variable_strengths = !isempty(strengths)
     use_included_pairs = !isempty(included_pairs)
     mode = included_pairs.mode == :include ? 0 : 1
-    one_to_all = flags.is_onetoall 
+    one_to_all = flags.is_onetoall
     avg_res = flags.avg_res
-    four_neighbors = flags.four_neighbors   
+    four_neighbors = flags.four_neighbors
 
     if use_included_pairs
         points_unique = included_pairs.point_ids
@@ -53,7 +53,7 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
     a = construct_graph(gmap, nodemap, avg_res, four_neighbors)
     cc = connected_components(SimpleWeightedGraph(a))
     G = laplacian(a)
-    csinfo("There are $(size(a, 1)) points and $(length(cc)) connected components")
+    csinfo("There are $(size(a, 1)) points and $(length(cc)) connected components", cfg["suppress_messages"] in TRUELIST)
 
     # source_map = Matrix{eltype(a)}(0, 0)
     # ground_map = Matrix{eltype(a)}(0, 0)
@@ -77,7 +77,7 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
         # copyto!(point_map, original_point_map)
         point_map = copy(original_point_map)
         str = use_variable_strengths ? strengths[i,2] : 1
-        csinfo("Solving point $i of $num_points_to_solve")
+        csinfo("Solving point $i of $num_points_to_solve", cfg["suppress_messages"] in TRUELIST)
         # copyto!(s, z)
         s = copy(z)
         n = points_unique[i]
@@ -89,7 +89,7 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
                 end
             end
             # polymap = create_new_polymap(gmap, Polymap(polymap), points_rc, point_map = point_map)
-            newpoly = create_new_polymap(gmap, polymap, points_rc, 0, 0, point_map)            
+            newpoly = create_new_polymap(gmap, polymap, points_rc, 0, 0, point_map)
             nodemap = construct_node_map(gmap, polymap)
             a = construct_graph(gmap, nodemap, avg_res, four_neighbors)
         end
@@ -107,17 +107,17 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
         end
 
         check_node = nodemap[points_rc[1][i], points_rc[2][i]]
-        
+
         policy = one_to_all ? :rmvgnd : :rmvsrc
-        sources, grounds, finite_grounds = 
-                    _get_sources_and_grounds(source_map, ground_map, 
+        sources, grounds, finite_grounds =
+                    _get_sources_and_grounds(source_map, ground_map,
                             flags, G, nodemap, policy)
-      
+
         advanced_data = AdvancedData(G, cc, nodemap, newpoly, hbmeta,
-                        sources, grounds, source_map, finite_grounds, 
+                        sources, grounds, source_map, finite_grounds,
                         check_node, n, gmap)
 
-        
+
         if one_to_all
             # v = advanced(cfg, a, source_map, ground_map; nodemap = nodemap, policy = :rmvgnd,
             #                check_node = check_node, src = n, polymap = Polymap(newpoly), hbmeta = hbmeta)
@@ -136,8 +136,8 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
     pmap(x -> f(x), 1:num_points_to_solve)
 
     if flags.outputflags.write_cur_maps
-        write_cum_maps(cum, gmap, cfg, hbmeta, 
-                       flags.outputflags.write_max_cur_maps, 
+        write_cum_maps(cum, gmap, cfg, hbmeta,
+                       flags.outputflags.write_max_cur_maps,
                        flags.outputflags.write_cum_cur_map_only)
     end
 
