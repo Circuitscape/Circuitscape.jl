@@ -10,7 +10,7 @@ Circuitscape is an open-source program that uses circuit theory to model connect
 in heterogeneous landscapes. Its most common applications include modeling movement and gene flow 
 of plants and animals, as well as identifying areas important for connectivity conservation. 
 
-Circuitscape has now been rewritten in [Julia](https://julialang.org) for better performance and scalability. Julia is modern open-source language for scientific computing. 
+Circuitscape has now been rewritten in [Julia](https://julialang.org) for better performance and scalability. Julia is a modern open-source language for scientific computing. 
 
 This work is based on the original [Circuitscape](https://github.com/Circuitscape/Circuitscape) project by Brad McRae, Viral B. Shah 
 and Tanmay Mohapatra. 
