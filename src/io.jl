@@ -134,9 +134,21 @@ function _guess_file_type(filename, f)
 end
 
 function read_polymap(T, file::String, habitatmeta;
-                      nodata_as = 0, resample = true) # TODO remove unused argument -VL
+                      nodata_as = 0, resample = true) # TODO remove resample -VL
 
-    polymap, rastermeta = _grid_reader(T, file)
+    polymap, rastermeta = _grid_reader(Float64, file)
+
+    # Convert polymap to T. It's easier to do here and check for errors than
+    # to add another Boolean flag argument to read_raster that specifies if the
+    # file is for nodes points or polygons.
+    try
+        polymap = convert(Array{T}, polymap)
+    catch e
+        isa(e, InexactError) && @error string("Your node file (point_file in ",
+                                       "the .ini) contains non-integer values.",
+                                       " See the docs on specifying nodes for",
+                                       " more information.")
+    end
 
     ind = findall(x -> x == rastermeta.nodata, polymap)
     if nodata_as != -1
