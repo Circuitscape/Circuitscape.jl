@@ -134,7 +134,7 @@ function _guess_file_type(filename, f)
 end
 
 function read_polymap(T, file::String, habitatmeta;
-                      nodata_as = 0, resample = true) # TODO remove resample -VL
+                      nodata_as = 0)
 
     polymap, rastermeta = _grid_reader(Float64, file)
 
