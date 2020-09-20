@@ -503,7 +503,7 @@ function write_raster(fn_prefix::String,
         # does not support creation of ASCII rasters)
         ArchGDAL.write(dataset, fn,
                        driver = ArchGDAL.getdriver(driver),
-                       options = options))
+                       options = options)
     end
 
 end
