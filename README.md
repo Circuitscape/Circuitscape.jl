@@ -3,6 +3,8 @@
 Linux and OSX: [![Build Status](https://travis-ci.com/Circuitscape/Circuitscape.jl.svg?branch=master)](https://travis-ci.com/Circuitscape/Circuitscape.jl)
 [![Coverage Status](https://coveralls.io/repos/github/Circuitscape/Circuitscape.jl/badge.svg?branch=master)](https://coveralls.io/github/Circuitscape/Circuitscape.jl?branch=master)
 [![codecov.io](http://codecov.io/github/Circuitscape/Circuitscape.jl/coverage.svg?branch=master)](http://codecov.io/github/Circuitscape/Circuitscape.jl?branch=master)
+[![](https://img.shields.io/badge/docs-stable-blue.svg)](https://docs.circuitscape.org/Circuitscape.jl/stable/)
+[![](https://img.shields.io/badge/docs-dev-blue.svg)](https://docs.circuitscape.org/Circuitscape.jl/latest/)
 
 Windows: [![Build status](https://ci.appveyor.com/api/projects/status/4a8u8985hq2mt569?svg=true)](https://ci.appveyor.com/project/ranjanan/circuitscape-jl)
 
