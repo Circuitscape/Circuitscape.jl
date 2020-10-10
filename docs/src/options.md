@@ -58,7 +58,7 @@ When checked, current maps will be generated for every pair of focal nodes in th
 
 ![](https://raw.github.com/Circuitscape/Circuitscape/master/docs/4.0/images/image24.png)
 
-**Fig. 11.** Current map used to predict important connectivity areas between core habitat patches (green polygons, entered as focal regions) for mountain lions. Warmer colors indicate areas with higher current density. "Pinch points," or areas where connectivity is most tenuous, are shown in yellow. Quantile classification schemes or "histogram equalize" stretches tend to work well for current maps when using ArcGIS. Research Collaborators: Brett Dickson and Rick Hopkins, Live Oak Associates.
+**Fig. 1.** Current map used to predict important connectivity areas between core habitat patches (green polygons, entered as focal regions) for mountain lions. Warmer colors indicate areas with higher current density. "Pinch points," or areas where connectivity is most tenuous, are shown in yellow. Quantile classification schemes or "histogram equalize" stretches tend to work well for current maps when using ArcGIS. Research Collaborators: Brett Dickson and Rick Hopkins, Live Oak Associates.
 
 ### Create voltage maps
 
