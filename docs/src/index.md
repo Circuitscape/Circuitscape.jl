@@ -60,7 +60,7 @@ Cntrl+C.
 Please note that this version of Circuitscape **does not** come with a GUI. 
 
 You can, as a fallback, manually write your own INI file by copying and pasting an example 
-from the [test folder]() and change values as needed.    
+from the [test folder]() and change values as needed.
 
 ## Citing Circuitscape
 
