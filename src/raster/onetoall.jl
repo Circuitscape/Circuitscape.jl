@@ -67,6 +67,7 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
     num_points_to_solve = size(points_unique, 1)
     original_point_map = copy(point_map)
     unique_point_map = zeros(V, size(gmap))
+    strength_map = use_variable_strengths ? zeros(T, size(gmap)) : zeros(T, 0, 0)
 
     for i in points_unique
         ind = findfirst(x -> x == i, points_rc[3])
@@ -94,7 +95,6 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
                 idx = findall(x -> x == 0, _tmp)
                 _strengths = deepcopy(strengths)
                 _strengths[idx, 2] .= 1
-                strength_map = zeros(T, size(gmap))
                 for x = 1:size(points_rc[1], 1)
                     strength_map[f(1,x), f(2,x)] = _strengths[x,2]
                 end
