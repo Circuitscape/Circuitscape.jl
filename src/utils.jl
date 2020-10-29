@@ -341,6 +341,7 @@ function runtests(f = compute)
                 # x = x[:,2]
 
                 @test sum(abs2, x - r) < tol
+                compare_all_output("allToOneVerify$(i)", is_single)
                 @info("Test allToOneVerify$i passed")
             end
         end
