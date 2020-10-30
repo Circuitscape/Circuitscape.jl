@@ -235,6 +235,8 @@ function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Tuple{Matrix{T},M
         return v, outcurr
     end
 
+    @show solver_called
+
     scenario = cfg["scenario"]
     if !solver_called
         ret = Matrix{T}(undef,1,1)

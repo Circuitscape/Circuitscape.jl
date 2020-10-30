@@ -90,19 +90,19 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
                     map!(x -> x == exclude ? 0 : x, point_map, point_map)
                 end
             end
-            if use_variable_strengths
-                _tmp = [point_map[f(1,x), f(2,x)] for x = 1:size(points_rc[1], 1)]
-                idx = findall(x -> x == 0, _tmp)
-                _strengths = deepcopy(strengths)
-                _strengths[idx, 2] .= 1
-                for x = 1:size(points_rc[1], 1)
-                    strength_map[f(1,x), f(2,x)] = _strengths[x,2]
-                end
-            end
             # polymap = create_new_polymap(gmap, Polymap(polymap), points_rc, point_map = point_map)
             newpoly = create_new_polymap(gmap, polymap, points_rc, 0, 0, point_map)
             nodemap = construct_node_map(gmap, polymap)
             a = construct_graph(gmap, nodemap, avg_res, four_neighbors)
+        end
+        if use_variable_strengths
+            _tmp = [point_map[f(1,x), f(2,x)] for x = 1:size(points_rc[1], 1)]
+            idx = findall(x -> x == 0, _tmp)
+            _strengths = deepcopy(strengths)
+            _strengths[idx, 2] .= 1
+            for x = 1:size(points_rc[1], 1)
+                strength_map[f(1,x), f(2,x)] = _strengths[x,2]
+            end
         end
         # T = eltype(a)
         if sum(point_map) == n
