@@ -67,6 +67,7 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
     num_points_to_solve = size(points_unique, 1)
     original_point_map = copy(point_map)
     unique_point_map = zeros(V, size(gmap))
+    strength_map = use_variable_strengths ? zeros(T, size(gmap)) : zeros(T, 0, 0)
 
     for i in points_unique
         ind = findfirst(x -> x == i, points_rc[3])
@@ -89,20 +90,19 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
                     map!(x -> x == exclude ? 0 : x, point_map, point_map)
                 end
             end
-            if use_variable_strengths
-                _tmp = [point_map[f(1,x), f(2,x)] for x = 1:size(points_rc[1], 1)]
-                idx = findall(x -> x == 0, _tmp)
-                _strengths = deepcopy(strengths)
-                _strengths[idx, 2] .= 1
-                strength_map = zeros(T, size(gmap))
-                for x = 1:size(points_rc[1], 1)
-                    strength_map[f(1,x), f(2,x)] = _strengths[x,2]
-                end
-            end
             # polymap = create_new_polymap(gmap, Polymap(polymap), points_rc, point_map = point_map)
             newpoly = create_new_polymap(gmap, polymap, points_rc, 0, 0, point_map)
             nodemap = construct_node_map(gmap, polymap)
             a = construct_graph(gmap, nodemap, avg_res, four_neighbors)
+        end
+        if use_variable_strengths
+            _tmp = [point_map[f(1,x), f(2,x)] for x = 1:size(points_rc[1], 1)]
+            idx = findall(x -> x == 0, _tmp)
+            _strengths = deepcopy(strengths)
+            _strengths[idx, 2] .= 1
+            for x = 1:size(points_rc[1], 1)
+                strength_map[f(1,x), f(2,x)] = _strengths[x,2]
+            end
         end
         # T = eltype(a)
         if sum(point_map) == n
