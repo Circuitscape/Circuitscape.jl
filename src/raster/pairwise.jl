@@ -86,7 +86,7 @@ function _pt_file_polygons_path(rasterdata::RasData{T,V},
     four_neighbors = flags.four_neighbors
 
     # Cumulative maps
-    #cum = initialize_cum_maps(gmap, flags.outputflags.write_max_cur_maps)
+    cum = initialize_cum_maps(gmap, flags.outputflags.write_max_cur_maps)
 
     pts = unique(points_rc[3])
     resistances = -1 * ones(length(pts), length(pts))
@@ -223,11 +223,11 @@ function compute_graph_data_no_polygons(data::RasData{T,V},
     end
 
     # Cumulative current maps
-    # cum = initialize_cum_maps(cellmap, write_max_cur_maps)
+    cum = initialize_cum_maps(cellmap, write_max_cur_maps)
 
     GraphData(G, cc, points, points_rc[3], 
                 exclude_pairs, nodemap, polymap, 
-                hbmeta, cellmap)
+                hbmeta, cellmap, cum)
 end
 Base.isempty(t::IncludeExcludePairs) = t.mode == :undef
 

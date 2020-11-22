@@ -1,3 +1,10 @@
+struct Cumulative{T}
+    cum_curr::Vector{Matrix{T}}
+    max_curr::Vector{Matrix{T}}
+    cum_branch_curr::Vector{Vector{T}}
+    cum_node_curr::Vector{Vector{T}}
+end
+
 struct GraphData{T,V}
     G::SparseMatrixCSC{T,V}
     cc::Vector{Vector{V}}
@@ -8,6 +15,7 @@ struct GraphData{T,V}
     polymap::Matrix{V}
     hbmeta::RasterMeta
     cellmap::Matrix{T}
+    cum::Cumulative{T}
 end
 
 struct ComponentData{T,V}
@@ -25,6 +33,7 @@ struct Output{T,V}
     comp_idx::Tuple{V,V}
     resistance::T
     col::V
+    cum::Cumulative{T}
 end
 
 struct Shortcut{T}
@@ -74,6 +83,9 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
 
     # Get number of focal points
     numpoints = size(points, 1)
+
+    # Cumulative currents
+    cum = data.cum
 
     csinfo("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
 
@@ -137,12 +149,12 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
 
             # Iteration space through all possible pairs
             rng = i+1:size(csub, 1)
-            #=if nthreads() > 1 
+            if nthreads() > 1 
                 for j in rng
                     pj = csub[j]
                     csinfo("Scheduling pair $(d[(pi,pj)]) of $num to be solved")
                 end
-            end=#
+            end
 
             # Loop through all possible pairs
             for j in rng
@@ -180,7 +192,9 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
                             current[comp_j] = 1
 
                             # t2 = @elapsed v[threadid()] = solve_linear_system(cfg, matrix, current[threadid()], P)
-                            t2 = @elapsed v = cg(matrix, current, Pl=P, maxiter = 100_000, tol = 1e-6)
+                            t2 = @elapsed v = cg(matrix, current; Pl = P, maxiter = 100_000, tol = 1e-6)
+                            # t2 = @elapsed v = solve(P.ml, current; tol = 1e-6)
+                            # v = matrix \ current
                             # push!(Main.foo, (matrix, current, v, P, threadid()))
                             csinfo("Time taken to solve linear system = $t2 seconds")
                             v .= v .- v[comp_i]
@@ -194,9 +208,9 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
                             #    resistances[c_j, c_i] = r
                             # end
                             output = Output(points, v, (orig_pts[c_i], orig_pts[c_j]),
-                                            (comp_i, comp_j), r, V(c_j))
+                                             (comp_i, comp_j), r, V(c_j), cum)
                             postprocess(output, component_data, flags, shortcut, cfg)
-                            v, r
+                            c_i, c_j, r
                         end
 
                         t = @spawn f(matrix, P)
@@ -212,15 +226,15 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
             update_shortcut_resistances!(idx, shortcut, resistances, points, comp)
         else
         
-            Main.buzz[] = l
+            X = fetch.(l)
 
             # Set all resistances
-            #for x in X
-            #    for i = 1:size(x, 1)
-            #        resistances[x[i][1], x[i][2]] = x[i][3]
-            #        resistances[x[i][2], x[i][1]] = x[i][3]
-            #    end
-            #end
+            for x in X
+                for i = 1:size(x, 1)
+                    resistances[x[1], x[2]] = x[3]
+                    resistances[x[2], x[1]] = x[3]
+                end
+            end
         end
 
     end
