@@ -191,8 +191,8 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
                             current[comp_i] = -1
                             current[comp_j] = 1
 
-                            # t2 = @elapsed v[threadid()] = solve_linear_system(cfg, matrix, current[threadid()], P)
-                            t2 = @elapsed v = cg(matrix, current; Pl = P, maxiter = 100_000, tol = 1e-6)
+                            t2 = @elapsed v = solve_linear_system(cfg, matrix, current, P)
+                            # t2 = @elapsed v = cg(matrix, current; Pl = P, maxiter = 100_000, tol = 1e-6)
                             # t2 = @elapsed v = solve(P.ml, current; tol = 1e-6)
                             # v = matrix \ current
                             # push!(Main.foo, (matrix, current, v, P, threadid()))
@@ -227,6 +227,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
         else
         
             X = fetch.(l)
+            display(X)
 
             # Set all resistances
             for x in X
@@ -573,7 +574,7 @@ function solve_linear_system(cfg,
             _G::SparseMatrixCSC{T,V}, 
             curr::Vector{T}, M)::Vector{T} where {T,V} 
     v = cg(_G, curr, Pl = M, tol = T(1e-6), maxiter = 100_000)
-    push!(Main.foo, (_G, curr, M, v))
+    # push!(Main.foo, (_G, curr, M, v))
     v
 end
 
