@@ -292,6 +292,7 @@ function multiple_solver(cfg, a::SparseMatrixCSC{T,V}, sources, grounds, finiteg
         t1 = @elapsed volt = M \ sources
         csinfo("Time taken to solve linear system = $t1 seconds", cfg["suppress_messages"] in TRUELIST)
     end
+    @assert norm(solve*sources .- volt) < 1e-5
 
     # Replace the inf with 0
     voltages = zeros(eltype(a), length(volt) + length(infgrounds))
