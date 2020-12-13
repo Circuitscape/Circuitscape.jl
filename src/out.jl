@@ -80,11 +80,7 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
 
         # Max current if user asks for it
         if write_max_cur_maps
-<<<<<<< HEAD
             max_curr[threadid()] .= max.(max_curr[threadid()], cmap)
-=======
-            max_curr[mycsid()] .= max.(max_curr[mycsid()], cmap)
->>>>>>> master
         end
 
 

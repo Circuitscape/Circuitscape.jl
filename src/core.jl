@@ -51,10 +51,10 @@ Input:
 function single_ground_all_pairs(data::GraphData{T,V}, flags, cfg, log = true) where {T,V}
 
     if flags.solver in AMG
-        csinfo("Solver used: AMG accelerated by CG", cfg["suppress_messages"] in TRUELIST)
+        csinfo("Solver used: AMG accelerated by CG")
         amg_solver_path(data, flags, cfg, log)
     else
-        csinfo("Solver used: CHOLMOD", cfg["suppress_messages"] in TRUELIST)
+        csinfo("Solver used: CHOLMOD")
         bs = parse(Int, cfg["cholmod_batch_size"])
         _cholmod_solver_path(data, flags, cfg, log, bs)
     end
@@ -87,11 +87,7 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
     # Cumulative currents
     cum = data.cum
 
-<<<<<<< HEAD
     csinfo("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
-=======
-    csinfo("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components", cfg["suppress_messages"] in TRUELIST)
->>>>>>> master
 
     num, d = get_num_pairs(cc, points, exclude)
     log && csinfo("Total number of pair solves = $num", cfg["suppress_messages"] in TRUELIST)
@@ -143,26 +139,18 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
 
         l = Vector{Task}()
 
-        for i in 1:size(csub, 1)
+        # for i in 1:size(csub, 1)
+        function f(i)
 
+            ret = Vector{Tuple{V,V,T}}()
             pi = csub[i]
             comp_i = something(findfirst(isequal(pi),comp), 0)
             comp_i = V(comp_i)
             I = findall(x -> x == pi, points)
-            # smash_repeats!(ret, I)
+            smash_repeats!(ret, I)
 
             # Iteration space through all possible pairs
             rng = i+1:size(csub, 1)
-<<<<<<< HEAD
-            if nthreads() > 1 
-=======
-            if nprocs() > 1
->>>>>>> master
-                for j in rng
-                    pj = csub[j]
-                    csinfo("Scheduling pair $(d[(pi,pj)]) of $num to be solved", cfg["suppress_messages"] in TRUELIST)
-                end
-            end
 
             # Loop through all possible pairs
             for j in rng
@@ -179,52 +167,20 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
                 # Forget excluded pairs
                 ex = false
                 for c_i in I
-
-                    # v = Vector{Vector{T}}(undef, nthreads())
-                    # current = [zeros(T, size(matrix, 1)) for _ in 1:nthreads()]
-                    # r = zeros(T, nthreads())
-
                     for c_j in J
                         if (c_i, c_j) in exclude
                             continue
                         end
 
+                        current = zeros(T, size(matrix, 1))
+                        current[comp_i] = -1
+                        current[comp_j] = 1
+
                         # Solve system
-<<<<<<< HEAD
-                        log && csinfo("Solving pair $(d[(pi,pj)]) of $num")
-
-                        function f(matrix, P)
-
-                            # Initialize currents
-                            current = zeros(T, size(matrix, 1))
-                            current[comp_i] = -1
-                            current[comp_j] = 1
-
-                            t2 = @elapsed v = solve_linear_system(cfg, matrix, current, P)
-                            # t2 = @elapsed v = cg(matrix, current; Pl = P, maxiter = 100_000, tol = 1e-6)
-                            # t2 = @elapsed v = solve(P.ml, current; tol = 1e-6)
-                            # v = matrix \ current
-                            # push!(Main.foo, (matrix, current, v, P, threadid()))
-                            csinfo("Time taken to solve linear system = $t2 seconds")
-                            v .= v .- v[comp_i]
-
-                            # Calculate resistance
-                            r = v[comp_j] - v[comp_i]
-
-                            # Return resistance value
-                            # if get_shortcut_resistances
-                            #     resistances[c_i, c_j] = r
-                            #    resistances[c_j, c_i] = r
-                            # end
-                            output = Output(points, v, (orig_pts[c_i], orig_pts[c_j]),
-                                             (comp_i, comp_j), r, V(c_j), cum)
-                            postprocess(output, component_data, flags, shortcut, cfg)
-                            c_i, c_j, r
-=======
                         # csinfo("Solving points $pi and $pj")
-                        log && csinfo("Solving pair $(d[(pi,pj)]) of $num", cfg["suppress_messages"] in TRUELIST)
+                        log && csinfo("Solving pair $(d[(pi,pj)]) of $num")
                         t2 = @elapsed v = solve_linear_system(cfg, matrix, current, P)
-                        csinfo("Time taken to solve linear system = $t2 seconds", cfg["suppress_messages"] in TRUELIST)
+                        csinfo("Time taken to solve linear system = $t2 seconds")
                         v .= v .- v[comp_i]
 
                         # Calculate resistance
@@ -235,14 +191,11 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
                         if get_shortcut_resistances
                             resistances[c_i, c_j] = r
                             resistances[c_j, c_i] = r
->>>>>>> master
                         end
-
-                        t = @spawn f(matrix, P)
-                        push!(l, t)
                     end
                 end
             end
+            ret
         end
 
         if get_shortcut_resistances
@@ -250,24 +203,18 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
             f(1)
             update_shortcut_resistances!(idx, shortcut, resistances, points, comp)
         else
-<<<<<<< HEAD
         
+            for i = 1:size(csub, 1)
+                push!(l, @spawn f(i))
+            end
             X = fetch.(l)
             display(X)
-=======
-            is_parallel = cfg["parallelize"] in TRUELIST
-            if is_parallel
-                X = pmap(x ->f(x), 1:size(csub,1))
-            else
-                X = map(x ->f(x), 1:size(csub,1))
-            end
->>>>>>> master
 
             # Set all resistances
             for x in X
                 for i = 1:size(x, 1)
-                    resistances[x[1], x[2]] = x[3]
-                    resistances[x[2], x[1]] = x[3]
+                    resistances[x[i][1], x[i][2]] = x[i][3]
+                    resistances[x[i][2], x[i][1]] = x[i][3]
                 end
             end
         end
@@ -609,19 +556,12 @@ function sum_off_diag(G, i)
      sum
  end
 
-<<<<<<< HEAD
 function solve_linear_system(cfg, 
             _G::SparseMatrixCSC{T,V}, 
             curr::Vector{T}, M)::Vector{T} where {T,V} 
     v = cg(_G, curr, Pl = M, tol = T(1e-6), maxiter = 100_000)
     # push!(Main.foo, (_G, curr, M, v))
     v
-=======
-function solve_linear_system(cfg,
-            G::SparseMatrixCSC{T,V},
-            curr::Vector{T}, M)::Vector{T} where {T,V}
-    cg(G, curr, Pl = M, tol = T(1e-6), maxiter = 100_000)
->>>>>>> master
 end
 
 function postprocess(output, component_data, flags, shortcut, cfg)
@@ -646,17 +586,13 @@ function postprocess(output, component_data, flags, shortcut, cfg)
 
     if flags.outputflags.write_volt_maps
         t = @elapsed write_volt_maps(name, output, component_data, flags, cfg)
-        csinfo("Time taken to write voltage maps = $t seconds", cfg["suppress_messages"] in TRUELIST)
+        csinfo("Time taken to write voltage maps = $t seconds")
     end
 
     if flags.outputflags.write_cur_maps
-<<<<<<< HEAD
         t = @elapsed cmap = write_cur_maps(name, output, component_data, 
-=======
-        t = @elapsed write_cur_maps(name, output, component_data,
->>>>>>> master
                                     [-9999.], flags, cfg)
-        csinfo("Time taken to write current maps = $t seconds", cfg["suppress_messages"] in TRUELIST)
+        csinfo("Time taken to write current maps = $t seconds")
     end
 
     cmap
