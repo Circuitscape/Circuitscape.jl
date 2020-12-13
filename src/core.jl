@@ -192,6 +192,9 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
                             resistances[c_i, c_j] = r
                             resistances[c_j, c_i] = r
                         end
+                        output = Output(points, v, (orig_pts[c_i], orig_pts[c_j]),
+                                        (comp_i, comp_j), r, V(c_j), cum)
+                        postprocess(output, component_data, flags, shortcut, cfg)
                     end
                 end
             end
@@ -208,7 +211,6 @@ function amg_solver_path(data::GraphData{T,V}, flags, cfg, log)::Matrix{T} where
                 push!(l, @spawn f(i))
             end
             X = fetch.(l)
-            display(X)
 
             # Set all resistances
             for x in X

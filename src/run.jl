@@ -28,6 +28,9 @@ function compute(path::String)
         csinfo("Starting up Circuitscape to use $n processes in parallel", cfg["suppress_messages"] in TRUELIST)
         myaddprocs(n)
     end
+    if nthreads() > 1
+        csinfo("Starting up Circuitscape with $(nthreads()) threads")
+    end
     t = @elapsed r = _compute(T, V, cfg)
     csinfo("Time taken to complete job = $t", cfg["suppress_messages"] in TRUELIST)
     is_parallel && rmprocs(workers())
