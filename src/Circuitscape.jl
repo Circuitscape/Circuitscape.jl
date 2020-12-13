@@ -1,6 +1,7 @@
 # __precompile__(false)
 module Circuitscape
 using AlgebraicMultigrid
+using ArchGDAL
 using SimpleWeightedGraphs
 using LightGraphs
 using IterativeSolvers

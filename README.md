@@ -1,21 +1,21 @@
 # Circuitscape
 
-Linux and OSX: [![Build Status](https://travis-ci.org/Circuitscape/Circuitscape.jl.svg?branch=master)](https://travis-ci.org/Circuitscape/Circuitscape.jl)
-[![Coverage Status](https://coveralls.io/repos/github/Circuitscape/Circuitscape.jl/badge.svg?branch=master)](https://coveralls.io/github/Circuitscape/Circuitscape.jl?branch=master)
-[![codecov.io](http://codecov.io/github/Circuitscape/Circuitscape.jl/coverage.svg?branch=master)](http://codecov.io/github/Circuitscape/Circuitscape.jl?branch=master)
 
-Windows: [![Build status](https://ci.appveyor.com/api/projects/status/4a8u8985hq2mt569?svg=true)](https://ci.appveyor.com/project/ranjanan/circuitscape-jl)
-
-**Users of Circuitscape on Julia v0.6 should now shift to Julia 1.0. Circuitscape on Julia v0.6 will no longer be supported.**
+| **Documentation** | **Chat** | **Build Status**| **Changelog**|
+|:-----------------------------------------------------:|:------------------------------------:|:-----------:|:-------:|
+| [![docs](https://img.shields.io/badge/docs-stable-blue.svg)](https://circuitscape.org/docs) [![docs](https://img.shields.io/badge/docs-latest-blue.svg)](https://docs.circuitscape.org/Circuitscape.jl/latest/) | [![gitter](https://badges.gitter.im/Circuitscape/Circuitscape.jl.png)](https://gitter.im/Circuitscape/Circuitscape.jl) | [![Build Status](https://travis-ci.com/Circuitscape/Circuitscape.jl.svg?branch=master)](https://travis-ci.com/Circuitscape/Circuitscape.jl) [![Build status](https://ci.appveyor.com/api/projects/status/4a8u8985hq2mt569?svg=true)](https://ci.appveyor.com/project/ranjanan/circuitscape-jl) [![codecov.io](http://codecov.io/github/Circuitscape/Circuitscape.jl/coverage.svg?branch=master)](http://codecov.io/github/Circuitscape/Circuitscape.jl?branch=master) [![Coverage Status](https://coveralls.io/repos/github/Circuitscape/Circuitscape.jl/badge.svg?branch=master)](https://coveralls.io/github/Circuitscape/Circuitscape.jl?branch=master) | [![news](https://img.shields.io/static/v1?label=version&message=v5.7.1&color=orange)](https://github.com/Circuitscape/Circuitscape.jl/releases) |
 
 Circuitscape is an open-source program that uses circuit theory to model connectivity 
 in heterogeneous landscapes. Its most common applications include modeling movement and gene flow 
 of plants and animals, as well as identifying areas important for connectivity conservation. 
 
-Circuitscape has now been rewritten in [Julia](https://julialang.org) for better performance and scalability. Julia is modern open-source language for scientific computing. 
+Circuitscape has now been rewritten in [Julia](https://julialang.org) for better performance and scalability. Julia is a modern open-source language for scientific computing. 
 
 This work is based on the original [Circuitscape](https://github.com/Circuitscape/Circuitscape) project by Brad McRae, Viral B. Shah 
 and Tanmay Mohapatra. 
+
+[Check out the documentation.](https://circuitscape.org/docs)
+
 
 ## The New Circuitscape - Modern, Fast and Flexible
 
@@ -104,7 +104,7 @@ julia> Pkg.add("Circuitscape")
 If you want the latest development version, you can additionally do: 
 
 ```julia
-julia> Pkg.checkout("Circuitscape")
+julia> Pkg.add(PackageSpec(name="Circuitscape", rev="master"))
 ```
 
 Check if all the tests are passing by doing the following:
@@ -139,12 +139,19 @@ an INI file [from the tests](https://github.com/Circuitscape/Circuitscape.jl/tre
 
 ## Citation
 
-A preprint is available here: https://arxiv.org/abs/1906.03542. You can also use the following BibTeX entry to cite this package: 
+A preprint is available here: https://proceedings.juliacon.org/papers/10.21105/jcon.00058. You can also use the following BibTeX entry to cite this package: 
 ```bibtex
-@misc{1906.03542,
-Author = {Ranjan Anantharaman and Kimberly Hall and Viral Shah and Alan Edelman},
-Title = {Circuitscape in Julia: High Performance Connectivity Modelling to Support Conservation Decisions},
-Year = {2019},
-Eprint = {arXiv:1906.03542},
+@article{Anantharaman2020,
+  doi = {10.21105/jcon.00058},
+  url = {https://doi.org/10.21105/jcon.00058},
+  year = {2020},
+  publisher = {The Open Journal},
+  volume = {1},
+  number = {1},
+  pages = {58},
+  author = {Ranjan Anantharaman and Kimberly Hall and Viral B. Shah and Alan Edelman},
+  title = {Circuitscape in Julia: High Performance Connectivity Modelling to Support Conservation Decisions},
+  journal = {Proceedings of the JuliaCon Conferences}
 }
+
 ```

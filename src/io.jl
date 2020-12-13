@@ -23,10 +23,12 @@ struct RasterMeta
     yllcorner::Float64
     cellsize::Float64
     nodata::Float64
-    file_type::Int
+    transform::Array{Float64, 1}
+    wkt::String
 end
+
 function RasterMeta()
-    RasterMeta(0,0,0,0,0,0,0)
+    RasterMeta(0,0,0,0,0,0,[0.0],"")
 end
 
 struct RasData{T,V} <: Data
@@ -65,7 +67,7 @@ end
 
 function read_cellmap(habitat_file::String, is_res::Bool, ::Type{T}) where {T}
 
-    cell_map, rastermeta = _ascii_grid_reader(T, habitat_file)
+    cell_map, rastermeta = _grid_reader(T, habitat_file)
 
     gmap = similar(cell_map)
     ind = findall(x -> x == -9999, cell_map)
@@ -85,71 +87,39 @@ function read_cellmap(habitat_file::String, is_res::Bool, ::Type{T}) where {T}
     gmap, rastermeta
 end
 
-function _ascii_grid_reader(T, file)
-    f = endswith(file, ".gz") ? GZip.open(file, "r") : open(file, "r")
-    rastermeta = _ascii_grid_read_header(file, f)
-    c = Matrix{T}(undef,0,0)
-    ss = 6
-    if rastermeta.nodata == -Inf
-        ss = 5
-    end
-    try
-        c = readdlm(f, T; skipstart = ss)
-    catch
-        seek(f, 0)
-        try
-            d = readdlm(f; skipstart = ss)
-            d = d[:, 1:end-1]
-            c = map(T, d)
-        catch
-            error("Failed to read habitat map. There may be errors in your file.")
-        end
-    end
-    map!(x -> x == rastermeta.nodata ? -9999. : x , c, c)
-    close(f)
-    c, rastermeta
+function _grid_reader(T, file)
+    endswith(file, ".gz") ? file = "/vsigzip/$(file)" : ()
+
+    c, wkt, transform = read_raster(file, T)
+
+    rastermeta = get_raster_meta(c, wkt, transform)
+
+    return c, rastermeta
+
 end
 
-function _ascii_grid_read_header(habitat_file, f)
-    file_type = _guess_file_type(habitat_file, f)
-    ncols = parse(Int, split(readline(f))[2])
-    nrows = parse(Int, split(readline(f))[2])
-    xllcorner = parse(Float64, split(readline(f))[2])
-    yllcorner = parse(Float64, split(readline(f))[2])
-    cellsize = parse(Float64, split(readline(f))[2])
-    nodata = -Inf
-    s = split(readline(f))
-    if occursin("NODATA", s[1]) || occursin("nodata", s[1])
-        nodata = parse(Float64, s[2])
-    end
-    seek(f, 0)
-    RasterMeta(ncols, nrows, xllcorner, yllcorner, cellsize, nodata, file_type)
+function get_raster_meta(habitat_file, wkt, transform)
+    dims = size(habitat_file)
+    ncols = dims[2]
+    nrows = dims[1]
+    xllcorner = transform[1]
+    yllcorner = transform[4]  - (nrows * transform[2])
+    cellsize = transform[2]
+    nodata = -9999 # set in read_raster (overwrites old nodata val)
+    RasterMeta(ncols, nrows, xllcorner, yllcorner, cellsize, nodata, transform, wkt)
 end
-
-#=function _guess_file_type(filename, f)
-    s = readline(f)
-    seek(f, 0)
-
-    if startswith(s, "min")
-        return PAIRS_AAGRID
-    elseif startswith(s, "mode")
-        return PAIRS_LIST
-    elseif occursin(".asc", filename)
-        return AAGRID
-    elseif endswith(filename, ".txt")
-        return TXTLIST
-    else
-        throw("Check file format")
-    end
-
-end=#
 
 function _guess_file_type(filename, f)
-
     hdr = readline(f)
-    seek(f, 0)
+    seek(f, 0) #TODO I think this is not necessary? -VL
 
-    if startswith(hdr, FILE_HDR_NPY)
+    f2 = endswith(filename, "gz") ? GZip.open(filename, "r") : open(filename, "r")
+    bytes = read(f2, 4)[3:4]
+    close(f2)
+
+    if bytes == [0x2a, 0x00]
+        filetype = FILE_TYPE_GEOTIFF
+    elseif startswith(hdr, FILE_HDR_NPY)
         filetype = FILE_TYPE_NPY
     elseif startswith(lowercase(hdr), FILE_HDR_AAGRID)
         filetype = FILE_TYPE_AAGRID
@@ -160,14 +130,25 @@ function _guess_file_type(filename, f)
     else
         filetype = FILE_TYPE_TXTLIST
     end
-
     return filetype
 end
 
 function read_polymap(T, file::String, habitatmeta;
-                            nodata_as = 0, resample = true)
+                      nodata_as = 0)
 
-    polymap, rastermeta = _ascii_grid_reader(T, file)
+    polymap, rastermeta = _grid_reader(Float64, file)
+
+    # Convert polymap to T. It's easier to do here and check for errors than
+    # to add another Boolean flag argument to read_raster that specifies if the
+    # file is for nodes points or polygons.
+    try
+        polymap = convert(Array{T}, polymap)
+    catch e
+        isa(e, InexactError) && @error string("Your node file (point_file in ",
+                                       "the .ini) contains non-integer values.",
+                                       " See the docs on specifying nodes for",
+                                       " more information.")
+    end
 
     ind = findall(x -> x == rastermeta.nodata, polymap)
     if nodata_as != -1
@@ -244,16 +225,17 @@ function read_point_map(V, file, habitatmeta)
     V.(i), V.(j), V.(v)
 end
 
+
 function read_source_and_ground_maps(T, V, source_file, ground_file, habitatmeta,
                                         is_res)
 
     ground_map = Matrix{T}(undef,0,0)
     source_map = Matrix{T}(undef,0,0)
 
-    f = endswith(ground_file, "gz") ? Gzip.open(ground_file, "r") : open(ground_file, "r")
+    f = endswith(ground_file, "gz") ? GZip.open(ground_file, "r") : open(ground_file, "r")
     filetype = _guess_file_type(ground_file, f)
 
-    if filetype == FILE_TYPE_AAGRID
+    if filetype == FILE_TYPE_AAGRID || filetype == FILE_TYPE_GEOTIFF
         ground_map = read_polymap(T, ground_file, habitatmeta; nodata_as = -1)
         ground_map = map(T, ground_map)
     else
@@ -263,10 +245,10 @@ function read_source_and_ground_maps(T, V, source_file, ground_file, habitatmeta
     end
     close(f)
 
-    f = endswith(source_file, "gz") ? Gzip.open(source_file, "r") : open(source_file, "r")
+    f = endswith(source_file, "gz") ? GZip.open(source_file, "r") : open(source_file, "r")
     filetype = _guess_file_type(source_file, f)
 
-    if filetype == FILE_TYPE_AAGRID
+    if filetype == FILE_TYPE_AAGRID || filetype == FILE_TYPE_GEOTIFF
         source_map = read_polymap(T, source_file, habitatmeta)
         source_map = map(T, source_map)
     else
@@ -290,14 +272,15 @@ end
 
 function read_included_pairs(V, filename)
 
-    f = endswith(filename, "gz") ? Gzip.open(filename, "r") : open(filename, "r")
+    f = endswith(filename, "gz") ? GZip.open(filename, "r") : open(filename, "r")
     filetype = _guess_file_type(filename, f)
+    close(f)
     minval = 0
     maxval = 0
     mode = :undef
 
     if filetype == FILE_TYPE_INCL_PAIRS_AAGRID
-        open(filename, "r") do fV
+        open(filename, "r") do f
             minval = parse(Float64, split(readline(f))[2])
             maxval = parse(Float64, split(readline(f))[2])
         end
@@ -407,12 +390,12 @@ function load_raster_data(T, V, cfg)::RasData{T,V}
     ground_file = cfg["ground_file"]
     ground_is_res = cfg["ground_file_is_resistances"] in TRUELIST
 
-    csinfo("Reading maps")
+    csinfo("Reading maps", cfg["suppress_messages"] in TRUELIST)
 
     # Read cell map
     cellmap, hbmeta = read_cellmap(hab_file, hab_is_res, T)
     c = count(x -> x > 0, cellmap)
-    csinfo("Resistance/Conductance map has $c nodes")
+    csinfo("Resistance/Conductance map has $c nodes", cfg["suppress_messages"] in TRUELIST)
 
     # Read polymap
     if use_polygons
@@ -466,3 +449,48 @@ function update!(cellmap::Matrix{T}, m::String, hbmeta) where {T}
     map!(x -> x > 0 ? 1 : 0, mask, mask)
     cellmap .= cellmap .* mask
 end
+
+# Inspired by GeoArrays.read()
+function read_raster(path::String, T)
+    # Check if file exists (ArchGDAL error is cryptic)
+    check_path = endswith(path, ".gz") ? path[10:lastindex(path)] : path
+    !isfile(check_path) && error("the file \"$(check_path)\" does not exist")
+
+    raw = ArchGDAL.unsafe_read(path)
+    transform = ArchGDAL.getgeotransform(raw)
+    wkt = ArchGDAL.getproj(raw)
+
+    # Extract 1st band (should only be one band anyway)
+    # to get a 2D array instead of 3D
+    band = ArchGDAL.getband(raw, 1)
+
+    # Extract the array
+    array_t = ArchGDAL.read(band)
+
+    # This handles UInt tiff rasters that can still have negative NoData values
+    # Need to convert the NoData value to Int64 in these cases
+    if eltype(array_t) <: Integer
+        ras_type = Int64
+    else
+        ras_type = eltype(array_t)
+    end
+
+    # Extract no data value, first converting it to the proper type (based on
+    # the raster). Then, need to convert to T. Weird, yes,
+    # but it's the only way I could get it to work for all raster types... -VL
+    nodata_val = convert(T, convert(ras_type, ArchGDAL.getnodatavalue(band)))
+
+    # Transpose the array -- ArchGDAL returns a x by y array, need y by x
+    array = convert(Array{T}, permutedims(array_t, [2, 1]))
+
+    array[array .== nodata_val] .= -9999.0
+
+    # Line to handle NaNs in datasets read from tifs
+    array[isnan.(array)] .= -9999.0
+
+    # Close connection to dataset
+    ArchGDAL.destroy(raw)
+
+    array, wkt, transform # wkt and transform are needed later for write_raster
+end
+
