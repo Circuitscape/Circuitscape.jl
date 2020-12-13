@@ -281,10 +281,17 @@ function multiple_solver(cfg, a::SparseMatrixCSC{T,V}, sources, grounds, finiteg
     deleteat!(r, dst_del)
     asolve = asolve[r, r]
 
-    t1 = @elapsed M = aspreconditioner(smoothed_aggregation(asolve))
-    csinfo("Time taken to construct preconditioner = $t1 seconds", cfg["suppress_messages"] in TRUELIST)
-    t1 = @elapsed volt = solve_linear_system(cfg, asolve, sources, M)
-    csinfo("Time taken to solve linear system = $t1 seconds", cfg["suppress_messages"] in TRUELIST)
+    if cfg["solver"] == "cg+amg"
+        t1 = @elapsed M = aspreconditioner(smoothed_aggregation(asolve))
+        csinfo("Time taken to construct preconditioner = $t1 seconds", cfg["suppress_messages"] in TRUELIST)
+        t1 = @elapsed volt = solve_linear_system(cfg, asolve, sources, M)
+        csinfo("Time taken to solve linear system = $t1 seconds", cfg["suppress_messages"] in TRUELIST)
+    elseif cfg["solver"] in CHOLMOD
+        t1 = @elapsed M = cholesky(asolve)
+        csinfo("Time taken to construct cholesky factor = $t1 seconds", cfg["suppress_messages"] in TRUELIST)
+        t1 = @elapsed volt = M \ sources
+        csinfo("Time taken to solve linear system = $t1 seconds", cfg["suppress_messages"] in TRUELIST)
+    end
 
     # Replace the inf with 0
     voltages = zeros(eltype(a), length(volt) + length(infgrounds))
