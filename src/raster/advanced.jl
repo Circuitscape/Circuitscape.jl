@@ -243,8 +243,6 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, flags, cfg)::Tuple{Matrix
         return v, outcurr
     end
 
-    @show solver_called
-
     scenario = cfg["scenario"]
     if !solver_called
         ret = Matrix{T}(undef,1,1)

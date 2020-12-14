@@ -108,7 +108,7 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
 
     # Cumulative currents
 
-    cum = data.cum
+    cum = prob.cum
 
     csinfo("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components", cfg["suppress_messages"] in TRUELIST)
 
@@ -212,7 +212,7 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
                         # Solve system
                         # csinfo("Solving points $pi and $pj")
                         log && csinfo("Solving pair $(d[(pi,pj)]) of $num", cfg["suppress_messages"] in TRUELIST)
-                        t2 = @elapsed v = solve_linear_system(cfg, matrix, current, P)
+                        t2 = @elapsed v = solve_linear_system(matrix, current, P)
                         csinfo("Time taken to solve linear system = $t2 seconds", cfg["suppress_messages"] in TRUELIST)
 
                         v .= v .- v[comp_i]
