@@ -1,8 +1,8 @@
 """
-Primary driver for network pairwise. 
+Primary driver for network pairwise.
 """
 function network_pairwise(T, V, cfg)::Matrix{T}
-    
+
     # Get input
     networkdata = get_network_data(T, V, cfg)
 
@@ -18,13 +18,14 @@ end
 
 function compute_graph_data(data::NetworkData{T,V}, cfg)::GraphProblem{T,V} where {T,V}
 
+
     i,j,v = data.coords
 
     idx = findfirst(x -> x < 1, i)
     idx != nothing && throw("Indices no good")
     idx = findfirst(x -> x < 1, j)
     idx != nothing && throw("Indices no good")
-    
+
     m = max(i[end], j[end])
     A = sparse(i,j,v,m,m)
     A = A + A'
@@ -32,7 +33,7 @@ function compute_graph_data(data::NetworkData{T,V}, cfg)::GraphProblem{T,V} wher
     cc = connected_components(SimpleWeightedGraph(A))
 
     t = @elapsed G = laplacian(A)
-    csinfo("Time taken to construct graph laplacian = $t")
+    csinfo("Time taken to construct graph laplacian = $t", cfg["suppress_messages"] in TRUELIST)
 
     # T = eltype(i)
     exclude_pairs = Tuple{V,V}[]
@@ -47,10 +48,11 @@ function compute_graph_data(data::NetworkData{T,V}, cfg)::GraphProblem{T,V} wher
 
     GraphProblem(G, cc, data.fp, data.fp, 
                 exclude_pairs, nodemap, polymap, hbmeta, cellmap, cum, solver)
+
 end
 
 function get_network_flags(cfg)
-    
+
     # Computation flags
     is_raster = false
     is_advanced = cfg["scenario"] in ADVANCED
@@ -74,8 +76,8 @@ function get_network_flags(cfg)
                     write_cum_cur_maps_only, write_max_cur_maps,
                     set_null_currents_to_nodata, set_null_voltages_to_nodata,
                     compress_grids, log_transform_maps)
-    
-    NetworkFlags(is_raster, is_advanced, is_alltoone, is_onetoall, 
+
+    NetworkFlags(is_raster, is_advanced, is_alltoone, is_onetoall,
                 grnd_file_is_res, policy, solver, o)
 end
 

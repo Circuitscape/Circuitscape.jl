@@ -3,7 +3,7 @@ struct AdvancedProblem{T,V,W}
     cc::Vector{Vector{V}}
     nodemap::Matrix{V}
     polymap::Matrix{V}
-    hbmeta::RasterMeta    
+    hbmeta::RasterMeta
     sources::Vector{T}
     grounds::Vector{T}
     source_map::Matrix{T} # Needed for one to all mode
@@ -15,12 +15,13 @@ struct AdvancedProblem{T,V,W}
 end
 
 function raster_advanced(T, V, cfg)::Matrix{T}
-    
+
     # Load raster data
     rasterdata = load_raster_data(T, V, cfg)
 
     # Get flags
     flags = get_raster_flags(cfg)
+
 
     # Generate advanced 
     advanced_data = compute_advanced_data(rasterdata, flags, cfg)
@@ -31,6 +32,7 @@ function raster_advanced(T, V, cfg)::Matrix{T}
     v
 end
 
+
 function compute_advanced_data(data::RasterData{T,V}, 
                         flags,cfg)::AdvancedProblem{T,V} where {T,V}
 
@@ -38,11 +40,12 @@ function compute_advanced_data(data::RasterData{T,V},
     cellmap = data.cellmap
     polymap = data.polymap
     points_rc = data.points_rc
-    included_pairs = data.included_pairs    
+    included_pairs = data.included_pairs
     hbmeta = data.hbmeta
     source_map = data.source_map
-    
-    # FlagsAMGSolver
+
+
+    # Flags
     avg_res = flags.avg_res
     four_neighbors = flags.four_neighbors
     policy = flags.policy
@@ -56,7 +59,7 @@ function compute_advanced_data(data::RasterData{T,V},
     cc = connected_components(SimpleWeightedGraph(G))
 
     # Advanced mode specific stuff
-    sources, grounds, finite_grounds = 
+    sources, grounds, finite_grounds =
             get_sources_and_grounds(data, flags, G, nodemap)
 
     solver = get_solver(cfg)
@@ -64,18 +67,19 @@ function compute_advanced_data(data::RasterData{T,V},
     AdvancedProblem(G, cc, nodemap, polymap, hbmeta,
                 sources, grounds, source_map, 
                 finite_grounds, V(-1), V(0), cellmap, solver)
+
 end
 
 function get_sources_and_grounds(data, flags, G, nodemap)
 
-    # Data 
+    # Data
     source_map = data.source_map
     ground_map = data.ground_map
 
     _get_sources_and_grounds(source_map, ground_map, flags, G, nodemap)
 end
 
-function _get_sources_and_grounds(source_map, ground_map, 
+function _get_sources_and_grounds(source_map, ground_map,
                                   flags, G, nodemap::Matrix{V}, override_policy = :none) where V
     # Flags
     is_raster = flags.is_raster
@@ -108,13 +112,13 @@ function _get_sources_and_grounds(source_map, ground_map,
         sources[V.(source_map[:,1])] = source_map[:,2]
         grounds[V.(ground_map[:,1])] = ground_map[:,2]
     end
-    sources, grounds, finitegrounds = 
+    sources, grounds, finitegrounds =
         resolve_conflicts(sources, grounds, policy)
 end
 
-function resolve_conflicts(sources::Vector{T}, 
+function resolve_conflicts(sources::Vector{T},
                             grounds::Vector{T}, policy) where T
-    
+
     finitegrounds = similar(sources)
     l = size(sources, 1)
 
@@ -141,7 +145,7 @@ function resolve_conflicts(sources::Vector{T},
     infgrounds = map(x -> x == Inf, grounds)
     infconflicts = map((x,y) -> x > 0 && y > 0, infgrounds, sources)
     grounds[infconflicts] .= 0
-    
+
     sources, grounds, finitegrounds
 end
 
@@ -160,6 +164,7 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, flags, cfg)::Tuple{Matrix
     check_node = prob.check_node
     source_map = prob.source_map # Need it for one to all mode
     cellmap = prob.cellmap
+
 
     # Flags
     is_raster = flags.is_raster
@@ -199,6 +204,7 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, flags, cfg)::Tuple{Matrix
         end
     
         voltages = multiple_solver(cfg, prob.solver, a_local, s_local, g_local, f_local)
+
         local_nodemap = construct_local_node_map(nodemap, c, polymap)
         solver_called = true
 
@@ -220,7 +226,7 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, flags, cfg)::Tuple{Matrix
         if !is_raster
             write_volt_maps(name, voltages, FullGraph(G, cellmap), flags, cfg)
         else
-            write_aagrid(outvolt, name, cfg, hbmeta, cellmap, voltage = true)
+            write_grid(outvolt, name, cfg, hbmeta, cellmap, voltage = true)
         end
     end
 
@@ -228,7 +234,7 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, flags, cfg)::Tuple{Matrix
         if !is_raster
             write_cur_maps(name, voltages, FullGraph(G, cellmap), finitegrounds, flags, cfg)
         else
-            write_aagrid(outcurr, name, cfg, hbmeta, cellmap)
+            write_grid(outcurr, name, cfg, hbmeta, cellmap)
         end
     end
 
@@ -236,6 +242,8 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, flags, cfg)::Tuple{Matrix
         v = [collect(1:size(G, 1))  voltages]
         return v, outcurr
     end
+
+    @show solver_called
 
     scenario = cfg["scenario"]
     if !solver_called
@@ -265,14 +273,15 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, flags, cfg)::Tuple{Matrix
     return volt, outcurr
 end
 
+
 function multiple_solver(cfg, solver, a::SparseMatrixCSC{T,V}, sources, grounds, finitegrounds) where {T,V,S}
-    
+
     asolve = deepcopy(a)
     if finitegrounds[1] != -9999
         # asolve = a + spdiagm(finitegrounds, 0, size(a, 1), size(a, 1))
         asolve = a + spdiagm(0 => finitegrounds)
     end
-    
+
     infgrounds = findall(x -> x == Inf, grounds)
     deleteat!(sources, infgrounds)
     dst_del = V[]
@@ -327,5 +336,5 @@ struct FullGraph{T,V}
     hbmeta::RasterMeta
     cellmap::Matrix{T}
 end
-FullGraph(G::SparseMatrixCSC{T,V}, cellmap) where {T,V} = FullGraph(G, collect(V, 1:size(G,1)), 
+FullGraph(G::SparseMatrixCSC{T,V}, cellmap) where {T,V} = FullGraph(G, collect(V, 1:size(G,1)),
                             Matrix{V}(undef,0,0), RasterMeta(), cellmap)

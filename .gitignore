@@ -4,3 +4,7 @@
 *.jld
 *.tmp
 Manifest.toml
+temp/
+**/*.properties
+local
+.Trash-0/
