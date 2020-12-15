@@ -117,16 +117,6 @@ to compute the voltages. It plugs into the
 which is part of the SuiteSparse collection of high performance sparse
 matrix algorithms.
 
-### New Solver Mode - CHOLMOD
-
-Julia-CHOLMOD is a new solver mode used in the new Circuitscape. It performs a [cholesky
-decomposition](https://en.wikipedia.org/wiki/Cholesky_decomposition) on the graph
-constructed, and performs a batched back substitution
-to compute the voltages. It plugs into the
-[CHOLMOD](http://faculty.cse.tamu.edu/davis/suitesparse.html) library,
-which is part of the SuiteSparse collection of high performance sparse
-matrix algorithms.
-
 To use the this new mode, include a line in your Circuitscape
 INI file:
 ```
