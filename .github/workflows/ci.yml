@@ -61,8 +61,8 @@ jobs:
       - run: |
           julia --project=docs -e '
             using Documenter: doctest
-            using Omniscape
-            doctest(Omniscape)' 
+            using Circuitscape
+            doctest(Circuitscape)' 
       - run: julia --project=docs docs/make.jl
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
