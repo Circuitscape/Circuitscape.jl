@@ -4,10 +4,10 @@ env:
 on:
   pull_request:
     branches:
-      - main
+      - master
   push:
     branches:
-      - main
+      - master
     tags: '*'
 jobs:
   test:
