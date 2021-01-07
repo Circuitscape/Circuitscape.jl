@@ -8,3 +8,4 @@ temp/
 **/*.properties
 local
 .Trash-0/
+docs/build
