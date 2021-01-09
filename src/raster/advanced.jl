@@ -235,6 +235,8 @@ function advanced_kernel(data::AdvancedData{T,V}, flags, cfg)::Tuple{Matrix{T},M
         return v, outcurr
     end
 
+    @show solver_called
+
     scenario = cfg["scenario"]
     if !solver_called
         ret = Matrix{T}(undef,1,1)
@@ -279,10 +281,18 @@ function multiple_solver(cfg, a::SparseMatrixCSC{T,V}, sources, grounds, finiteg
     deleteat!(r, dst_del)
     asolve = asolve[r, r]
 
-    t1 = @elapsed M = aspreconditioner(smoothed_aggregation(asolve))
-    csinfo("Time taken to construct preconditioner = $t1 seconds", cfg["suppress_messages"] in TRUELIST)
-    t1 = @elapsed volt = solve_linear_system(cfg, asolve, sources, M)
-    csinfo("Time taken to solve linear system = $t1 seconds", cfg["suppress_messages"] in TRUELIST)
+    if cfg["solver"] == "cg+amg"
+        t1 = @elapsed M = aspreconditioner(smoothed_aggregation(asolve))
+        csinfo("Time taken to construct preconditioner = $t1 seconds", cfg["suppress_messages"] in TRUELIST)
+        t1 = @elapsed volt = solve_linear_system(cfg, asolve, sources, M)
+        csinfo("Time taken to solve linear system = $t1 seconds", cfg["suppress_messages"] in TRUELIST)
+    elseif cfg["solver"] in CHOLMOD
+        t1 = @elapsed M = cholesky(asolve)
+        csinfo("Time taken to construct cholesky factor = $t1 seconds", cfg["suppress_messages"] in TRUELIST)
+        t1 = @elapsed volt = M \ sources
+        csinfo("Time taken to solve linear system = $t1 seconds", cfg["suppress_messages"] in TRUELIST)
+    end
+    @assert norm(asolve*volt .- sources) < 1e-5
 
     # Replace the inf with 0
     voltages = zeros(eltype(a), length(volt) + length(infgrounds))

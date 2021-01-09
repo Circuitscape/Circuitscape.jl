@@ -33,7 +33,8 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
         points_unique = included_pairs.point_ids
         prune_points!(points_rc, included_pairs.point_ids)
         if use_variable_strengths
-            prune_strengths!(strengths, included_pairs.point_ids)
+            strengths[:,1] .-= 1
+            strengths = prune_strengths(strengths, included_pairs.point_ids)
         end
     end
 
@@ -66,6 +67,7 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
     num_points_to_solve = size(points_unique, 1)
     original_point_map = copy(point_map)
     unique_point_map = zeros(V, size(gmap))
+    strength_map = use_variable_strengths ? zeros(T, size(gmap)) : zeros(T, 0, 0)
 
     for i in points_unique
         ind = findfirst(x -> x == i, points_rc[3])
@@ -93,16 +95,33 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
             nodemap = construct_node_map(gmap, polymap)
             a = construct_graph(gmap, nodemap, avg_res, four_neighbors)
         end
+        if use_variable_strengths
+            _tmp = [point_map[f(1,x), f(2,x)] for x = 1:size(points_rc[1], 1)]
+            idx = findall(x -> x == 0, _tmp)
+            _strengths = deepcopy(strengths)
+            _strengths[idx, 2] .= 1
+            for x = 1:size(points_rc[1], 1)
+                strength_map[f(1,x), f(2,x)] = _strengths[x,2]
+            end
+        end
         # T = eltype(a)
+        if sum(point_map) == n
+            res[i] = -1
+            return nothing
+        end
         if one_to_all
             #source_map = map(x -> x == n ? str : 0, point_map)
             source_map = map(x -> x == n ? T(str) : T(0), unique_point_map)
             ground_map = map(x -> x == n ? T(0) : T(x), point_map)
             map!(x -> x > 0 ? Inf : x, ground_map, ground_map)
         else
-            source_map = map(x -> x != 0 ? T(x) : T(0), point_map)
-            map!(x -> x == n ? 0 : x, source_map, source_map)
-            map!(x -> x != 0 ? 1 : x, source_map, source_map)
+            if use_variable_strengths
+                source_map = map((x,y) -> x == n ? T(0) : T(y), unique_point_map, strength_map)
+            else
+                source_map = map(x -> x != 0 ? T(1) : T(0), unique_point_map)
+                source_map = map((x,y) -> x == n ? T(0) : y, point_map, source_map)
+                # map!(x -> x != 0 ? 1 : x, source_map, source_map)
+            end
             ground_map = map(x -> x == n ? Inf : T(0), point_map)
         end
 
@@ -157,7 +176,7 @@ function prune_points!(points_rc, point_ids::Vector{V}) where V
     for i in 1:3 deleteat!(points_rc[i], rmv) end
 end
 
-function prune_strengths!(strengths, point_ids::Vector{V}) where V
+function prune_strengths(strengths, point_ids::Vector{V}) where V
     pts = strengths[:,1]
     l = length(pts)
     rmv = V[]

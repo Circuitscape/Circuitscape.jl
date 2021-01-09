@@ -1,10 +1,9 @@
 # Circuitscape
 
-Linux and OSX: [![Build Status](https://travis-ci.com/Circuitscape/Circuitscape.jl.svg?branch=master)](https://travis-ci.com/Circuitscape/Circuitscape.jl)
-[![Coverage Status](https://coveralls.io/repos/github/Circuitscape/Circuitscape.jl/badge.svg?branch=master)](https://coveralls.io/github/Circuitscape/Circuitscape.jl?branch=master)
-[![codecov.io](http://codecov.io/github/Circuitscape/Circuitscape.jl/coverage.svg?branch=master)](http://codecov.io/github/Circuitscape/Circuitscape.jl?branch=master)
 
-Windows: [![Build status](https://ci.appveyor.com/api/projects/status/4a8u8985hq2mt569?svg=true)](https://ci.appveyor.com/project/ranjanan/circuitscape-jl)
+| **Documentation** | **Chat** | **Build Status**| **Changelog**|
+|:-----------------------------------------------------:|:------------------------------------:|:-----------:|:-------:|
+| [![docs](https://img.shields.io/badge/docs-stable-blue.svg)](https://circuitscape.org/docs) [![docs](https://img.shields.io/badge/docs-latest-blue.svg)](https://docs.circuitscape.org/Circuitscape.jl/latest/) | [![gitter](https://badges.gitter.im/Circuitscape/Circuitscape.jl.png)](https://gitter.im/Circuitscape/Circuitscape.jl) | [![Build Status](https://github.com/Circuitscape/Circuitscape.jl/workflows/CI/badge.svg)](https://github.com/Circuitscape/Circuitscape.jl/actions?query=workflow%3ACI) [![Build status](https://ci.appveyor.com/api/projects/status/4a8u8985hq2mt569?svg=true)](https://ci.appveyor.com/project/ranjanan/circuitscape-jl) [![codecov.io](http://codecov.io/github/Circuitscape/Circuitscape.jl/coverage.svg?branch=master)](http://codecov.io/github/Circuitscape/Circuitscape.jl?branch=master) | [![news](https://img.shields.io/static/v1?label=version&message=v5.7.1&color=orange)](https://github.com/Circuitscape/Circuitscape.jl/releases) |
 
 Circuitscape is an open-source program that uses circuit theory to model connectivity 
 in heterogeneous landscapes. Its most common applications include modeling movement and gene flow 
@@ -14,6 +13,9 @@ Circuitscape has now been rewritten in [Julia](https://julialang.org) for better
 
 This work is based on the original [Circuitscape](https://github.com/Circuitscape/Circuitscape) project by Brad McRae, Viral B. Shah 
 and Tanmay Mohapatra. 
+
+[Check out the documentation.](https://circuitscape.org/docs)
+
 
 ## The New Circuitscape - Modern, Fast and Flexible
 
@@ -29,7 +31,7 @@ following results. We started up Circuitscape with 16 parallel processes,
 and used benchmark problems from the standard Circuitscape 
 [benchmark suite.](https://github.com/Circuitscape/BigTests)
 
-<img src="/benchmark/benchmark.png" width=650 height=450>
+<img src="docs/src/benchmark/benchmark.png" width=650 height=450>
 
 These benchmarks were run on a Linux (Ubuntu) server machine with the following specs: 
 * Name: Intel(R) Xeon(R) Silver 4114 CPU 
