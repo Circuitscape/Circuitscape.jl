@@ -457,9 +457,6 @@ function read_raster(path::String, T)
     !isfile(check_path) && error("the file \"$(check_path)\" does not exist")
 
     ArchGDAL.read(path) do raw
-        transform = ArchGDAL.getgeotransform(raw)
-        wkt = ArchGDAL.getproj(raw)
-
         # Extract 1st band (should only be one band anyway)
         # to get a 2D array instead of 3D
         band = ArchGDAL.getband(raw, 1)
@@ -488,6 +485,8 @@ function read_raster(path::String, T)
         # Line to handle NaNs in datasets read from tifs
         array[isnan.(array)] .= -9999.0
         
+        transform = ArchGDAL.getgeotransform(raw)
+        wkt = ArchGDAL.getproj(raw)
         array, wkt, transform # wkt and transform are needed later for write_raster
     end
 end
