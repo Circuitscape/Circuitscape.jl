@@ -456,41 +456,38 @@ function read_raster(path::String, T)
     check_path = endswith(path, ".gz") ? path[10:lastindex(path)] : path
     !isfile(check_path) && error("the file \"$(check_path)\" does not exist")
 
-    raw = ArchGDAL.unsafe_read(path)
-    transform = ArchGDAL.getgeotransform(raw)
-    wkt = ArchGDAL.getproj(raw)
+    ArchGDAL.read(path) do raw
+        # Extract 1st band (should only be one band anyway)
+        # to get a 2D array instead of 3D
+        band = ArchGDAL.getband(raw, 1)
 
-    # Extract 1st band (should only be one band anyway)
-    # to get a 2D array instead of 3D
-    band = ArchGDAL.getband(raw, 1)
+        # Extract the array
+        array_t = ArchGDAL.read(band)
 
-    # Extract the array
-    array_t = ArchGDAL.read(band)
+        # This handles UInt tiff rasters that can still have negative NoData values
+        # Need to convert the NoData value to Int64 in these cases
+        if eltype(array_t) <: Integer
+            ras_type = Int64
+        else
+            ras_type = eltype(array_t)
+        end
 
-    # This handles UInt tiff rasters that can still have negative NoData values
-    # Need to convert the NoData value to Int64 in these cases
-    if eltype(array_t) <: Integer
-        ras_type = Int64
-    else
-        ras_type = eltype(array_t)
+        # Extract no data value, first converting it to the proper type (based on
+        # the raster). Then, need to convert to T. Weird, yes,
+        # but it's the only way I could get it to work for all raster types... -VL
+        nodata_val = convert(T, convert(ras_type, ArchGDAL.getnodatavalue(band)))
+
+        # Transpose the array -- ArchGDAL returns a x by y array, need y by x
+        array = convert(Array{T}, permutedims(array_t, [2, 1]))
+
+        array[array .== nodata_val] .= -9999.0
+
+        # Line to handle NaNs in datasets read from tifs
+        array[isnan.(array)] .= -9999.0
+        
+        transform = ArchGDAL.getgeotransform(raw)
+        wkt = ArchGDAL.getproj(raw)
+        array, wkt, transform # wkt and transform are needed later for write_raster
     end
-
-    # Extract no data value, first converting it to the proper type (based on
-    # the raster). Then, need to convert to T. Weird, yes,
-    # but it's the only way I could get it to work for all raster types... -VL
-    nodata_val = convert(T, convert(ras_type, ArchGDAL.getnodatavalue(band)))
-
-    # Transpose the array -- ArchGDAL returns a x by y array, need y by x
-    array = convert(Array{T}, permutedims(array_t, [2, 1]))
-
-    array[array .== nodata_val] .= -9999.0
-
-    # Line to handle NaNs in datasets read from tifs
-    array[isnan.(array)] .= -9999.0
-
-    # Close connection to dataset
-    ArchGDAL.destroy(raw)
-
-    array, wkt, transform # wkt and transform are needed later for write_raster
 end
 
