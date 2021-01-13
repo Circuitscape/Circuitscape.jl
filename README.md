@@ -14,7 +14,7 @@ Circuitscape has now been rewritten in [Julia](https://julialang.org) for better
 This work is based on the original [Circuitscape](https://github.com/Circuitscape/Circuitscape) project by Brad McRae, Viral B. Shah 
 and Tanmay Mohapatra. 
 
-[Check out the documentation.](https://circuitscape.org/docs)
+[Check out the documentation.](https://docs.circuitscape.org/Circuitscape.jl/latest/)
 
 
 ## The New Circuitscape - Modern, Fast and Flexible
