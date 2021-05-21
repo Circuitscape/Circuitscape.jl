@@ -612,7 +612,7 @@ function sum_off_diag(G, i)
 function solve_linear_system(
             G::SparseMatrixCSC{T,V}, 
             curr::Vector{T}, M)::Vector{T} where {T,V} 
-    v = cg(G, curr, Pl = M, tol = T(1e-6), maxiter = 100_000)
+    v = cg(G, curr, Pl = M, rtol = T(1e-6), maxiter = 100_000)
     @assert norm(G*v - curr) < 1e-5
     v
 end
