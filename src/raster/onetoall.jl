@@ -10,7 +10,7 @@ function raster_one_to_all(T, V, cfg)::Matrix{T}
     onetoall_kernel(rasterdata, flags, cfg)
 end
 
-function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
+function onetoall_kernel(data::RasterData{T,V}, flags, cfg)::Matrix{T} where {T,V}
 
     # Data
     strengths = data.strengths
@@ -132,9 +132,12 @@ function onetoall_kernel(data::RasData{T,V}, flags, cfg)::Matrix{T} where {T,V}
                     _get_sources_and_grounds(source_map, ground_map,
                             flags, G, nodemap, policy)
 
-        advanced_data = AdvancedData(G, cc, nodemap, newpoly, hbmeta,
-                        sources, grounds, source_map, finite_grounds,
-                        check_node, n, gmap)
+
+        solver = get_solver(cfg)
+      
+        advanced_data = AdvancedProblem(G, cc, nodemap, newpoly, hbmeta,
+                        sources, grounds, source_map, finite_grounds, 
+                        check_node, n, gmap, solver)
 
 
         if one_to_all

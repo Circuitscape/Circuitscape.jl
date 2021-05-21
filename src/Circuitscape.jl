@@ -6,6 +6,7 @@ using SimpleWeightedGraphs
 using LightGraphs
 using IterativeSolvers
 using GZip
+using Pardiso
 
 using LinearAlgebra
 using SparseArrays
@@ -14,6 +15,7 @@ using Distributed
 using DelimitedFiles
 using Logging
 using Dates
+using SuiteSparse
 
 include("consts.jl")
 include("config.jl")

@@ -29,6 +29,7 @@ function compute(path::String)
         myaddprocs(n)
     end
     t = @elapsed r = _compute(T, V, cfg)
+
     csinfo("Time taken to complete job = $t", cfg["suppress_messages"] in TRUELIST)
     is_parallel && rmprocs(workers())
     r
@@ -71,7 +72,9 @@ function compute(dict)
         myaddprocs(n)
     end
     t = @elapsed r = _compute(T, V, cfg)
+
     csinfo("Time taken to complete job = $t", cfg["suppress_messages"] in TRUELIST)
     is_parallel && rmprocs(workers())
+
     r
 end
