@@ -315,7 +315,7 @@ function multiple_solve(s::AMGSolver, matrix::SparseMatrixCSC{T,V}, sources::Vec
 end
 
 function multiple_solve(s::CholmodSolver, matrix::SparseMatrixCSC{T,V}, sources::Vector{T}, suppress_info::Bool) where {T,V}
-    factor = construct_cholesky_factor(matrix, s)
+    factor = construct_cholesky_factor(matrix, s, suppress_info)
     t1 = @elapsed volt = solve_linear_system(factor, matrix, sources)
     @assert norm(matrix*volt .- sources) < 1e-5
     csinfo("Time taken to solve linear system = $t1 seconds", suppress_info)
@@ -323,7 +323,7 @@ function multiple_solve(s::CholmodSolver, matrix::SparseMatrixCSC{T,V}, sources:
 end
 
 function multiple_solve(s::MKLPardisoSolver, matrix::SparseMatrixCSC{T,V}, sources::Vector{T}, suppress_info::Bool) where {T,V}
-    factor = construct_cholesky_factor(matrix, s)
+    factor = construct_cholesky_factor(matrix, s, suppress_info)
     t1 = @elapsed volt = solve_linear_system(factor, matrix, sources)
     @assert norm(matrix*volt .- sources) < 1e-5
     csinfo("Time taken to solve linear system = $t1 seconds", supress_info)
