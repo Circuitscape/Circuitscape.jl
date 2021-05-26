@@ -495,7 +495,7 @@ end
 # So can we make this consistent?
 function construct_cholesky_factor(matrix, ::CholmodSolver, suppress_info::Bool)
     t = @elapsed factor = cholesky(matrix + sparse(10eps()*I,size(matrix)...))
-    csinfo("Time taken to construct cholesky factor = $t", suppress_messages)
+    csinfo("Time taken to construct cholesky factor = $t", suppress_info)
     factor
 end
 construct_cholesky_factor(matrix, ::MKLPardisoSolver, suppress_info::Bool) = 
