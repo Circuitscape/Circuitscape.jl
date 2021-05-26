@@ -326,7 +326,7 @@ function multiple_solve(s::MKLPardisoSolver, matrix::SparseMatrixCSC{T,V}, sourc
     factor = construct_cholesky_factor(matrix, s, suppress_info)
     t1 = @elapsed volt = solve_linear_system(factor, matrix, sources)
     @assert norm(matrix*volt .- sources) < 1e-5
-    csinfo("Time taken to solve linear system = $t1 seconds", supress_info)
+    csinfo("Time taken to solve linear system = $t1 seconds", suppress_info)
     volt
 end
 
