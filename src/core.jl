@@ -68,14 +68,14 @@ end
 function get_solver(cfg)
     s = cfg["solver"]
     if s in AMG
-        csinfo("Solver used: AMG accelerated by CG")
+        csinfo("Solver used: AMG accelerated by CG", cfg["suppress_messages"] in TRUELIST)
         return AMGSolver()
     elseif s in CHOLMOD
-        csinfo("Solver used: CHOLMOD")
+        csinfo("Solver used: CHOLMOD", cfg["suppress_messages"] in TRUELIST)
         bs = parse(Int, cfg["cholmod_batch_size"])
         return CholmodSolver(bs)
     elseif s in MKLPARDISO
-        csinfo("Solver used: MKLPardiso")
+        csinfo("Solver used: MKLPardiso", cfg["suppress_messages"] in TRUELIST)
         bs = parse(Int, cfg["cholmod_batch_size"])
         return MKLPardisoSolver(bs)
     end
