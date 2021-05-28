@@ -39,3 +39,7 @@ const INFO = ["INFO", "info", "Info"]
 const DEBUG = ["DEBUG", "debug", "Debug"]
 const WARNING = ["WARNING", "WARN", "warning", "warn", "Warning", "Warn"]
 const CRITICAL = ["CRITICAL", "critical", "Critical"]
+
+# Constants for tolerance when checking matrix norms
+const TOL_SINGLE = 1e-4
+const TOL_DOUBLE = 1e-5
