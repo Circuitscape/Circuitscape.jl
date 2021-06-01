@@ -68,14 +68,14 @@ end
 function get_solver(cfg)
     s = cfg["solver"]
     if s in AMG
-        csinfo("Solver used: AMG accelerated by CG")
+        csinfo("Solver used: AMG accelerated by CG", cfg["suppress_messages"] in TRUELIST)
         return AMGSolver()
     elseif s in CHOLMOD
-        csinfo("Solver used: CHOLMOD")
+        csinfo("Solver used: CHOLMOD", cfg["suppress_messages"] in TRUELIST)
         bs = parse(Int, cfg["cholmod_batch_size"])
         return CholmodSolver(bs)
     elseif s in MKLPARDISO
-        csinfo("Solver used: MKLPardiso")
+        csinfo("Solver used: MKLPardiso", cfg["suppress_messages"] in TRUELIST)
         bs = parse(Int, cfg["cholmod_batch_size"])
         return MKLPardisoSolver(bs)
     end
@@ -290,9 +290,9 @@ function _check_eltype(a, solver::CholmodSolver)
 end
 _check_eltype(a, solver::MKLPardisoSolver) = a
 
-function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, MKLPardisoSolver}, flags, 
+function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, MKLPardisoSolver}, flags,
                                   cfg, log) where {T,V}
-    
+
     # Data
     a = prob.G
     cc = prob.cc
@@ -493,12 +493,12 @@ end
 
 # TODO: In the pardiso case, we're not really constructing the factor
 # So can we make this consistent?
-function construct_cholesky_factor(matrix, ::CholmodSolver)
+function construct_cholesky_factor(matrix, ::CholmodSolver, suppress_info::Bool)
     t = @elapsed factor = cholesky(matrix + sparse(10eps()*I,size(matrix)...))
-    csinfo("Time taken to construct cholesky factor = $t")
+    csinfo("Time taken to construct cholesky factor = $t", suppress_info)
     factor
 end
-construct_cholesky_factor(matrix, ::MKLPardisoSolver) = 
+construct_cholesky_factor(matrix, ::MKLPardisoSolver, suppress_info::Bool) = 
             MKLPardisoFactorize()
 
 
@@ -610,8 +610,8 @@ function sum_off_diag(G, i)
  end
 
 function solve_linear_system(
-            G::SparseMatrixCSC{T,V}, 
-            curr::Vector{T}, M)::Vector{T} where {T,V} 
+            G::SparseMatrixCSC{T,V},
+            curr::Vector{T}, M)::Vector{T} where {T,V}
     v = cg(G, curr, Pl = M, reltol = T(1e-6), maxiter = 100_000)
     @assert norm(G*v - curr) < 1e-5
     v
@@ -622,7 +622,7 @@ function solve_linear_system(factor::MKLPardisoFactorize, matrix, rhs)
     mat = sparse(10eps()*I,size(matrix)...) + matrix
     x = zeros(eltype(matrix), size(matrix, 1))
     for i = 1:size(lhs, 2)
-        factor(x, mat, rhs[:,i]) 
+        factor(x, mat, rhs[:,i])
         @assert norm(mat*x - rhs[:,i]) < 1e-5
         lhs[:,i] .= x
     end
