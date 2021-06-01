@@ -361,7 +361,7 @@ function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, MKLPardisoS
         # Conductance matrix corresponding to CC
         matrix = comps[cid]
 
-        t = @elapsed factor = construct_cholesky_factor(matrix, solver)
+        t = @elapsed factor = construct_cholesky_factor(matrix, solver, cfg["suppress_messages"] in TRUELIST)
 
         # Get local nodemap for CC - useful for output writing
         t2 = @elapsed local_nodemap = construct_local_node_map(nodemap, comp, polymap)
@@ -498,7 +498,7 @@ function construct_cholesky_factor(matrix, ::CholmodSolver, suppress_info::Bool)
     csinfo("Time taken to construct cholesky factor = $t", suppress_info)
     factor
 end
-construct_cholesky_factor(matrix, ::MKLPardisoSolver, suppress_info::Bool) = 
+construct_cholesky_factor(matrix, ::MKLPardisoSolver, suppress_info::Bool) =
             MKLPardisoFactorize()
 
 
@@ -613,7 +613,7 @@ function solve_linear_system(
             G::SparseMatrixCSC{T,V},
             curr::Vector{T}, M)::Vector{T} where {T,V}
     v = cg(G, curr, Pl = M, reltol = T(1e-6), maxiter = 100_000)
-    @assert norm(G*v - curr) < 1e-5
+    @assert norm(G*v - curr) < (eltype(curr) == Float64 ? TOL_DOUBLE : TOL_SINGLE)
     v
 end
 
@@ -623,7 +623,7 @@ function solve_linear_system(factor::MKLPardisoFactorize, matrix, rhs)
     x = zeros(eltype(matrix), size(matrix, 1))
     for i = 1:size(lhs, 2)
         factor(x, mat, rhs[:,i])
-        @assert norm(mat*x - rhs[:,i]) < 1e-5
+        @assert norm(mat*x - rhs[:,i]) < (eltype(matrix) == Float64 ? TOL_DOUBLE : TOL_SINGLE)
         lhs[:,i] .= x
     end
     lhs
@@ -632,7 +632,7 @@ end
 function solve_linear_system(factor::SuiteSparse.CHOLMOD.Factor, matrix, rhs)
     lhs = factor \ rhs
     for i = 1:size(rhs, 2)
-        @assert norm(matrix*lhs[:,i] - rhs[:,i]) < 1e-5
+        @assert norm(matrix*lhs[:,i] - rhs[:,i]) < (eltype(matrix) == Float64 ? TOL_DOUBLE : TOL_SINGLE)
     end
     lhs
 end
