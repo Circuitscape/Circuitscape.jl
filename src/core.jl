@@ -290,9 +290,9 @@ function _check_eltype(a, solver::CholmodSolver)
 end
 _check_eltype(a, solver::MKLPardisoSolver) = a
 
-function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, MKLPardisoSolver}, flags,
+function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, MKLPardisoSolver}, flags, 
                                   cfg, log) where {T,V}
-
+    
     # Data
     a = prob.G
     cc = prob.cc
@@ -498,7 +498,7 @@ function construct_cholesky_factor(matrix, ::CholmodSolver)
     csinfo("Time taken to construct cholesky factor = $t")
     factor
 end
-construct_cholesky_factor(matrix, ::MKLPardisoSolver) =
+construct_cholesky_factor(matrix, ::MKLPardisoSolver) = 
             MKLPardisoFactorize()
 
 
@@ -610,10 +610,10 @@ function sum_off_diag(G, i)
  end
 
 function solve_linear_system(
-            G::SparseMatrixCSC{T,V},
-            curr::Vector{T}, M)::Vector{T} where {T,V}
+            G::SparseMatrixCSC{T,V}, 
+            curr::Vector{T}, M)::Vector{T} where {T,V} 
     v = cg(G, curr, Pl = M, reltol = T(1e-6), maxiter = 100_000)
-    @assert norm(G*v - curr) < (eltype(curr) == Float64 ? TOL_DOUBLE : TOL_SINGLE)
+    @assert norm(G*v - curr) < 1e-5
     v
 end
 
@@ -622,8 +622,8 @@ function solve_linear_system(factor::MKLPardisoFactorize, matrix, rhs)
     mat = sparse(10eps()*I,size(matrix)...) + matrix
     x = zeros(eltype(matrix), size(matrix, 1))
     for i = 1:size(lhs, 2)
-        factor(x, mat, rhs[:,i])
-        @assert norm(mat*x - rhs[:,i]) < (eltype(matrix) == Float64 ? TOL_DOUBLE : TOL_SINGLE)
+        factor(x, mat, rhs[:,i]) 
+        @assert norm(mat*x - rhs[:,i]) < 1e-5
         lhs[:,i] .= x
     end
     lhs
@@ -632,7 +632,7 @@ end
 function solve_linear_system(factor::SuiteSparse.CHOLMOD.Factor, matrix, rhs)
     lhs = factor \ rhs
     for i = 1:size(rhs, 2)
-        @assert norm(matrix*lhs[:,i] - rhs[:,i]) < (eltype(matrix) == Float64 ? TOL_DOUBLE : TOL_SINGLE)
+        @assert norm(matrix*lhs[:,i] - rhs[:,i]) < 1e-5
     end
     lhs
 end
