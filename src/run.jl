@@ -16,8 +16,8 @@ function compute(path::String)
     update_logging!(cfg)
     write_config(cfg)
     T = cfg["precision"] in SINGLE ? Float32 : Float64
-    if T == Float32 && cfg["solver"] in CHOLMOD
-        cswarn("CHOLMOD solver mode works only in double precision. Switching precision to double.")
+    if T == Float32 && (cfg["solver"] in CHOLMOD || cfg["solver"] in MKLPARDISO)
+        cswarn("Cholmod & MKLPardiso solver modes work only in double precision. Switching precision to double.")
         T = Float64
     end
     V = cfg["use_64bit_indexing"] in TRUELIST ? Int64 : Int32
