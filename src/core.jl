@@ -613,17 +613,17 @@ function solve_linear_system(
             G::SparseMatrixCSC{T,V},
             curr::Vector{T}, M)::Vector{T} where {T,V}
     v = cg(G, curr, Pl = M, reltol = T(1e-6), maxiter = 100_000)
-    @assert norm(G*v - curr) < (eltype(curr) == Float64 ? TOL_DOUBLE : TOL_SINGLE)
+	@assert (norm(G*v .- curr, Inf) / norm(v, Inf)) < 1e-5
     v
 end
 
 function solve_linear_system(factor::MKLPardisoFactorize, matrix, rhs)
     lhs = similar(rhs)
-    mat = sparse(10eps()*I,size(matrix)...) + matrix
+	mat = sparse(10eps(eltype(matrix))*I,size(matrix)...) + matrix
     x = zeros(eltype(matrix), size(matrix, 1))
     for i = 1:size(lhs, 2)
         factor(x, mat, rhs[:,i])
-        @assert norm(mat*x - rhs[:,i]) < (eltype(matrix) == Float64 ? TOL_DOUBLE : TOL_SINGLE)
+		@assert (norm(mat*x .- rhs[:,i], Inf) / norm(x, Inf)) < 1e-5
         lhs[:,i] .= x
     end
     lhs
@@ -632,7 +632,7 @@ end
 function solve_linear_system(factor::SuiteSparse.CHOLMOD.Factor, matrix, rhs)
     lhs = factor \ rhs
     for i = 1:size(rhs, 2)
-        @assert norm(matrix*lhs[:,i] - rhs[:,i]) < (eltype(matrix) == Float64 ? TOL_DOUBLE : TOL_SINGLE)
+		@assert (norm(matrix*lhs[:,i] .- rhs[:,i], Inf) / norm(lhs[:,i], Inf)) < 1e-5
     end
     lhs
 end
