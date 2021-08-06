@@ -7,8 +7,6 @@ using LightGraphs
 using IterativeSolvers
 using GZip
 using Pardiso
-using JLD2
-using FileIO
 
 using LinearAlgebra
 using SparseArrays
