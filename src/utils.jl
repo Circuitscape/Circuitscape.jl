@@ -100,7 +100,7 @@ function compute_single(str)
     cfg["precision"] = "single"
     V = cfg["use_64bit_indexing"] in TRUELIST ? Int64 : Int32
     T = Float32
-	if cfg["solver"] in CHOLMOD || cfg["solver"] == "mklpardiso"
+	if cfg["solver"] in CHOLMOD || cfg["solver"] in MKLPARDISO
         cswarn("Cholmod and Pardiso support only double precision. Changing precision to double.")
         T = Float64
     end
