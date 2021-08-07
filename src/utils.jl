@@ -86,6 +86,10 @@ end
 function compute_mklpardiso(str, batch_size = 5)
     cfg = parse_config(str)
     T = cfg["precision"] in SINGLE ? Float32 : Float64
+    if T == Float32
+        cswarn("Pardiso supports only double precision. Changing precision to double.")
+        T = Float64
+    end
     V = cfg["use_64bit_indexing"] in TRUELIST ? Int64 : Int32
     cfg["solver"] = "mklpardiso"
     _compute(T, V, cfg)
@@ -96,8 +100,8 @@ function compute_single(str)
     cfg["precision"] = "single"
     V = cfg["use_64bit_indexing"] in TRUELIST ? Int64 : Int32
     T = Float32
-    if cfg["solver"] == "cholmod"
-        cswarn("Cholmod supports only double precision. Changing precision to double.")
+	if cfg["solver"] in CHOLMOD || cfg["solver"] in MKLPARDISO
+        cswarn("Cholmod and Pardiso support only double precision. Changing precision to double.")
         T = Float64
     end
     _compute(T, V, cfg)
