@@ -322,6 +322,9 @@ function read_included_pairs(V, filename)
         end
 
         return IncludeExcludePairs(mode, point_ids, mat)
+    else
+        throw(ErrorException("Error reading focal node include/exclude pairs file. Please
+            check file format and refer to the tests for examples."))
     end
 
 end
