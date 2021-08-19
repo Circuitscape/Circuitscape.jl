@@ -40,10 +40,10 @@ function step3()
     cfg["habitat_file"] = path
     println()
     println("Is this a resistance or conductance file?")
-    is_res = ["PREVIOUS STEP", "resistances", "conductance"]
+    is_res = ["PREVIOUS STEP", "resistance", "conductance"]
     n = request(RadioMenu(is_res))
     n == 1 && step2()
-    cfg["habitat_map_is_resistances"] = is_res[n]
+    cfg["habitat_map_is_resistances"] = is_res[n] == "resistance" ? "true" : "false"
     step4() 
 end
 
