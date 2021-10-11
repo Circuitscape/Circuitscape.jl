@@ -24,7 +24,7 @@ Note that zero and infinite values for conductances and resistances represent sp
 
 ### Focal node location and data type
 
-This file specifies locations of nodes between which effective resistance and current flow are to be calculated (See Figs. 6 and 9). **Each focal node should have a unique positive integer ID.** Files may be text lists specifying coordinates or appropriate raster grid formats. When a grid is used, it must have the same cell size and extent as the resistance grid. The value stored in each grid cell location refers to the focal node ID. Cells that do not contain focal nodes should be coded with NODATA values. When a text list is used, the value field references the focal node ID. Examples are in the examples directory (located where Circuitscape is installed) and can also be found on the Circuitscape downloads page.
+This file specifies locations of nodes between which effective resistance and current flow are to be calculated (See Figs. 6 and 9). **Each focal node should have a unique positive integer ID.** Files may be text lists specifying coordinates or appropriate raster grid formats. When a grid is used, it must have the same cell size and extent as the resistance grid. The value stored in each grid cell location refers to the focal node ID. Cells that do not contain focal nodes should be coded with NODATA values. When a text list is used, the value field references the focal node ID.
 
 For raster analyses, focal nodes may occur at points (single cells on the resistance grid) or across regions (Fig. 8). For the latter, a single ID would occupymore than one cell in a grid or more than one pair of coordinates in a text list (and falling within more than one cell in the underlying resistance grid). Cells within a single region would then be collapsed into a single node, as they are when short-circuit region files are used (see below). The difference is that a focal region will be "burned in" to the resistance grid only for pairwise calculations that include that focal node. As with short-circuit regions, focal regions need not be made up of contiguous cells. For large grids or large numbers of focal nodes, focal regions may require more computation time. When calculating resistances on large raster grids and not creating voltage or current maps, focal points will run much more quickly.
 
@@ -36,11 +36,11 @@ On Mac OS X and Linux systems, Circuitscape can run iterations in parallel for p
 
 ### Current source file
 
-This file specifies locations and strengths, in amps, of current sources (Figs. 7 and 11). Either a raster or a text list may be used. Rasters must have the same cell size, projection, and extent as the resistance grid, and cells that do not contain current sources should be coded with NODATA values. Note: current sources may be positive or negative (i.e., they may inject current into the grid or pull current out. Similarly, grounds may either serve as a sink for current or may contribute current if there are negative current sources in the grid). Examples are in the examples directory.
+This file specifies locations and strengths, in amps, of current sources (Figs. 7 and 11). Either a raster or a text list may be used. Rasters must have the same cell size, projection, and extent as the resistance grid, and cells that do not contain current sources should be coded with NODATA values. Note: current sources may be positive or negative (i.e., they may inject current into the grid or pull current out. Similarly, grounds may either serve as a sink for current or may contribute current if there are negative current sources in the grid).
 
 ### Ground point file
 
-This file specifies locations of ground nodes and resistances or conductances of resistors tying them to ground (Figs. 7 and 11). Either a raster or a text list may be used. Rasters must have the same cell size, projection, and extent as the resistance grid, and cells that do not contain grounds should be coded with NODATA values. Note that if a direct (R = 0) ground connection conflicts with a current source, the ground will be removed unless the 'remove source' option in the Options Window is chosen. Example ground input files are in the examples directory.
+This file specifies locations of ground nodes and resistances or conductances of resistors tying them to ground (Figs. 7 and 11). Either a raster or a text list may be used. Rasters must have the same cell size, projection, and extent as the resistance grid, and cells that do not contain grounds should be coded with NODATA values. Note that if a direct (R = 0) ground connection conflicts with a current source, the ground will be removed unless the 'remove source' option in the Options Window is chosen.
 
 ### Data represent conductances instead of resistances to ground
 
@@ -114,7 +114,7 @@ When running raster data in pairwise, all-to-one, and one-to all modes, focal no
 
 #### Read raster mask file
 
-When checked, a dialog will open to select a raster mask file. Cells with negative, zero, or NODATA values in the mask will be dropped from the corresponding resistance map (i.e., treated as complete barriers). Positive integer cells will be retained. File should only contain integers and be in raster format. See example file "mask.asc" in the examples directory.
+When checked, a dialog will open to select a raster mask file. Cells with negative, zero, or NODATA values in the mask will be dropped from the corresponding resistance map (i.e., treated as complete barriers). Positive integer cells will be retained. File should only contain integers and be in raster format.
 
 #### Load a raster short-circuit region map
 
@@ -122,7 +122,7 @@ Short-circuit regions act as areas of zero resistance, essentially providing pat
 
 #### One-to-all and All-to-One modes: Read source strength file
 
-When checked, a dialog will open to select a text list of focal node IDs and corresponding source strengths. For any focal node in this list, the amount of current injected into that node when it is a source node will be set to the strength specified in the list. All nodes not in the list will default to 1 Amp. This should be in the same file format as the Text List File Format given below, but with two columns (ID followed by source strength). File should have a .txt extension. See example file "source_strength_list.txt" in the examples directory.
+When checked, a dialog will open to select a text list of focal node IDs and corresponding source strengths. For any focal node in this list, the amount of current injected into that node when it is a source node will be set to the strength specified in the list. All nodes not in the list will default to 1 Amp. This should be in the same file format as the Text List File Format given below, but with two columns (ID followed by source strength). File should have a .txt extension.
 
 #### Read file with focal node pairs to include/exclude
 
@@ -131,9 +131,9 @@ This option allows users to only perform calculations on a subset of focal node 
 This affects all modes except the Advanced Mode. Files should be in tab-delimited text with a .txt extension. See formatting information in the _Input file formats_ section below.
 
 
-## ASCII raster format
+## Input raster format
 
-When using the stand-alone Circuitscape interface, raster input maps should be stored in Arc/Info ASCII grid format, as exported by standard GIS packages (see examples in examples directory; these may be viewed with standard text editors). For focal nodes, the value stored in each grid location refers to the focal node ID, and a single ID can occupy more than one cell (IDs must be positive integers). For current sources, the grid value specifies the source strength in amps. For grounds, the grid value specifies either the resistance or conductance of the resistor tying each ground node to ground, as specified in the Options window.
+Raster input maps should be stored in Arc/Info ASCII grid of GeoTIFF format, as exported by standard GIS packages. For focal nodes, the value stored in each grid location refers to the focal node ID, and a single ID can occupy more than one cell (IDs must be positive integers). For current sources, the grid value specifies the source strength in amps. For grounds, the grid value specifies either the resistance or conductance of the resistor tying each ground node to ground, as specified in the Options window.
 
 The ASCII raster format is as follows:
 
@@ -150,7 +150,7 @@ The ASCII raster format is as follows:
 
 Numeric data only. Columns are delimited with tabs and rows are delimited with new line characters.
 
-**Examples (these can also be found in the examples directory)**
+**Examples**
 
 Below is a 10 x10 resistance map. Cells with infinite resistance are assigned NODATA values (-9999):
 
@@ -206,7 +206,7 @@ can be defined by the following text list:
         2    4    1
         3    4    1
 
-This file can be found in the examples directory (network_graph.txt). **Please note:** typically, there should just be one entry for each pair of connected nodes. If there are two entries for a single pair in the form of (node1, node2, value1) and (node2, node1, value2), these will be considered parallel resistors and their conductances will be summed. For example, if the above text list had an extra entry for node pair (4, 3) like this:
+**Please note:** typically, there should just be one entry for each pair of connected nodes. If there are two entries for a single pair in the form of (node1, node2, value1) and (node2, node1, value2), these will be considered parallel resistors and their conductances will be summed. For example, if the above text list had an extra entry for node pair (4, 3) like this:
 
         0    1    1
         1    2    1
@@ -229,7 +229,7 @@ To tie node 4 directly to ground (i.e. to connect it to ground with a wire that 
         3    49.5
         4    0
 
-These files are also included in the examples directory. The resulting circuit would look like this (from McRae et al. 2008):
+The resulting circuit would look like this (from McRae et al. 2008):
 
 ![](https://raw.github.com/Circuitscape/Circuitscape/master/docs/4.0/images/AdvancedNetwork.png)
 
@@ -268,7 +268,7 @@ Similarly, if the first line in the above file read:
 
     mode     exclude
 
-all pairs except (1,2), (1,3), and (1,5) would be analyzed. See example file "list_of_pairs_to_include.txt" in the examples directory.
+all pairs except (1,2), (1,3), and (1,5) would be analyzed.
 
 The second method uses a matrix identifying which pairs of focal nodes to connect. The file specifies minimum and maximum values in the matrix to consider a pair connected. This method can be useful when used with a distance matrix to only run analyses between points separated by a minimum distance, or by a distance equal to or less than a maximum distance. Note: any focal node not in the matrix will be dropped from analyses. Entries on the diagonal are ignored. For example, in the following matrix, only pairs with entries between 2 and 50 are connected. Pairs (1,2), (2,4), and (3,4) will not be analyzed.  
 Focal node 5 will be dropped entirely:
@@ -284,7 +284,7 @@ Focal node 5 will be dropped entirely:
 
 Make sure to include a zero in the upper-left corner of the matrix.
 
-Files should be in tab-delimited text with a .txt extension. See example file “matrix_of_pairs_to_include_and_exclude.txt” in the examples directory.
+Files should be in tab-delimited text with a .txt extension.
 
 # 9\. Output files
 
@@ -300,7 +300,7 @@ When not using the ArcGIS toolbox, raster voltage and current maps are written u
 
 Resistance data are written in both matrix and 3-column formats.
 
-Here are pairwise resistances written to the output directory for the eight neighbor case (using per-cell resistances and average resistances for cell connection calculations; this can be replicated by loading eight_neighbor_example.ini from the examples directory). The first row and column contain the focal node IDs:
+Here are pairwise resistances written to the output directory for the eight neighbor case (using per-cell resistances and average resistances for cell connection calculations). The first row and column contain the focal node IDs:
 
       0          1            2            3  
       1          0            11.93688471  15.03634473
