@@ -44,7 +44,7 @@ function compute_graph_data(data::NetworkData{T,V}, cfg)::GraphProblem{T,V} wher
     hbmeta = RasterMeta()
     cellmap = Matrix{T}(undef,0,0)
 
-    cum = initialize_cum_vectors(v)
+	cum = initialize_cum_vectors(data.coords, size(G,1))
 
     GraphProblem(G, cc, data.fp, data.fp, 
                 exclude_pairs, nodemap, polymap, hbmeta, cellmap, cum, solver)

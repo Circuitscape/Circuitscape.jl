@@ -47,6 +47,9 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
 
     if !flags.is_raster
 
+		cum_branch_curr = output.cum.cum_branch_curr
+		cum_node_curr = output.cum.cum_node_curr
+
         # Branch currents
         branch_currents_array = _convert_to_3col(branch_currents, cc)
 
@@ -54,12 +57,24 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
 
         # Accumulate branch currents
         # cum_branch_curr[mycsid()] .+= branch_currents_array[:,3]
+		bca = branch_currents_array
+		cbc = cum_branch_curr[mycsid()]
+
+		k = output.cum.coords
+		@inbounds for i = 1:size(branch_currents_array, 1)
+			idx = findfirst(isequal((Int(bca[i,1]), Int(bca[i,2]))), k)
+			cbc[idx] += bca[i,3]
+		end
 
         # Node currents
         node_currents_array = _append_name_to_node_currents(node_currents, cc)
 
         # Accumulate node currents
-        # cum_node_curr[mycsid()] .+= node_currents_array[:,2]
+        cnc = cum_node_curr[mycsid()] 
+		nca = node_currents_array
+		@inbounds for i = 1:size(nca, 1)
+			cnc[Int(nca[i,1])] += nca[i,2]
+		end
 
         # !write_cum_cur_map_only &&
         write_currents(node_currents_array, branch_currents_array, name, cfg)

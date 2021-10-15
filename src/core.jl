@@ -1,8 +1,9 @@
-struct Cumulative{T}
+struct Cumulative{T,V}
     cum_curr::Vector{SharedMatrix{T}}
     max_curr::Vector{SharedMatrix{T}}
-    cum_branch_curr::Vector{SharedVector{T}}
-    cum_node_curr::Vector{SharedVector{T}}
+	cum_branch_curr::Vector{SharedVector{T}}
+	cum_node_curr::Vector{SharedVector{T}}
+	coords::Vector{Tuple{V,V}}
 end
 
 struct GraphProblem{T,V,W}
@@ -111,7 +112,6 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
     cum = prob.cum
 
     csinfo("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components", cfg["suppress_messages"] in TRUELIST)
-
 
     num, d = get_num_pairs(cc, points, exclude)
     log && csinfo("Total number of pair solves = $num", cfg["suppress_messages"] in TRUELIST)
