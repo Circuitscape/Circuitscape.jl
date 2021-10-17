@@ -13,7 +13,21 @@ function network_pairwise(T, V, cfg)::Matrix{T}
     graphdata = compute_graph_data(networkdata, cfg)
 
     # Send to main kernel
-    single_ground_all_pairs(graphdata, flags, cfg)
+    ret = single_ground_all_pairs(graphdata, flags, cfg)
+
+	# Write cum maps
+	cum_node_curr = collect(graphdata.cum.cum_node_curr[1])
+	cum_branch_curr = collect(graphdata.cum.cum_branch_curr[1])
+	for i = 2:nprocs()
+		cum_node_curr .+= graphdata.cum_node_curr[i][:,2]
+		cum_branch_curr .+= graphdata.cum_branch_curr[i][:,3]
+	end
+	cum_node_curr = hcat(1:length(cum_node_curr), cum_node_curr)
+	coords = graphdata.cum.coords
+	cum_branch_curr = hcat(getindex.(coords, 1), getindex.(coords, 2), cum_branch_curr)
+	write_currents(cum_node_curr, cum_branch_curr, "cum", cfg)
+
+	ret
 end
 
 function compute_graph_data(data::NetworkData{T,V}, cfg)::GraphProblem{T,V} where {T,V}
