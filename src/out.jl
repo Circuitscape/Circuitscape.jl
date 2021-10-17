@@ -47,13 +47,20 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
 
     if !flags.is_raster
 
-		cum_branch_curr = output.cum.cum_branch_curr
-		cum_node_curr = output.cum.cum_node_curr
-
         # Branch currents
         branch_currents_array = _convert_to_3col(branch_currents, cc)
 
+        # Node currents
+        node_currents_array = _append_name_to_node_currents(node_currents, cc)
+
+		if flags.is_advanced
+			write_currents(node_currents_array, branch_currents_array, name, cfg)
+			return nothing
+		end
+
         # TODO: implement cumulative maps for netowrk mode
+		cum_branch_curr = output.cum.cum_branch_curr
+		cum_node_curr = output.cum.cum_node_curr
 
         # Accumulate branch currents
         # cum_branch_curr[mycsid()] .+= branch_currents_array[:,3]
@@ -66,8 +73,6 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
 			cbc[idx] += bca[i,3]
 		end
 
-        # Node currents
-        node_currents_array = _append_name_to_node_currents(node_currents, cc)
 
         # Accumulate node currents
         cnc = cum_node_curr[mycsid()] 
@@ -78,6 +83,7 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
 
         # !write_cum_cur_map_only &&
         write_currents(node_currents_array, branch_currents_array, name, cfg)
+		return nothing
     else
 
         cmap = node_currents
@@ -100,6 +106,7 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
         !write_cum_cur_map_only &&
                         write_grid(cmap, name, cfg, hbmeta)
 
+		return nothing
    end
 end
 
@@ -110,7 +117,6 @@ function write_currents(node_curr_arr, branch_curr_arr, name, cfg)
 end
 
 _append_name_to_node_currents(node_currents, cc) = [cc node_currents]
-
 
 function _convert_to_3col(branch_currents, cc)
 
