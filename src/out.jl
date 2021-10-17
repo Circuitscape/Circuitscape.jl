@@ -50,19 +50,40 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
         # Branch currents
         branch_currents_array = _convert_to_3col(branch_currents, cc)
 
-        # TODO: implement cumulative maps for netowrk mode
-
-        # Accumulate branch currents
-        # cum_branch_curr[mycsid()] .+= branch_currents_array[:,3]
-
         # Node currents
         node_currents_array = _append_name_to_node_currents(node_currents, cc)
 
+		if flags.is_advanced
+			write_currents(node_currents_array, branch_currents_array, name, cfg)
+			return nothing
+		end
+
+        # TODO: implement cumulative maps for netowrk mode
+		cum_branch_curr = output.cum.cum_branch_curr
+		cum_node_curr = output.cum.cum_node_curr
+
+        # Accumulate branch currents
+        # cum_branch_curr[mycsid()] .+= branch_currents_array[:,3]
+		bca = branch_currents_array
+		cbc = cum_branch_curr[mycsid()]
+
+		k = output.cum.coords
+		@inbounds for i = 1:size(branch_currents_array, 1)
+			idx = findfirst(isequal((Int(bca[i,1]), Int(bca[i,2]))), k)
+			cbc[idx] += bca[i,3]
+		end
+
+
         # Accumulate node currents
-        # cum_node_curr[mycsid()] .+= node_currents_array[:,2]
+        cnc = cum_node_curr[mycsid()] 
+		nca = node_currents_array
+		@inbounds for i = 1:size(nca, 1)
+			cnc[Int(nca[i,1])] += nca[i,2]
+		end
 
         # !write_cum_cur_map_only &&
         write_currents(node_currents_array, branch_currents_array, name, cfg)
+		return nothing
     else
 
         cmap = node_currents
@@ -85,17 +106,20 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
         !write_cum_cur_map_only &&
                         write_grid(cmap, name, cfg, hbmeta)
 
+		return nothing
    end
 end
 
 function write_currents(node_curr_arr, branch_curr_arr, name, cfg)
    pref = split(cfg["output_file"], ".out")[1]
+   # 1e-6 because we guarantee only 6 digits of precision on solve
+   idx = findall(x -> !isapprox(x, 0.0, atol = 1e-6), branch_curr_arr[:,3])
+   branch_curr_arr = branch_curr_arr[idx, :]
    writedlm("$(pref)_node_currents$(name).txt", node_curr_arr, '\t')
    writedlm("$(pref)_branch_currents$(name).txt", branch_curr_arr, '\t')
 end
 
 _append_name_to_node_currents(node_currents, cc) = [cc node_currents]
-
 
 function _convert_to_3col(branch_currents, cc)
 
