@@ -112,6 +112,9 @@ end
 
 function write_currents(node_curr_arr, branch_curr_arr, name, cfg)
    pref = split(cfg["output_file"], ".out")[1]
+   # 1e-6 because we guarantee only 6 digits of precision on solve
+   idx = findall(x -> !isapprox(x, 0.0, atol = 1e-6), branch_curr_arr[:,3])
+   branch_curr_arr = branch_curr_arr[idx, :]
    writedlm("$(pref)_node_currents$(name).txt", node_curr_arr, '\t')
    writedlm("$(pref)_branch_currents$(name).txt", branch_curr_arr, '\t')
 end
