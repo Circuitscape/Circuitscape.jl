@@ -305,8 +305,7 @@ function runtests(f = compute)
             end
         end
 
-
-        #=@testset "Raster Pairwise" begin
+        @testset "Raster Pairwise" begin
             # Raster pairwise tests
             for i = 1:17
                 # Weird windows 32 stuff
@@ -363,7 +362,7 @@ function runtests(f = compute)
                 compare_all_output("allToOneVerify$(i)", is_single)
                 @info("Test allToOneVerify$i passed")
             end
-        end=#
+        end
     end
 end
 

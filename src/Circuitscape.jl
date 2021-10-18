@@ -3,7 +3,7 @@ module Circuitscape
 using AlgebraicMultigrid
 using ArchGDAL
 using SimpleWeightedGraphs
-using LightGraphs
+using Graphs
 using IterativeSolvers
 using GZip
 using Pardiso
