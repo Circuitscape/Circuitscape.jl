@@ -224,7 +224,7 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, flags, cfg)::Tuple{Matrix
     name = src == 0 ? "" : "_$(V(src))"
     if write_v_maps
         if !is_raster
-            write_volt_maps(name, voltages, FullGraph(G, cellmap), flags, cfg)
+            write_volt_maps(name, outvolt, FullGraph(G, cellmap), flags, cfg)
         else
             write_grid(outvolt, name, cfg, hbmeta, cellmap, voltage = true)
         end
@@ -232,7 +232,7 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, flags, cfg)::Tuple{Matrix
 
     if write_c_maps && !write_cum_cur_map_only
         if !is_raster
-            write_cur_maps(name, voltages, FullGraph(G, cellmap), finitegrounds, flags, cfg)
+            write_cur_maps(name, outcurr, FullGraph(G, cellmap), finitegrounds, flags, cfg)
         else
             write_grid(outcurr, name, cfg, hbmeta, cellmap)
         end
