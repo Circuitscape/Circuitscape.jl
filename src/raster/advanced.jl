@@ -178,7 +178,7 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, flags, cfg)::Tuple{Matrix
     ind = findall(x->x!=0,nodemap)
     f_local = Vector{eltype(G)}()
     solver_called = false
-    voltages = Vector{eltype(G)}()
+	voltages = zeros(eltype(G), size(G, 1))
     outvolt = alloc_map(hbmeta)
     outcurr = alloc_map(hbmeta)
 
@@ -203,7 +203,7 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, flags, cfg)::Tuple{Matrix
             f_local = finitegrounds
         end
 
-        voltages = multiple_solver(cfg, prob.solver, a_local, s_local, g_local, f_local)
+		voltages[c] .+= multiple_solver(cfg, prob.solver, a_local, s_local, g_local, f_local)
 
         local_nodemap = construct_local_node_map(nodemap, c, polymap)
         solver_called = true
@@ -224,7 +224,7 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, flags, cfg)::Tuple{Matrix
     name = src == 0 ? "" : "_$(V(src))"
     if write_v_maps
         if !is_raster
-            write_volt_maps(name, outvolt, FullGraph(G, cellmap), flags, cfg)
+            write_volt_maps(name, voltages, FullGraph(G, cellmap), flags, cfg)
         else
             write_grid(outvolt, name, cfg, hbmeta, cellmap, voltage = true)
         end
@@ -232,7 +232,7 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, flags, cfg)::Tuple{Matrix
 
     if write_c_maps && !write_cum_cur_map_only
         if !is_raster
-            write_cur_maps(name, outcurr, FullGraph(G, cellmap), finitegrounds, flags, cfg)
+            write_cur_maps(name, voltages, FullGraph(G, cellmap), finitegrounds, flags, cfg)
         else
             write_grid(outcurr, name, cfg, hbmeta, cellmap)
         end
