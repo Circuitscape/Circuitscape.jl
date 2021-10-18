@@ -208,10 +208,10 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, flags, cfg)::Tuple{Matrix
         local_nodemap = construct_local_node_map(nodemap, c, polymap)
         solver_called = true
 
-        if write_v_maps && is_raster
+        if write_v_maps # && is_raster
             accum_voltages!(outvolt, voltages, local_nodemap, hbmeta)
         end
-        if write_c_maps && is_raster
+        if write_c_maps # && is_raster
             accum_currents!(outcurr, voltages, cfg, a_local, voltages, f_local, local_nodemap, hbmeta)
         end
 
