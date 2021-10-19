@@ -7,7 +7,7 @@ struct AdvancedProblem{T,V,W}
     sources::Vector{T}
     grounds::Vector{T}
     source_map::Matrix{T} # Needed for one to all mode
-    finite_grounds::Vector{T}
+    finitegrounds::Vector{T}
     check_node::V
     src::V
     cellmap::Matrix{T}
@@ -59,14 +59,14 @@ function compute_advanced_data(data::RasterData{T,V},
     cc = connected_components(SimpleWeightedGraph(G))
 
     # Advanced mode specific stuff
-    sources, grounds, finite_grounds =
+    sources, grounds, finitegrounds =
             get_sources_and_grounds(data, flags, G, nodemap)
 
     solver = get_solver(cfg)
 
     AdvancedProblem(G, cc, nodemap, polymap, hbmeta,
                 sources, grounds, source_map,
-                finite_grounds, V(-1), V(0), cellmap, solver)
+                finitegrounds, V(-1), V(0), cellmap, solver)
 
 end
 
@@ -119,7 +119,6 @@ end
 function resolve_conflicts(sources::Vector{T},
                             grounds::Vector{T}, policy) where T
 
-    finitegrounds = similar(sources)
     l = size(sources, 1)
 
     finitegrounds = map(x -> x < T(Inf) ? x : T(0.), grounds)
@@ -158,7 +157,7 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, flags, cfg)::Tuple{Matrix
     hbmeta = prob.hbmeta
     sources = prob.sources
     grounds = prob.grounds
-    finitegrounds = prob.finite_grounds
+    finitegrounds = prob.finitegrounds
     cc = prob.cc
     src = prob.src
     check_node = prob.check_node
@@ -212,7 +211,8 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, flags, cfg)::Tuple{Matrix
             accum_voltages!(outvolt, voltages, local_nodemap, hbmeta)
         end
         if write_c_maps # && is_raster
-            accum_currents!(outcurr, voltages, cfg, a_local, voltages, f_local, local_nodemap, hbmeta)
+            # accum_currents!(outcurr, voltages, cfg, a_local, voltages, f_local, local_nodemap, hbmeta)
+            accum_currents!(outcurr, voltages, cfg, G, voltages, finitegrounds, local_nodemap, hbmeta)
         end
 
         for i in eachindex(volt)
