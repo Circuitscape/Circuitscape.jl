@@ -202,25 +202,21 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, flags, cfg)::Tuple{Matrix
             f_local = finitegrounds
         end
 
-		# voltages[c] .+= multiple_solver(cfg, prob.solver, a_local, s_local, g_local, f_local)
-		_v = multiple_solver(cfg, prob.solver, a_local, s_local, g_local, f_local)
-		voltages[c] .+= _v
+		voltages[c] .+= multiple_solver(cfg, prob.solver, a_local, s_local, g_local, f_local)
 
         local_nodemap = construct_local_node_map(nodemap, c, polymap)
         solver_called = true
 
         if write_v_maps 
-			is_raster && accum_voltages!(outvolt, _v, local_nodemap, hbmeta)
-			!is_raster && accum_voltages!(outvolt, voltages, local_nodemap, hbmeta)
+			accum_voltages!(outvolt, voltages, local_nodemap, hbmeta)
         end
         if write_c_maps 
-			is_raster && accum_currents!(outcurr, _v, cfg, a_local, _v, f_local, local_nodemap, hbmeta)
-			!is_raster && accum_currents!(outcurr, voltages, cfg, G, voltages, finitegrounds, local_nodemap, hbmeta)
+			accum_currents!(outcurr, voltages, cfg, G, voltages, finitegrounds, local_nodemap, hbmeta)
         end
 
         for i in eachindex(volt)
             _i = Int(local_nodemap[i])
-            _i != 0 && (volt[i] = voltages[_i])
+			_i != 0 && (volt[i] = voltages[c][_i])
         end
     end
 
