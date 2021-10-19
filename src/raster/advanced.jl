@@ -208,10 +208,12 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, flags, cfg)::Tuple{Matrix
         solver_called = true
 
         if write_v_maps 
-			accum_voltages!(outvolt, voltages, local_nodemap, hbmeta)
+			is_raster ? accum_voltages!(outvolt, voltages[c], local_nodemap, hbmeta) : 
+				accum_voltages!(outvolt, voltages, local_nodemap, hbmeta)
         end
         if write_c_maps 
-			accum_currents!(outcurr, voltages, cfg, G, voltages, finitegrounds, local_nodemap, hbmeta)
+			is_raster ? accum_currents!(outcurr, voltages[c], cfg, a_local, voltages[c], f_local, local_nodemap, hbmeta) : 
+				accum_currents!(outcurr, voltages, cfg, G, voltages, finitegrounds, local_nodemap, hbmeta)
         end
 
         for i in eachindex(volt)
