@@ -47,11 +47,24 @@ function load_graph(V, gpath::String, ::Type{T}) where {T}
     i = zeros(V, size(g, 1))
     j = zeros(V, size(g, 1))
     v = zeros(T, size(g, 1))
-    for iter = 1:size(g, 1)
-        i[iter] = g[iter,1] + 1
-        j[iter] = g[iter,2] + 1
-        v[iter] = g[iter,3]
-    end
+	for iter = 1:size(g, 1)
+		i[iter] = g[iter,1]
+		j[iter] = g[iter,2]
+		v[iter] = g[iter,3]
+	end
+	min_node = min(minimum(i), minimum(j))
+	if min_node > 1 
+		throw(ErrorException("""Your resistance file starts counting nodes 
+							 from $min_node. Circuitscape.jl starts counting from 1. 
+							 Please rename your nodes to start from 1."""))
+	elseif min_node == 0
+		csinfo("""Circuitscape.jl starts counting nodes from 1, 
+			   not 0. This will be reflected in the outputs.""")
+		for iter = 1:size(g, 1)
+			i[iter] = g[iter,1] + 1
+			j[iter] = g[iter,2] + 1
+		end
+	end
     i,j,v
 end
 
