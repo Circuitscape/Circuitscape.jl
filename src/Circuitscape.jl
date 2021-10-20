@@ -2,8 +2,8 @@
 module Circuitscape
 using AlgebraicMultigrid
 using ArchGDAL
-using SimpleWeightedGraphs
 using Graphs
+using SimpleWeightedGraphs
 using IterativeSolvers
 using GZip
 using Pardiso
