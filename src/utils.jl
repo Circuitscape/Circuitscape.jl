@@ -470,6 +470,122 @@ function (p::MKLPardisoFactorize)(x,A,b,update_matrix=false;kwargs...)
     Pardiso.pardiso(p.ps, x, A, b)
 end
 
+# Function to calculate current for Omniscape moving window solves
+function compute_omniscape_current(
+        conductance::Array{T, 2} where T <: Union{Float32, Float64},
+        source::Array{T, 2} where T <: Union{Float32, Float64},
+        ground::Array{T, 2} where T <: Union{Float32, Float64},
+        cs_cfg::Dict{String, String}
+    )
+    V = Int64
+    T = eltype(conductance)
+
+    # get raster data
+    cellmap = conductance
+    polymap = Matrix{V}(undef, 0, 0)
+    source_map = source
+    ground_map = ground
+    points_rc = (V[], V[], V[])
+    strengths = Matrix{T}(undef, 0, 0)
+
+    included_pairs = IncludeExcludePairs(:undef,
+                                         V[],
+                                         Matrix{V}(undef,0,0))
+
+    # This is just to satisfy type requirements, most of it not used
+    hbmeta = RasterMeta(size(cellmap)[2],
+                        size(cellmap)[1],
+                        0.,
+                        0.,
+                        1.,
+                        -9999.,
+                        Array{T, 1}(undef, 1),
+                        "")
+
+    rasterdata = RasterData(cellmap,
+                            polymap,
+                            source_map,
+                            ground_map,
+                            points_rc,
+                            strengths,
+                            included_pairs,
+                            hbmeta)
+
+    # Generate advanced data
+    o = OutputFlags(
+        false, false, false, false,
+        false, false, false, false
+    )
+
+    flags = RasterFlags(
+        true, false, true, false, false, false, Symbol("rmvsrc"),
+        cs_cfg["connect_four_neighbors_only"] in TRUELIST, false, 
+        cs_cfg["solver"], o
+    )
+
+    data = compute_advanced_data(rasterdata, flags, cs_cfg)
+
+    G = data.G
+    nodemap = data.nodemap
+    polymap = data.polymap
+    hbmeta = data.hbmeta
+    sources = data.sources
+    grounds = data.grounds
+    finitegrounds = data.finitegrounds
+    cc = data.cc
+    check_node = data.check_node
+    source_map = data.source_map # Need it for one to all mode
+    cellmap = data.cellmap
+
+    f_local = Vector{eltype(G)}()
+    voltages = Vector{eltype(G)}()
+    outcurr = alloc_map(hbmeta)
+
+    for c in cc
+        if check_node != -1 && !(check_node in c)
+            continue
+        end
+
+        # a_local = laplacian(G[c, c])
+        a_local = G[c,c]
+        s_local = sources[c]
+        g_local = grounds[c]
+
+        if sum(s_local) == 0 || sum(g_local) == 0
+            continue
+        end
+
+        if finitegrounds != [-9999.]
+            f_local = finitegrounds[c]
+        else
+            f_local = finitegrounds
+        end
+
+        voltages = multiple_solver(cs_cfg,
+                                   data.solver,
+                                   a_local,
+                                   s_local,
+                                   g_local,
+                                   f_local)
+
+        local_nodemap = construct_local_node_map(nodemap,
+                                                 c,
+                                                 polymap)
+
+        accum_currents!(outcurr,
+                        voltages,
+                        cs_cfg,
+                        a_local,
+                        voltages,
+                        f_local,
+                        local_nodemap,
+                        hbmeta)
+    end
+
+    return outcurr
+end
+
+
 # Testing utilities
 function change_to_test_path()
     origpath = pwd()
