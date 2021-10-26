@@ -1,9 +1,9 @@
 # Circuitscape
 
 
-| **Documentation** | **Chat** | **Build Status**| **Changelog**|
-|:-----------------------------------------------------:|:------------------------------------:|:-----------:|:-------:|
-| [![docs](https://img.shields.io/badge/docs-latest-blue.svg)](https://docs.circuitscape.org/Circuitscape.jl/latest/) | [![gitter](https://badges.gitter.im/Circuitscape/Circuitscape.jl.png)](https://gitter.im/Circuitscape/Circuitscape.jl) | [![Build Status](https://github.com/Circuitscape/Circuitscape.jl/workflows/CI/badge.svg)](https://github.com/Circuitscape/Circuitscape.jl/actions?query=workflow%3ACI) [![codecov.io](http://codecov.io/github/Circuitscape/Circuitscape.jl/coverage.svg?branch=master)](http://codecov.io/github/Circuitscape/Circuitscape.jl?branch=master) | [![news](https://img.shields.io/static/v1?label=version&message=v5.8.3&color=orange)](https://github.com/Circuitscape/Circuitscape.jl/releases) |
+| **Documentation** | **Chat** | **Build Status**|
+|:-----------------------------------------------------:|:------------------------------------:|:-----------:|
+| [![docs](https://img.shields.io/badge/docs-latest-blue.svg)](https://docs.circuitscape.org/Circuitscape.jl/latest/) | [![gitter](https://badges.gitter.im/Circuitscape/Circuitscape.jl.png)](https://gitter.im/Circuitscape/Circuitscape.jl) | [![Build Status](https://github.com/Circuitscape/Circuitscape.jl/workflows/CI/badge.svg)](https://github.com/Circuitscape/Circuitscape.jl/actions?query=workflow%3ACI) [![codecov.io](http://codecov.io/github/Circuitscape/Circuitscape.jl/coverage.svg?branch=master)](http://codecov.io/github/Circuitscape/Circuitscape.jl?branch=master) |
 
 Circuitscape is an open-source program that uses circuit theory to model connectivity 
 in heterogeneous landscapes. Its most common applications include modeling movement and gene flow 
