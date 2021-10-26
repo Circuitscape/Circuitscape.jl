@@ -1,6 +1,46 @@
-import Circuitscape: construct_node_map
+import Circuitscape: construct_node_map, compute_omniscape_current
 using Circuitscape
 
+# Omniscape moving window solve test 
+# just checking syntax, other tests should be sufficient to ensure correctness.
+let
+        conductance = [
+                1 5   1.;
+                2 1   1;
+                9 1   6
+        ]
+        source = [
+                1 0 0.;
+                0 0 0;
+                0 1 0
+        ]
+        ground = [
+                0 0 1.;
+                0 0 0;
+                0 0 0
+        ]
+
+        cs_cfg = Dict{String, String}()
+
+        cs_cfg["ground_file_is_resistances"] = "True"
+        cs_cfg["use_direct_grounds"] = "False"
+        cs_cfg["output_file"] = "temp"
+        cs_cfg["write_cum_cur_map_only"] = "False"
+        cs_cfg["scenario"] = "Advanced"
+        cs_cfg["suppress_messages"] = "True"
+        cs_cfg["connect_four_neighbors_only"] = "False"
+        cs_cfg["solver"] = "cholmod"
+        cs_cfg["cholmod_batch_size"] = "1000"
+        cs_cfg["data_type"] = "raster"
+
+        current = compute_omniscape_current(
+                conductance,
+                source,
+                ground,
+                cs_cfg
+        )
+        
+end
 # Construct nodemap tests
 let
         gmap = [0 1 2
