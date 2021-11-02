@@ -103,7 +103,7 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
         end
 
         # Write current maps
-        !write_cum_cur_map_only &&
+        !write_cum_cur_map_only && flags.outputflags.write_cur_maps && 
                         write_grid(cmap, name, cfg, hbmeta)
 
 		return nothing
