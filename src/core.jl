@@ -662,11 +662,11 @@ function postprocess(output, component_data, flags, shortcut, cfg)
         csinfo("Time taken to write voltage maps = $t seconds", cfg["suppress_messages"] in TRUELIST)
     end
 
-    if flags.outputflags.write_cur_maps
-        t = @elapsed write_cur_maps(name, output, component_data,
-                                    [-9999.], flags, cfg)
-        csinfo("Time taken to write current maps = $t seconds", cfg["suppress_messages"] in TRUELIST)
-    end
+    # TODO: Even though this function is called write_cur_maps
+    # actually writing the calculated maps depends on some flags. 
+    t = @elapsed write_cur_maps(name, output, component_data,
+                                [-9999.], flags, cfg)
+    csinfo("Time taken to calculate current maps = $t seconds", cfg["suppress_messages"] in TRUELIST)
     nothing
 end
 
