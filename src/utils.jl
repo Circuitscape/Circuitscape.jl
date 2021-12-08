@@ -327,12 +327,12 @@ function runtests(f = compute)
 
         @testset "Raster Advanced" begin
             # Raster advanced tests
-            for i in 1:5
+            for i in 1:6
                 @info("Testing mgVerify$i")
                 r = f("input/raster/advanced/$i/mgVerify$(i).ini")
-                x = readdlm("output_verify/mgVerify$(i)_voltmap.asc"; skipstart = 6)
-                @test sum(abs2, x - r) < 1e-4
-                # compare_all_output("mgVerify$(i)")
+                # x = readdlm("output_verify/mgVerify$(i)_voltmap.asc"; skipstart = 6)
+                # @test sum(abs2, x - r) < 1e-4
+                compare_all_output("mgVerify$(i)")
                 @info("Test mgVerify$i passed")
             end
         end

@@ -251,10 +251,12 @@ function read_source_and_ground_maps(T, V, source_file, ground_file, habitatmeta
     if filetype == FILE_TYPE_AAGRID || filetype == FILE_TYPE_GEOTIFF
         ground_map = read_polymap(T, ground_file, habitatmeta; nodata_as = -1)
         ground_map = map(T, ground_map)
-    else
-        rc = readdlm(ground_file, V)
+    elseif filetype == FILE_TYPE_TXTLIST
+        rc = _txt_list_reader(ground_file, T, habitatmeta)
         ground_map = -9999 * ones(T, habitatmeta.nrows, habitatmeta.ncols)
-        ground_map[rc[:,2], rc[:,3]] = rc[:,1]
+        ground_map[V.(rc[:,2]), V.(rc[:,3])] = rc[:,1]
+    else
+        throw(ErrorException("Cannot recognise file type."))
     end
     close(f)
 
@@ -264,10 +266,12 @@ function read_source_and_ground_maps(T, V, source_file, ground_file, habitatmeta
     if filetype == FILE_TYPE_AAGRID || filetype == FILE_TYPE_GEOTIFF
         source_map = read_polymap(T, source_file, habitatmeta)
         source_map = map(T, source_map)
-    else
-        rc = readdlm(source_file, V)
+    elseif filetype == FILE_TYPE_TXTLIST
+        rc = _txt_list_reader(source_file, T, habitatmeta)
         source_map = -9999 * ones(T, habitatmeta.nrows, habitatmeta.ncols)
-        source_map[rc[:,2], rc[:,3]] = rc[:,1]
+        source_map[V.(rc[:,2]), V.(rc[:,3])] = rc[:,1]
+    else
+        throw(ErrorException("Cannot recognize file type."))
     end
     close(f)
 
@@ -281,6 +285,19 @@ function read_source_and_ground_maps(T, V, source_file, ground_file, habitatmeta
     end
 
     source_map, ground_map
+end
+
+function _txt_list_reader(filename, T, habitatmeta)
+    points = readdlm(filename, T)
+    pts_remapped = zeros(T, size(points)...)
+    try
+        pts_remapped[:,1] = points[:,1]
+        pts_remapped[:,2] = ceil.(habitatmeta.nrows .- (points[:,3] .- habitatmeta.yllcorner) ./ habitatmeta.cellsize)
+        pts_remapped[:,3] = ceil.((points[:,2] .- habitatmeta.xllcorner) ./ habitatmeta.cellsize)
+    catch 
+        throw(ErrorException("Error extracting locations from text list file"))
+    end
+    pts_remapped
 end
 
 function read_included_pairs(V, filename)
