@@ -22,7 +22,7 @@ SuiteSparse = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
-AlgebraicMultigrid = "0.4"
+AlgebraicMultigrid = "0.4, 0.5"
 ArchGDAL = "0.5 - 0.6, 0.7"
 GZip = "0.5.1"
 Graphs = "1"
