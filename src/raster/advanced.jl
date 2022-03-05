@@ -311,7 +311,7 @@ function multiple_solve(s::AMGSolver, matrix::SparseMatrixCSC{T,V}, sources::Vec
     csinfo("Time taken to construct preconditioner = $t1 seconds", suppress_info)
     t1 = @elapsed volt = solve_linear_system(matrix, sources, M)
     # @assert norm(matrix*volt .- sources) < (eltype(sources) == Float64 ? TOL_DOUBLE : TOL_SINGLE)
-	@assert (norm(matrix*volt .- sources, Inf) / norm(volt, Inf)) < 1e-5
+	@assert (norm(matrix*volt .- sources) / norm(sources)) < 1e-6
     csinfo("Time taken to solve linear system = $t1 seconds", suppress_info)
     volt
 end
@@ -320,7 +320,7 @@ function multiple_solve(s::CholmodSolver, matrix::SparseMatrixCSC{T,V}, sources:
     factor = construct_cholesky_factor(matrix, s, suppress_info)
     t1 = @elapsed volt = solve_linear_system(factor, matrix, sources)
     # @assert norm(matrix*volt .- sources) < (eltype(sources) == Float64 ? TOL_DOUBLE : TOL_SINGLE)
-	@assert (norm(matrix*volt .- sources, Inf) / norm(volt, Inf)) < 1e-5
+	@assert (norm(matrix*volt .- sources) / norm(sources)) < 1e-6
     csinfo("Time taken to solve linear system = $t1 seconds", suppress_info)
     volt
 end
@@ -329,7 +329,7 @@ function multiple_solve(s::MKLPardisoSolver, matrix::SparseMatrixCSC{T,V}, sourc
     factor = construct_cholesky_factor(matrix, s, suppress_info)
     t1 = @elapsed volt = solve_linear_system(factor, matrix, sources)
     # @assert norm(matrix*volt .- sources) < (eltype(sources) == Float64 ? TOL_DOUBLE : TOL_SINGLE)
-	@assert (norm(matrix*volt .- sources, Inf) / norm(volt, Inf)) < 1e-5
+	@assert (norm(matrix*volt .- sources) / norm(sources)) < 1e-6
     csinfo("Time taken to solve linear system = $t1 seconds", suppress_info)
     volt
 end
