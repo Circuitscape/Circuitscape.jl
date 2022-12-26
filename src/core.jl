@@ -288,7 +288,6 @@ function _check_eltype(a, solver::CholmodSolver)
     cswarn("CHOLMOD only works with double precision. Converting single precision matrix to double")
     Float64.(a)
 end
-_check_eltype(a, solver::MKLPardisoSolver) = a
 
 function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, MKLPardisoSolver}, flags,
                                   cfg, log) where {T,V}
@@ -498,8 +497,6 @@ function construct_cholesky_factor(matrix, ::CholmodSolver, suppress_info::Bool)
     csinfo("Time taken to construct cholesky factor = $t", suppress_info)
     factor
 end
-construct_cholesky_factor(matrix, ::MKLPardisoSolver, suppress_info::Bool) =
-            MKLPardisoFactorize()
 
 
 """
@@ -617,17 +614,6 @@ function solve_linear_system(
     v
 end
 
-function solve_linear_system(factor::MKLPardisoFactorize, matrix, rhs)
-    lhs = similar(rhs)
-	mat = sparse(10eps(eltype(matrix))*I,size(matrix)...) + matrix
-    x = zeros(eltype(matrix), size(matrix, 1))
-    for i = 1:size(lhs, 2)
-        factor(x, mat, rhs[:,i])
-		@assert (norm(mat*x .- rhs[:,i]) / norm(rhs[:,i])) < 1e-6
-        lhs[:,i] .= x
-    end
-    lhs
-end
 
 function solve_linear_system(factor::SuiteSparse.CHOLMOD.Factor, matrix, rhs)
     lhs = factor \ rhs

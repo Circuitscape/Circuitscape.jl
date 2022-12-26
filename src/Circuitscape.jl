@@ -6,7 +6,6 @@ using Graphs
 using SimpleWeightedGraphs
 using IterativeSolvers
 using GZip
-using Pardiso
 
 using LinearAlgebra
 using SparseArrays
