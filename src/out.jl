@@ -70,6 +70,7 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
 		k = output.cum.coords
 		@inbounds for i = 1:size(branch_currents_array, 1)
 			idx = findfirst(isequal((Int(bca[i,1]), Int(bca[i,2]))), k)
+			idx == nothing && (idx = findfirst(isequal((Int(bca[i,2]), Int(bca[i,1]))), k))
 			cbc[idx] += bca[i,3]
 		end
 
