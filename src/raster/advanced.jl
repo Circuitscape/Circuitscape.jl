@@ -216,10 +216,9 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, flags, cfg)::Tuple{Matrix
 				accum_currents!(outcurr, voltages, cfg, G, voltages, finitegrounds, local_nodemap, hbmeta)
         end
 
-        for i in eachindex(volt)
-            _i = Int(local_nodemap[i])
-			_i != 0 && (volt[i] = voltages[c][_i])
-        end
+		_is = map(i -> Int(local_nodemap[i]), 1:length(volt))
+		_isn0 = findall(!iszero, _is)
+		volt[_isn0] .= voltages[c][_is[_isn0]] 
     end
 
     name = src == 0 ? "" : "_$(V(src))"
