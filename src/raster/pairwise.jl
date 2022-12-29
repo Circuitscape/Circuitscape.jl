@@ -90,7 +90,8 @@ function _pt_file_polygons_path(rasterdata::RasterData{T,V},
     avg_res = flags.avg_res
     four_neighbors = flags.four_neighbors
 	included_pairs = rasterdata.included_pairs
-	exclude_pairs = generate_exclude_pairs(points_rc, included_pairs)
+	exclude_pairs = isempty(included_pairs) ? Vector{Tuple{V,V}}() : 
+						generate_exclude_pairs(points_rc, included_pairs)
 
     # Cumulative maps
     cum = initialize_cum_maps(gmap, flags.outputflags.write_max_cur_maps)
