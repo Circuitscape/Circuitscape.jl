@@ -235,7 +235,6 @@ function compute_graph_data_no_polygons(data::RasterData{T,V},
                 hbmeta, cellmap, cum, solver)
 
 end
-Base.isempty(t::IncludeExcludePairs) = t.mode == :undef
 
 function generate_exclude_pairs(points_rc, included_pairs::IncludeExcludePairs{V}) where V
 

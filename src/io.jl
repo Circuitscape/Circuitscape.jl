@@ -8,6 +8,7 @@ end
 function IncludeExcludePairs(V)
     IncludeExcludePairs(:undef, V[], Matrix{V}(undef,0,0))
 end
+Base.isempty(t::IncludeExcludePairs) = t.mode == :undef
 
 struct NetworkData{T,V} <: Data
     coords::Tuple{Vector{V},Vector{V},Vector{T}}
@@ -476,7 +477,7 @@ function load_raster_data(T, V, cfg)::RasterData{T,V}
 
     # Variable source strengths
     if use_var_source
-        strengths = read_point_strengths(T, var_source_file)
+        strengths = read_point_strengths(T, var_source_file, false)
     else
         strengths = Matrix{T}(undef, 0,0)
     end
