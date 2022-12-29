@@ -123,7 +123,7 @@ function write_config(cfg)
         point_file = $(cfg["point_file"])
 
         [Calculation options]
-        solver = cg+amg
+		solver = $(cfg["solver"])
 
         [Output options]
         write_cum_cur_map_only = $(cfg["write_cum_cur_map_only"] in TRUELIST)
