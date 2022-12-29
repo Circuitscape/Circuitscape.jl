@@ -8,7 +8,6 @@ end
 function IncludeExcludePairs(V)
     IncludeExcludePairs(:undef, V[], Matrix{V}(undef,0,0))
 end
-Base.isempty(x::IncludeExcludePairs) = isempty(x.include_pairs)
 
 struct NetworkData{T,V} <: Data
     coords::Tuple{Vector{V},Vector{V},Vector{T}}
