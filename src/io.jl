@@ -65,18 +65,22 @@ function load_graph(V, gpath::String, ::Type{T}) where {T}
 			j[iter] = g[iter,2] + 1
 		end
 	end
-    i,j,v
+    i,j,v, min_node==0
 end
 
 function read_focal_points(V, path::String) 
-	ret = vec(readdlm(path, V))
+	ret = try 
+			vec(readdlm(path, V)) 
+		catch
+			vec(V.(readdlm(path)))
+		end
 	minimum(ret) == 0 && (ret .+= 1)
 	ret
 end
 
-function read_point_strengths(T, path::String) 
+function read_point_strengths(T, path::String, starts_from_zero) 
 	str = readdlm(path, T)
-	starts_from_zero = minimum(str[:,1]) == 0
+	starts_from_zero = minimum(str[:,1]) == 0 || starts_from_zero 
 	starts_from_zero && (str[:,1] .+= 1)
 	str
 end
@@ -372,7 +376,7 @@ function get_network_data(T, V, cfg)::NetworkData{T,V}
 
     is_pairwise = cfg["scenario"] in PAIRWISE
 
-    i,j,v = load_graph(V, hab_file, T)
+    i,j,v,starts_from_zero = load_graph(V, hab_file, T)
 
     if hab_is_res
         v = 1 ./ v
@@ -385,8 +389,8 @@ function get_network_data(T, V, cfg)::NetworkData{T,V}
     end
 
     if !is_pairwise
-		source_list = read_point_strengths(T, source_file)
-		ground_list = read_point_strengths(T, ground_file)
+		source_list = read_point_strengths(T, source_file, starts_from_zero)
+		ground_list = read_point_strengths(T, ground_file, starts_from_zero)
     else
         source_list = Matrix{T}(undef,0,0)
         ground_list = Matrix{T}(undef,0,0)
