@@ -68,9 +68,18 @@ function load_graph(V, gpath::String, ::Type{T}) where {T}
     i,j,v
 end
 
-read_focal_points(V, path::String) = V.(vec(readdlm(path)) .+ 1)
+function read_focal_points(V, path::String) 
+	ret = vec(readdlm(path, V))
+	minimum(ret) == 0 && (ret .+= 1)
+	ret
+end
 
-read_point_strengths(T, path::String) = readdlm(path, T)
+function read_point_strengths(T, path::String) 
+	str = readdlm(path, T)
+	starts_from_zero = minimum(str[:,1]) == 0
+	starts_from_zero && (str[:,1] .+= 1)
+	str
+end
 
 function read_cellmap(habitat_file::String, is_res::Bool, ::Type{T}) where {T}
 
@@ -382,17 +391,6 @@ function get_network_data(T, V, cfg)::NetworkData{T,V}
         source_list = Matrix{T}(undef,0,0)
         ground_list = Matrix{T}(undef,0,0)
     end
-	starts_from_zero = minimum(i) == 0 || minimum(j) == 0 ||
-		minimum(source_list[:,1]) == 0 || minimum(ground_list[:,1]) == 0
-	if starts_from_zero
-		csinfo("""Circuitscape.jl starts counting nodes from 1, 
-			   not 0. This will be reflected in the outputs.""")
-		i .+= 1
-		j .+= 1
-		source_list[:,1] .+= 1
-		ground_list[:,1] .+= 1
-	end
-
 
     NetworkData((i,j,v), fp, source_list, ground_list)
 end
