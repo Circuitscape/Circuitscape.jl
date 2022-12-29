@@ -81,6 +81,7 @@ function _pt_file_polygons_path(rasterdata::RasterData{T,V},
         # construct new graph
         # solve for two points
     # end
+	
 
     # Data
     gmap = rasterdata.cellmap
@@ -88,6 +89,8 @@ function _pt_file_polygons_path(rasterdata::RasterData{T,V},
     points_rc = rasterdata.points_rc
     avg_res = flags.avg_res
     four_neighbors = flags.four_neighbors
+	included_pairs = rasterdata.included_pairs
+	exclude_pairs = generate_exclude_pairs(points_rc, included_pairs)
 
     # Cumulative maps
     cum = initialize_cum_maps(gmap, flags.outputflags.write_max_cur_maps)
@@ -105,6 +108,9 @@ function _pt_file_polygons_path(rasterdata::RasterData{T,V},
             pt2 = pts[j]
             csinfo("Solving pair $k of $n", cfg["suppress_messages"] in TRUELIST)
             k += 1
+			if (pt1,pt2) in exclude_pairs || (pt2, pt1) in exclude_pairs 
+				continue
+			end
             graphdata = compute_graph_data_polygons(rasterdata, flags, pt1, pt2, cum, cfg)
             pairwise_resistance = single_ground_all_pairs(graphdata, flags, cfg, false)
             resistances[i,j] = resistances[j,i] = pairwise_resistance[2,3]
