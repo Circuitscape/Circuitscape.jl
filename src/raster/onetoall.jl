@@ -33,7 +33,6 @@ function onetoall_kernel(data::RasterData{T,V}, flags, cfg)::Matrix{T} where {T,
         points_unique = included_pairs.point_ids
         prune_points!(points_rc, included_pairs.point_ids)
         if use_variable_strengths
-            strengths[:,1] .-= 1
             strengths = prune_strengths(strengths, included_pairs.point_ids)
         end
     end
