@@ -328,7 +328,7 @@ function runtests(f = compute)
 
         @testset "Raster One to All" begin
             # Raster one to all test
-			for i in [12]
+			for i in 1:13
                 @info("Testing oneToAllVerify$i")
                 r = f("input/raster/one_to_all/$i/oneToAllVerify$(i).ini")
                 x = readdlm("output_verify/oneToAllVerify$(i)_resistances.out")
