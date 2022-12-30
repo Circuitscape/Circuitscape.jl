@@ -31,6 +31,8 @@ function compute_advanced_data(data::NetworkData{T,V},
     A = A + A'
 
     cc = connected_components(SimpleWeightedGraph(A))
+	c = size(A,1)
+	csinfo("Graph has $c nodes and $(length(cc)) connected components", cfg["suppress_messages"] in TRUELIST)
 
     t = @elapsed G = laplacian(A)
     csinfo("Time taken to construct graph laplacian = $t", cfg["suppress_messages"] in TRUELIST)
