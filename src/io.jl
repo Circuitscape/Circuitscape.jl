@@ -262,7 +262,9 @@ function read_source_and_ground_maps(T, V, source_file, ground_file, habitatmeta
     elseif filetype == FILE_TYPE_TXTLIST
         rc = _txt_list_reader(ground_file, T, habitatmeta)
         ground_map = -9999 * ones(T, habitatmeta.nrows, habitatmeta.ncols)
-        ground_map[V.(rc[:,2]), V.(rc[:,3])] = rc[:,1]
+		for (x,y,v) in zip(rc[:,2], rc[:,3], rc[:,1])
+			ground_map[V(x), V(y)] = v
+		end
     else
         throw(ErrorException("Cannot recognise file type."))
     end
@@ -277,7 +279,9 @@ function read_source_and_ground_maps(T, V, source_file, ground_file, habitatmeta
     elseif filetype == FILE_TYPE_TXTLIST
         rc = _txt_list_reader(source_file, T, habitatmeta)
         source_map = -9999 * ones(T, habitatmeta.nrows, habitatmeta.ncols)
-        source_map[V.(rc[:,2]), V.(rc[:,3])] = rc[:,1]
+		for (x,y,v) in zip(rc[:,2], rc[:,3], rc[:,1])
+			source_map[V(x), V(y)] = v
+		end
     else
         throw(ErrorException("Cannot recognize file type."))
     end
