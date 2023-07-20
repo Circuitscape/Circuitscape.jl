@@ -1,6 +1,6 @@
 name = "Circuitscape"
 uuid = "2b7a1792-8151-5239-925d-e2b8fdfa3201"
-version = "5.12.3"
+version = "5.13.0"
 
 [deps]
 AlgebraicMultigrid = "2169fc97-5a83-5252-b627-83903c6c433c"
@@ -22,7 +22,7 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
 AlgebraicMultigrid = "0.5"
-ArchGDAL = "0.8, 0.9"
+ArchGDAL = "0.10"
 GZip = "0.5.1"
 Graphs = "1"
 IterativeSolvers = "0.9"
