@@ -230,7 +230,7 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, flags, cfg)::Tuple{Matrix
         end
     end
 
-    if write_c_maps && !write_cum_cur_map_only
+    if write_c_maps || write_cum_cur_map_only
         if !is_raster
             write_cur_maps(name, voltages, FullGraph(G, cellmap), finitegrounds, flags, cfg)
         else
