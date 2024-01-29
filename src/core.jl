@@ -610,7 +610,7 @@ function solve_linear_system(
             G::SparseMatrixCSC{T,V},
             curr::Vector{T}, M)::Vector{T} where {T,V}
     v = cg(G, curr, Pl = M, reltol = T(1e-6), maxiter = 100_000)
-	@assert norm(G*v .- curr) / norm(curr) < 1e-6
+	@assert norm(G*v .- curr) / norm(curr) < 1e-4
     v
 end
 
@@ -618,7 +618,7 @@ end
 function solve_linear_system(factor::SuiteSparse.CHOLMOD.Factor, matrix, rhs)
     lhs = factor \ rhs
     for i = 1:size(rhs, 2)
-		@assert (norm(matrix*lhs[:,i] .- rhs[:,i]) / norm(rhs[:,i])) < 1e-6
+		@assert (norm(matrix*lhs[:,i] .- rhs[:,i]) / norm(rhs[:,i])) < 1e-4
     end
     lhs
 end

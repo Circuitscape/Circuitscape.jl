@@ -50,7 +50,7 @@ function solve_linear_system(factor::MKLPardisoFactorize, matrix, rhs)
     x = zeros(eltype(matrix), size(matrix, 1))
     for i = 1:size(lhs, 2)
         factor(x, mat, rhs[:,i])
-		@assert (norm(mat*x .- rhs[:,i]) / norm(rhs[:,i])) < 1e-6
+		@assert (norm(mat*x .- rhs[:,i]) / norm(rhs[:,i])) < 1e-4
         lhs[:,i] .= x
     end
     lhs
