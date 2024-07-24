@@ -284,11 +284,6 @@ struct CholmodNode{T}
     points_idx::Tuple{T,T}
 end
 
-function _check_eltype(a, solver::CholmodSolver)
-    cswarn("CHOLMOD only works with double precision. Converting single precision matrix to double")
-    Float64.(a)
-end
-
 function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, MKLPardisoSolver}, flags,
                                   cfg, log) where {T,V}
 
@@ -313,9 +308,6 @@ function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, MKLPardisoS
 
     # Cumulative current map
     cum = prob.cum
-
-    # Check - CHOLMOD solver mode works only in double precision
-    a = _check_eltype(a, solver)
 
     # Batchsize
     batch_size = solver.bs
@@ -649,7 +641,7 @@ function postprocess(output, component_data, flags, shortcut, cfg)
     end
 
     # TODO: Even though this function is called write_cur_maps
-    # actually writing the calculated maps depends on some flags. 
+    # actually writing the calculated maps depends on some flags.
     t = @elapsed write_cur_maps(name, output, component_data,
                                 [-9999.], flags, cfg)
     csinfo("Time taken to calculate current maps = $t seconds", cfg["suppress_messages"] in TRUELIST)
