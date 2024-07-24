@@ -1,7 +1,6 @@
 using Circuitscape
 using Test
-import Circuitscape: compute_single, compute_cholmod, compute_mklpardiso,
-                     compute_parallel,
+import Circuitscape: compute_single, compute_cholmod, compute_parallel,
                      runtests
 using Logging
 Logging.disable_logging(Logging.Info)
