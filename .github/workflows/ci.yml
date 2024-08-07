@@ -18,6 +18,8 @@ jobs:
       matrix:
         version:
           - '1'
+          - 'lts'
+          - 'pre'
         os:
           - ubuntu-latest
           - windows-latest
