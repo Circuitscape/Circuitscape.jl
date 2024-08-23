@@ -85,6 +85,14 @@ function _get_sources_and_grounds(source_map, ground_map,
     is_raster = flags.is_raster
     grnd_file_is_res = flags.grnd_file_is_res
     policy = override_policy == :none ? flags.policy : override_policy
+	use_unit_currents = flags.use_unit_currents
+	use_direct_grounds = flags.use_direct_grounds
+	if use_unit_currents
+		source_map[findall(!iszero, source_map)] .= 1
+	end
+	if use_direct_grounds
+		ground_map[findall(!iszero, ground_map)] .= Inf
+	end
 
     # Initialize sources and grounds
     sources = zeros(eltype(G), size(G, 1))
@@ -172,6 +180,7 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, flags, cfg)::Tuple{Matrix
     write_v_maps = flags.outputflags.write_volt_maps
     write_c_maps = flags.outputflags.write_cur_maps
     write_cum_cur_map_only = flags.outputflags.write_cum_cur_map_only
+	use_unit_currents = flags.use_unit_currents
 
     volt = zeros(eltype(G), size(nodemap))
     ind = findall(x->x!=0,nodemap)

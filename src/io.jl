@@ -276,9 +276,10 @@ function read_source_and_ground_maps(T, V, source_file, ground_file, habitatmeta
     if filetype == FILE_TYPE_AAGRID || filetype == FILE_TYPE_GEOTIFF
         source_map = read_polymap(T, source_file, habitatmeta)
         source_map = map(T, source_map)
+		source_map[findall(isequal(-9999), source_map)] .= 0
     elseif filetype == FILE_TYPE_TXTLIST
         rc = _txt_list_reader(source_file, T, habitatmeta)
-        source_map = -9999 * ones(T, habitatmeta.nrows, habitatmeta.ncols)
+        source_map = zeros(T, habitatmeta.nrows, habitatmeta.ncols)
 		for (x,y,v) in zip(rc[:,2], rc[:,3], rc[:,1])
 			source_map[V(x), V(y)] = v
 		end
