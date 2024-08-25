@@ -484,7 +484,6 @@ function compute_omniscape_current(
 
     flags = RasterFlags(
         true, false, true, false, false, false, Symbol("rmvsrc"),
-		false, false,
         cs_cfg["connect_four_neighbors_only"] in TRUELIST, false, 
         cs_cfg["solver"], o
     )
