@@ -248,10 +248,12 @@ end
 
 
 function read_source_and_ground_maps(T, V, source_file, ground_file, habitatmeta,
-                                        is_res)
+                                        is_res, cfg)
 
     ground_map = Matrix{T}(undef,0,0)
     source_map = Matrix{T}(undef,0,0)
+	use_unit_currents = cfg["use_unit_currents"] in TRUELIST
+	use_direct_grounds = cfg["use_direct_grounds"] in TRUELIST
 
     f = endswith(ground_file, "gz") ? GZip.open(ground_file, "r") : open(ground_file, "r")
     filetype = _guess_file_type(ground_file, f)
@@ -296,6 +298,14 @@ function read_source_and_ground_maps(T, V, source_file, ground_file, habitatmeta
         ind = findall(x -> x == -9999, ground_map)
         ground_map[ind] .= 0
     end
+
+	# use_unit_currents & use_direct_grounds
+	if use_unit_currents
+		source_map[findall(!iszero, source_map)] .= 1
+	end
+	if use_direct_grounds
+		ground_map[findall(!iszero, ground_map)] .= Inf
+	end
 
     source_map, ground_map
 end
@@ -468,7 +478,7 @@ function load_raster_data(T, V, cfg)::RasterData{T,V}
     if is_advanced
         source_map, ground_map =
         read_source_and_ground_maps(T, V, source_file, ground_file,
-                                    hbmeta, ground_is_res)
+                                    hbmeta, ground_is_res, cfg)
     else
         source_map, ground_map = Matrix{T}(undef,0,0), Matrix{T}(undef,0,0)
     end

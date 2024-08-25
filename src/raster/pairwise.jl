@@ -6,8 +6,6 @@ struct RasterFlags
     is_alltoone::Bool
     grnd_file_is_res::Bool
     policy::Symbol
-	use_unit_currents::Bool
-	use_direct_grounds::Bool
     four_neighbors::Bool
     avg_res::Bool
     solver::String
@@ -46,8 +44,6 @@ function get_raster_flags(cfg)
     ground_file_is_resistances =
         cfg["ground_file_is_resistances"] in TRUELIST
     policy = Symbol(cfg["remove_src_or_gnd"])
-	use_unit_currents = cfg["use_unit_currents"] in TRUELIST
-	use_direct_grounds = cfg["use_direct_grounds"] in TRUELIST
 
     # Output Flags
     o = get_output_flags(cfg)
@@ -55,7 +51,6 @@ function get_raster_flags(cfg)
     RasterFlags(is_raster, is_pairwise, is_advanced,
                 is_onetoall, is_alltoone,
                 ground_file_is_resistances, policy,
-				use_unit_currents, use_direct_grounds,
                 four_neighbors, avg_res, solver, o)
 end
 
