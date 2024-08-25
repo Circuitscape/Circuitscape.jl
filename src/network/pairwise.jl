@@ -20,11 +20,6 @@ function network_pairwise(T, V, cfg)::Matrix{T}
 		cum_node_curr = collect(graphdata.cum.cum_node_curr[1])
 		cum_branch_curr = collect(graphdata.cum.cum_branch_curr[1])
 		for i = 2:nprocs()
-			display(cum_node_curr)
-			println()
-			display(graphdata.cum.cum_node_curr[i])
-			# cum_node_curr .+= graphdata.cum.cum_node_curr[i][:,2]
-			# cum_branch_curr .+= graphdata.cum.cum_branch_curr[i][:,3]
 			cum_node_curr .+= graphdata.cum.cum_node_curr[i]
 			cum_branch_curr .+= graphdata.cum.cum_branch_curr[i]
 		end
