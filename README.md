@@ -1,5 +1,6 @@
 # Circuitscape
 
+[![Documentation](https://img.shields.io/badge/docs-stable-blue.svg)](https://docs.circuitscape.org/Circuitscape.jl/latest/)
 [![Build Status](https://github.com/Circuitscape/Circuitscape.jl/workflows/CI/badge.svg)](https://github.com/Circuitscape/Circuitscape.jl/actions?query=workflow%3ACI) 
 [![codecov.io](http://codecov.io/github/Circuitscape/Circuitscape.jl/coverage.svg?branch=master)](http://codecov.io/github/Circuitscape/Circuitscape.jl?branch=master)
 
