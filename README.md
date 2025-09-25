@@ -1,9 +1,7 @@
 # Circuitscape
 
 
-| **Documentation** | **Chat** | **Build Status**|
-|:-----------------------------------------------------:|:------------------------------------:|:-----------:|
-(https://badges.gitter.im/Circuitscape/Circuitscape.jl.png)](https://gitter.im/Circuitscape/Circuitscape.jl) | [![Build Status](https://github.com/Circuitscape/Circuitscape.jl/workflows/CI/badge.svg)](https://github.com/Circuitscape/Circuitscape.jl/actions?query=workflow%3ACI) [![codecov.io](http://codecov.io/github/Circuitscape/Circuitscape.jl/coverage.svg?branch=master)](http://codecov.io/github/Circuitscape/Circuitscape.jl?branch=master) |
+(https://badges.gitter.im/Circuitscape/Circuitscape.jl.png)](https://gitter.im/Circuitscape/Circuitscape.jl)[![Build Status](https://github.com/Circuitscape/Circuitscape.jl/workflows/CI/badge.svg)](https://github.com/Circuitscape/Circuitscape.jl/actions?query=workflow%3ACI) [![codecov.io](http://codecov.io/github/Circuitscape/Circuitscape.jl/coverage.svg?branch=master)](http://codecov.io/github/Circuitscape/Circuitscape.jl?branch=master)
 
 > [!NOTE]  
 > Please note that to run the latest version of Circuitscape.jl, you need to install [Julia v1.11](https://julialang.org/downloads/) or up. 
