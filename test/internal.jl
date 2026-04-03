@@ -211,3 +211,11 @@ end
 # Users with dots in their names - issue #181
 # Just check that this does not break
 #compute("input/raster/extra.one/1/oneToAllVerify1.ini")
+
+# Issue 158: cumulative current map should not be produced when write_cur_maps=False
+let
+    cum_file = "output/sgVerify12_cum_curmap.asc"
+    isfile(cum_file) && rm(cum_file)
+    compute("input/raster/pairwise/12/sgVerify12.ini")
+    @test !isfile(cum_file)
+end
