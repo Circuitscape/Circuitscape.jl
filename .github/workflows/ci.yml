@@ -61,7 +61,14 @@ jobs:
             using Documenter: doctest
             using Circuitscape
             doctest(Circuitscape)'
-      - run: julia --project=docs docs/make.jl
+      - name: Install PDF dependencies
+        run: pip install Pygments
+      - name: Build PDF
+        run: julia --project=docs docs/make_pdf.jl
+      - name: Build and deploy HTML docs
+        run: |
+          cp docs/build/Circuitscape.jl.pdf docs/src/assets/
+          julia --project=docs docs/make.jl
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}

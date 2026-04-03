@@ -15,16 +15,17 @@ More detail about the underlying model, its parameterization, and potential appl
 in ecology, evolution, and conservation planning can be found in McRae (2006) and 
 McRae et al. (2008).
 
-More detail about implementation can be found in the 
-[Circuitscape In Julia paper](https://proceedings.juliacon.org/papers/10.21105/jcon.00058). 
+More detail about implementation can be found in the
+[Circuitscape In Julia paper](https://proceedings.juliacon.org/papers/10.21105/jcon.00058).
 
+A [PDF version](assets/Circuitscape.jl.pdf) of this documentation is also available.
 
 # Quick Start Guide
 
-This is a quick start guide. If you're looking for basics on how to use Circuitscape, 
-refer to the usage guide. 
+This is a quick start guide. If you're looking for basics on how to use Circuitscape,
+refer to the usage guide.
 
-To run Circuitscape, you need to install the [latest version]() of Julia. 
+To run Circuitscape, you need to install [Julia](https://julialang.org/downloads/).
 At the Julia prompt, install the Circuitscape package by running the following code
 
 ```julia
@@ -32,35 +33,48 @@ using Pkg
 Pkg.add("Circuitscape")
 ```
 
-You can also install Circuitscape in a 
-[local project](https://julialang.github.io/Pkg.jl/v1/environments/) as well. 
+You can also install Circuitscape in a
+[local project](https://julialang.github.io/Pkg.jl/v1/environments/) as well.
 
 ## Running a job
 
 A Circuitscape job is fully described by an INI file. This configuration file consists of
-file paths to data as well as flag values. A detailed list of fields found an in an
-INI File can be found in the Files and Flags section. Examples can be found in the 
+file paths to data as well as flag values. A detailed list of all INI arguments can be
+found in the [Inputs, Outputs and Options](options.md) section. Examples can be found in the
 [test folder](https://github.com/Circuitscape/Circuitscape.jl/tree/master/test/input). You
-can also use a builtin UI to build Circuitscape jobs. For more on that, skip ahead to 
-Building a Circuitscape Job. 
+can also use a built-in terminal UI to build Circuitscape jobs. For more on that, skip
+ahead to Building a Circuitscape Job.
 
-If you do have your INI file handy, you can run the job by: 
+If you do have your INI file handy, you can run the job by:
 ```julia
+using Circuitscape
 compute("myjob.ini")
 ```
+
+You can also run Circuitscape programmatically by passing a configuration dictionary:
+```julia
+using Circuitscape
+cfg = Circuitscape.init_config()
+cfg["habitat_file"] = "resistance_map.asc"
+cfg["point_file"] = "focal_nodes.asc"
+cfg["scenario"] = "pairwise"
+cfg["output_file"] = "output/results.out"
+compute(cfg)
+```
+
 ## Building a Circuitscape Job
 
-![](https://raw.githubusercontent.com/Circuitscape/www.circuitscape.org/RA/inibuilder/assets/inibuilder.gif)
+![](assets/inibuilder.png)
 
 The builder is kicked off by calling the `start()` function from the Julia prompt. It will
 build an INI file for you step by step, and either run the job directly or write the
-final INI file to a specified location. You can exit the builder at any time by hitting 
-Cntrl+C. 
+final INI file to a specified location. You can exit the builder at any time by hitting
+Ctrl+C.
 
-Please note that this version of Circuitscape **does not** come with a GUI. 
+Please note that this version of Circuitscape **does not** come with a GUI.
 
-You can, as a fallback, manually write your own INI file by copying and pasting an example 
-from the [test folder]() and change values as needed.
+You can also manually write your own INI file by copying and pasting an example
+from the [test folder](https://github.com/Circuitscape/Circuitscape.jl/tree/master/test/input) and changing values as needed.
 
 ## Citing Circuitscape
 
@@ -81,18 +95,15 @@ Please use the following to cite Circuitscape:
 }
 ```
 
-## What is new with Circuitscape?
+## Circuitscape.jl vs Circuitscape 4 (Python)
 
-The new Circuitscape is built entirely in the Julia language, a new
-programming language for technical computing. Julia is built from the
-ground up to be [fast](http://julialang.org/benchmarks). As such, this offers a
-number of advantages over the previous version, and these are detailed below.
+Circuitscape.jl is built entirely in the Julia language, offering significant
+performance advantages over the previous Python version (v4.0.5).
 
 ### Faster and More Scalable
 
-We benchmarked `Circuitscape.jl` (v0.1.0) with the Python version (v4.0.5) to obtain the
-following results. We started up Circuitscape with 16 parallel processes,
-and used benchmark problems from the standard Circuitscape
+We benchmarked `Circuitscape.jl` with the Python version (v4.0.5) using
+16 parallel processes and benchmark problems from the standard Circuitscape
 [benchmark suite.](https://github.com/Circuitscape/BigTests)
 
 ```@raw html
@@ -105,13 +116,13 @@ These benchmarks were run on a Linux (Ubuntu) server machine with the following 
 * Number of cores: 20
 * RAM: 384 GB
 
-From the benchmark, we see that the new version is upto *4x faster*
+From the benchmark, Circuitscape.jl is up to *4x faster*
 on 16 processes. However, the best performing bar in the chart is
-_Julia-CHOLMOD_, which is a new feature introduced.
+_Julia-CHOLMOD_, which uses a direct solver.
 
-### New Solver Mode - CHOLMOD
+### CHOLMOD Solver
 
-Julia-CHOLMOD is a new solver mode used in the new Circuitscape. It performs a [cholesky
+The CHOLMOD solver performs a [Cholesky
 decomposition](https://en.wikipedia.org/wiki/Cholesky_decomposition) on the graph
 constructed, and performs a batched back substitution
 to compute the voltages. It plugs into the
@@ -119,33 +130,28 @@ to compute the voltages. It plugs into the
 which is part of the SuiteSparse collection of high performance sparse
 matrix algorithms.
 
-To use the this new mode, include a line in your Circuitscape
+To use this mode, include a line in your Circuitscape
 INI file:
 ```
 solver = cholmod
 ```
 
-The cholesky decomposition is a direct solver method, unlike the algebraic
-multigrid method used by default in both the old and the new version.
-The advantage with this new direct method is that it can be much faster than
-the iterative solution, within a particular problem size.
+The Cholesky decomposition is a direct solver method, unlike the algebraic
+multigrid method used by default.
+The advantage is that it can be much faster than
+the iterative solution for smaller problem sizes.
 
-*Word of caution*: The cholesky decomposition is not practical
-to use beyond a certain problem size because of phenomenon called
+*Word of caution*: The Cholesky decomposition is not practical
+to use beyond a certain problem size because of a phenomenon called
 [fill-in](https://algowiki-project.org/en/Cholesky_method#Reordering_to_reduce_the_number_of_fill-in_elements), which results in loss of sparsity and large memory consumption.
 
-### Parallel, everywhere
+### Parallel on All Platforms
 
-The old Circuitscape had limited support for parallelism, which worked on Mac and
-Linux, but didn't work on Windows.
-
-Julia as a programming language is built from the ground up to be parallel,
-and as a result the new Circuitscape natively supports parallelism on all three
-platforms.
+Circuitscape.jl natively supports parallelism on Linux, macOS, and Windows.
 
 ### Single Precision (Experimental)
 
-The new Circuitscape introduces the ability to run problems in
+Circuitscape.jl supports running problems in
 single precision as opposed to the standard double precision.
 
 Single precision usually takes much less memory, but trades off
