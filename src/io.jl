@@ -452,6 +452,10 @@ function load_raster_data(T, V, cfg)::RasterData{T,V}
     # Read cell map
     cellmap, hbmeta = read_cellmap(hab_file, hab_is_res, T)
     c = count(x -> x > 0, cellmap)
+    ncells = length(cellmap)
+    if ncells > 5_000_000 && cfg["solver"] in CHOLMOD
+        cswarn("The landscape has $(ncells) cells and the CHOLMOD solver is selected. CHOLMOD is a sparse direct solver that consumes a lot of memory on large grids. Consider using solver = cg+amg instead.")
+    end
     csinfo("Resistance/Conductance map has $c nodes", cfg["suppress_messages"] in TRUELIST)
 
     # Read polymap
