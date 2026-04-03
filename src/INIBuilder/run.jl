@@ -67,8 +67,9 @@ function step4()
         path = n == 2 ? manualfilepicker() : filepicker()
         cfg["source_file"] = path
         println()
-        println("Step 4b: Enter path to ground file") 
-        n = ["PREVIOUS STEP", "Enter path manually", "Use filepicker"]
+        println("Step 4b: Enter path to ground file")
+        opt = ["PREVIOUS STEP", "Enter path manually", "Use filepicker"]
+        n = request(RadioMenu(opt))
         n == 1 && step3()
         path = n == 2 ? manualfilepicker() : filepicker()
         cfg["ground_file"] = path
