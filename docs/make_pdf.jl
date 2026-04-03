@@ -3,6 +3,7 @@ using Circuitscape, Documenter, tectonic_jll
 makedocs(
     sitename = "Circuitscape.jl",
     format = Documenter.LaTeX(platform = "tectonic", tectonic = tectonic_jll.tectonic()),
+    warnonly = [:cross_references],
     pages = ["Home" => "index.md",
              "User Guide" => "usage.md",
              "Inputs, Outputs and Options" => "options.md",
