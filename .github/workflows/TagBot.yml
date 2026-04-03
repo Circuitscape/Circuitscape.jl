@@ -6,7 +6,8 @@ on:
   workflow_dispatch:
     inputs:
       lookback:
-        default: 3
+        description: "[DEPRECATED] No longer has any effect"
+        default: "3"
 permissions:
   actions: read
   checks: read
