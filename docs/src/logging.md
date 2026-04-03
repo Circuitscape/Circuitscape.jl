@@ -1,13 +1,32 @@
-### The Log Window
+# Logging Options
 
-To disable all logging, write the following code: 
+## Disabling Log Output
+
+To disable all informational log messages, use Julia's built-in logging system:
+
 ```julia
 using Logging
 Logging.disable_logging(Logging.Info)
 ```
-This disables logging on a global level. If you 
-want to enable logging again, run
+
+This disables logging at a global level. To re-enable logging:
 
 ```julia
-Base.CoreLogging._min_enabled_level = Logging.LogLevel(0)
+Logging.disable_logging(Logging.Debug)
 ```
+
+## Logging to File
+
+Set `log_file` in your INI file to a file path to write log messages to a file:
+
+```
+log_file = /path/to/logfile.log
+```
+
+## Suppressing Messages
+
+Set `suppress_messages = True` in your INI file to suppress informational messages during computation. Warnings will still be displayed.
+
+## Log Level
+
+Set `log_level` in your INI file to control verbosity: `DEBUG`, `INFO` (default), `WARNING`, or `CRITICAL`.

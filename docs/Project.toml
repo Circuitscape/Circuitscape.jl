@@ -1,2 +1,7 @@
 [deps]
+Circuitscape = "2b7a1792-8151-5239-925d-e2b8fdfa3201"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+tectonic_jll = "d7dd28d6-a5e6-559c-9131-7eb760cdacc5"
+
+[compat]
+Documenter = "1"

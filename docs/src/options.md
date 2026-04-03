@@ -115,140 +115,121 @@ All Circuitscape configuration is done through an `.ini` file. Below is a comple
 
 ---
 
-To start the user interface using Windows, run Circuitscape as you would any other installed program. In Mac OS X, double-click on Circuitscape.app. The user interface shown in the Introduction section above will appear. You can also call Circuitscape from the Circuitscape for ArcGIS Toolbox, available from the Circuitscape website, or from the command line.
+## Data Type
 
-## Step 1: Choose your input data type
+Set `data_type` to `raster` or `network` to choose whether you will be analyzing raster grid or network data.
 
-The first step is to choose whether you will be analyzing network or raster data.
+## Modeling Mode
 
-## Step 2: Choose a modeling mode
+Circuitscape is run in one of four modes (set via `scenario`). Pairwise and advanced modes are available for both raster and network data types. The one-to-all and all-to-one modes are available for raster data only.
 
-As described above, Circuitscape is run in one of four modes. Pairwise and advanced modes are available for both raster and network data types. The one-to-all and all-to-one modes are available for raster data only.
+## Resistance Map or Network/Graph
 
-## Raster resistance map or network/graph
+The resistance file (`habitat_file`) specifies the ability of each cell in a landscape or link in a network to carry current. File formats are described in the _Input file formats_ section below.
 
-The resistance file specifies the ability of each cell in a landscape or link in a network to carry current (See Figs. 5 and 8). File formats are described in the _Input file formats_ section below.
+Most users code their data in terms of resistances (with higher values denoting greater resistance to movement). Set `habitat_map_is_resistances = False` to specify conductances instead (conductance is the reciprocal of resistance; higher values indicate greater ease of movement).
 
-### Data represent conductances instead of resistances
+Zero and infinite values for conductances and resistances represent special cases. Infinite resistances are coded as NODATA values in input resistance grids, or as zero or NODATA in input conductance grids; these are treated as complete barriers and are disconnected from all other cells. For raster analyses, cells with zero resistance (infinite conductance) can be specified using a separate short-circuit region file as described below.
 
-Most users code their network or raster data in terms of resistances (with higher values denoting greater resistance to movement), which is common in connectivity modeling. Check this box if you want to specify conductances instead (conductance is the reciprocal of resistance; higher values indicate greater ease of movement).
+## Focal Nodes (Pairwise, One-to-All, and All-to-One Modes)
 
-Note that zero and infinite values for conductances and resistances represent special cases. Infinite resistances are coded as NODATA values (see file format description in the _Input file formats_ section below) in input resistance grids, or as zero or NODATA in input conductance grids; these are treated as complete barriers, and are disconnected from all other cells. For raster analyses, cells with zero resistance (infinite conductance) can be specified using a separate short-circuit region file as described below.
+The focal node file (`point_file`) specifies locations of nodes between which effective resistance and current flow are to be calculated. **Each focal node should have a unique positive integer ID.** Files may be text lists specifying coordinates or raster grids. When a grid is used, it must have the same cell size and extent as the resistance grid. Cells that do not contain focal nodes should be coded with NODATA values.
 
-## Pairwise, one-to-all, and all-to-one mode options
+For raster analyses, focal nodes may occur at points (single cells on the resistance grid) or across regions. For the latter, a single ID would occupy more than one cell in a grid or more than one pair of coordinates in a text list (and falling within more than one cell in the underlying resistance grid). Cells within a single region are collapsed into a single node. The difference from short-circuit regions is that a focal region will be "burned in" to the resistance grid only for pairwise calculations that include that focal node. Focal regions need not be contiguous. For large grids, focal regions may require more computation time. When calculating resistances on large raster grids and not creating voltage or current maps, focal points will run much more quickly.
 
-### Focal node location and data type
+### Parallelism
 
-This file specifies locations of nodes between which effective resistance and current flow are to be calculated (See Figs. 6 and 9). **Each focal node should have a unique positive integer ID.** Files may be text lists specifying coordinates or appropriate raster grid formats. When a grid is used, it must have the same cell size and extent as the resistance grid. The value stored in each grid cell location refers to the focal node ID. Cells that do not contain focal nodes should be coded with NODATA values. When a text list is used, the value field references the focal node ID.
+Circuitscape can run iterations in parallel for pairwise mode when focal points (not focal regions) are used. Set `parallelize = True` and `max_parallel` to the desired number of processes.
 
-For raster analyses, focal nodes may occur at points (single cells on the resistance grid) or across regions (Fig. 8). For the latter, a single ID would occupymore than one cell in a grid or more than one pair of coordinates in a text list (and falling within more than one cell in the underlying resistance grid). Cells within a single region would then be collapsed into a single node, as they are when short-circuit region files are used (see below). The difference is that a focal region will be "burned in" to the resistance grid only for pairwise calculations that include that focal node. As with short-circuit regions, focal regions need not be made up of contiguous cells. For large grids or large numbers of focal nodes, focal regions may require more computation time. When calculating resistances on large raster grids and not creating voltage or current maps, focal points will run much more quickly.
+## Advanced Mode Options
 
-### Number of parallel processors to use
+### Current Source File
 
-On Mac OS X and Linux systems, Circuitscape can run iterations in parallel for pairwise mode when focal points, not focal regions, are used. Choose how many processors you would like to devote to Circuitscape runs.
+The source file (`source_file`) specifies locations and strengths, in amps, of current sources. Either a raster or a text list may be used. Rasters must have the same cell size, projection, and extent as the resistance grid, and cells that do not contain current sources should be coded with NODATA values. Current sources may be positive or negative (i.e., they may inject current into the grid or pull current out). Similarly, grounds may either serve as a sink for current or may contribute current if there are negative current sources in the grid.
 
-## Advanced mode options
+### Ground Point File
 
-### Current source file
+The ground file (`ground_file`) specifies locations of ground nodes and resistances or conductances of resistors tying them to ground. Either a raster or a text list may be used. Rasters must have the same cell size, projection, and extent as the resistance grid, and cells that do not contain grounds should be coded with NODATA values. If a direct (R = 0) ground connection conflicts with a current source, the ground will be removed unless `remove_src_or_gnd` is set to `rmvgnd` or `keepall`.
 
-This file specifies locations and strengths, in amps, of current sources (Figs. 7 and 11). Either a raster or a text list may be used. Rasters must have the same cell size, projection, and extent as the resistance grid, and cells that do not contain current sources should be coded with NODATA values. Note: current sources may be positive or negative (i.e., they may inject current into the grid or pull current out. Similarly, grounds may either serve as a sink for current or may contribute current if there are negative current sources in the grid).
+Set `ground_file_is_resistances = False` if your ground point file specifies connections to ground in terms of conductance instead. To tie cells directly to ground, keep `ground_file_is_resistances = True` and set values in the ground point file to zero.
 
-### Ground point file
+### Unit Currents and Direct Grounds
 
-This file specifies locations of ground nodes and resistances or conductances of resistors tying them to ground (Figs. 7 and 11). Either a raster or a text list may be used. Rasters must have the same cell size, projection, and extent as the resistance grid, and cells that do not contain grounds should be coded with NODATA values. Note that if a direct (R = 0) ground connection conflicts with a current source, the ground will be removed unless the 'remove source' option in the Options Window is chosen.
+Set `use_unit_currents = True` to force all current sources to 1 Amp, regardless of the value specified in the source file. Set `use_direct_grounds = True` to tie all ground nodes directly to ground (R=0) regardless of the ground file values.
 
-### Data represent conductances instead of resistances to ground
+### Source/Ground Conflicts
 
-The default (unchecked) setting is to specify resistances to ground. Checking this box means that your ground point file specifies connections to ground in terms of conductance instead. To tie cells directly to ground, use resistances as the data type and set values in the corresponding ground point file to zero.
+When a cell is connected both to a current source and to ground, `remove_src_or_gnd` determines the behavior: `keepall` (default), `rmvsrc`, `rmvgnd`, or `rmvall`. When using `keepall`, if a source is tied directly to ground (zero resistance), the ground connection will be removed.
 
-## Output options
+## Output Options
 
-### Base output filename
+### Current Maps
 
-Choose a directory path and base file name for output files. Resistances, current maps, voltage maps, and configuration files (which save user interface settings and have a .ini extension) will all use this base name, along with appropriate suffixes and extensions.
+When `write_cur_maps = True`, current maps will be generated for every pair of focal nodes in pairwise mode, or for the source/ground configuration in advanced mode. Current maps have the same dimension as the input files, with values at each cell representing the amount of current flowing through the node. In pairwise mode, a current map file will be created for each focal node pair, and a cumulative (additive) map will also be written. (Note that for a given pair of focal nodes, current maps are identical regardless of which node is the source and which is the ground due to symmetry.) For advanced mode, a single map will be written. Such maps can be used to identify areas which contribute most to connectivity between focal points (McRae et al. 2008).
 
-### Create current maps
+![](assets/image24.png)
 
-When checked, current maps will be generated for every pair of focal nodes in the pairwise mode, or for the current source and ground configuration specified in the advanced mode. Current maps have the same dimension as the original input files, with values at each node (cell) representing the amount of current flowing through the node. In the pairwise mode, a current map file will be created for each focal node pair, and a cumulative (additive) file will be also written. (Note that for a given pair of focal nodes, current maps are identical regardless of which node is the source and which is the ground due to symmetry). For the advanced modeling mode, a single map will be written showing current densities at each cell resulting from the current source and ground configurations in the input files. These files can be displayed in a GIS as in Fig. 13\. Such maps can be used to identify areas which contribute most to connectivity between focal points (McRae et al. 2008).
+**Fig. 1.** Current map used to predict important connectivity areas between core habitat patches (green polygons, entered as focal regions) for mountain lions. Warmer colors indicate areas with higher current density. "Pinch points," or areas where connectivity is most tenuous, are shown in yellow. Research Collaborators: Brett Dickson and Rick Hopkins, Live Oak Associates.
 
-![](https://raw.github.com/Circuitscape/Circuitscape/master/docs/4.0/images/image24.png)
+### Voltage Maps
 
-**Fig. 1.** Current map used to predict important connectivity areas between core habitat patches (green polygons, entered as focal regions) for mountain lions. Warmer colors indicate areas with higher current density. "Pinch points," or areas where connectivity is most tenuous, are shown in yellow. Quantile classification schemes or "histogram equalize" stretches tend to work well for current maps when using ArcGIS. Research Collaborators: Brett Dickson and Rick Hopkins, Live Oak Associates.
+When `write_volt_maps = True`, voltage maps are written. In pairwise mode, these give node voltages observed for each focal node pair if one node were connected to a 1 amp current source and the other to ground. In advanced mode, voltage maps show voltages resulting from the source and ground configurations.
 
-### Create voltage maps
+## Calculation Options
 
-For the pairwise modeling mode, voltage maps give node voltages that would be observed for each focal node pair if one node were connected to a 1 amp current source and the other to ground. For the advanced modeling mode, voltage maps show voltages at each cell resulting from the current source and ground configurations in the input files.
+### Cell Connectivity
 
-### Calculation Options
+For raster operations, Circuitscape creates a graph by connecting cells to their neighbors. Set `connect_four_neighbors_only = True` for 4 cardinal neighbors only (default is 8, including diagonals).
 
-#### Connect raster cells to FOUR neighbors instead of EIGHT
+### Average Resistance vs Conductance
 
-For raster operations, Circuitscape creates a graph (network) by connecting cells to their four (Fig. 4) or eight immediate neighbors. The default is eight (four cardinal and four diagonal neighbors), but check this box if you want to connect cells to their four cardinal neighbors only.
+Set `connect_using_avg_resistances = True` to connect cells by their average resistance instead of average conductance (the default).
 
-#### Use average conductance instead of resistance for connections between cells
+The distinction is particularly important when connecting cells with zero or infinite values. When average resistances are used, first-order neighbors are connected by resistors with resistance: _Rab_ = (_Ra_ + _Rb_) / 2, and second-order (diagonal) neighbors by: _Rab_ = sqrt(2) * (_Ra_ + _Rb_) / 2. When average conductances are used, first-order neighbors are connected by: _Gab_ = (_Ga_ + _Gb_) / 2, and second-order (diagonal) neighbors by: _Gab_ = (_Ga_ + _Gb_) / (2 * sqrt(2)).
 
-For raster operations, this choice determines whether cells are connected by their average resistance or by their average conductance. Most users will want the default (unchecked).
+## Mapping Options
 
-The distinction is particularly important when connecting cells with zero or infinite values. When average resistances are used, first-order neighbors connected by resistors with resistance given by: _Rab_ = (_Ra_ + _Rb_) / 2, and second-order (diagonal) neighbors are connected by resistors with resistance given by: _Rab_ = sqrt(2) * (_Ra_ + _Rb_) / 2, where _Ra_ and _Rb_ are the resistances of the neighboring cells. When average conductances are used, first-order neighbors connected by resistors with conductance (the reciprocal of resistance) given by: _Gab_ = (_Ga_ + _Gb_) / 2, and second-order (diagonal) neighbors are connected by resistors with resistance given by: _Gab_ = (_Ga_ + _Gb_) / (2 * sqrt(2)), where _Ga_ and _Gb_ are the conductances of the neighboring cells. (As noted above, resistance and conductance are reciprocals of each other, i.e., _Gab_ = 1 / _Rab_.)
+### Maximum Current Maps
 
-#### Advanced mode: use unit currents (i=1) for all current sources
+In pairwise, one-to-all, and all-to-one modes, current maps are created for every iteration. By default, Circuitscape writes a cumulative map showing the sum of values at each node or grid cell across all iterations. Set `write_max_cur_maps = True` to also write a map showing the maximum current value at each cell across iterations.
 
-All current sources will be set to 1 Amp, regardless of the value specified in the current source input file.
+### Cumulative Maps Only
 
-#### Advanced mode: use direct connections to ground (R=0) for all ground points
+Set `write_cum_cur_map_only = True` to calculate current maps for each iteration but only write the cumulative (and optionally maximum) map to disk. This saves disk space when many iterations are performed.
 
-All ground cells will be tied directly to ground, regardless of the value specified in the input ground file.
+### Compress Output Grids
 
-#### Advanced mode: when a source and ground are at the same node:
+Set `compress_grids = True` to compress output ASCII grids using gzip. This can be useful when many large maps will be written.
 
-Whenever a cell is connected both to a current source and to ground, this choice will determine whether the source is removed, the ground is removed, both are removed, or both are retained. For the latter, if a source is tied directly to ground (i.e., with zero resistance), the ground connection will be removed.
+### Log-Transform Current Maps
 
-### Mapping Options
+Set `log_transform_maps = True` to apply a log10 transform to current densities in output maps. Cells with zero current will be set to NODATA values.
 
-#### Write maximum of current maps
+### Set Focal Node Currents to Zero
 
-In pairwise, one-to-all, and all-to-one modes, current maps are created for every iteration. By default, Circuitscape will also write a cumulative map showing the sum of values at each node or grid cell across all iterations. If this option is checked, an an extra map that shows the maximum current value at each node or cell across iterations.
+When `set_focal_node_currents_to_zero = True`, focal nodes will have zero current in output maps when they are activated. For pairwise mode, cumulative maps will still show currents flowing through focal regions from other pairs being activated. This helps show the importance of each focal region for connecting others (see Dickson et al. 2013). *Note: not yet implemented in Circuitscape 5.*
 
-#### Write cumulative & max current maps only
+## Optional Input Files
 
-Maps of current flow between each pair of focal nodes (or for each focal node in one-to-all and all-to-one modes) will be calculated, but only one summed map of current from all calculations (and a map of maximum values if that option is checked) will be written to disk.
+### Mask File
 
-#### Compress output grids
+Set `use_mask = True` and provide `mask_file` to apply a raster mask. Cells with negative, zero, or NODATA values in the mask will be dropped from the resistance map (treated as complete barriers). Positive integer cells will be retained. File should only contain integers and be in raster format.
 
-Output ASCII grids are automatically compressed using the gzip file format. This can be useful when many large maps will be written.
+### Short-Circuit Region Map
 
-#### Log-transform current maps
+Set `use_polygons = True` and provide `polygon_file` to load short-circuit regions. These act as areas of zero resistance, providing patches through which current gets a "free ride." Each region should have a unique positive integer identifier; cells within each region are merged into a single node, including non-adjacent cells (regions need not be contiguous). Non-region areas should be stored as NODATA values. The file must have the same cell size and extent as the resistance grid.
 
-Values in output current maps will reflect a log10 transform of current densities, which can be useful for visualizing them in some GIS packages (e.g., ArcView 3.X). Cells with zero current will be re-coded with NODATA values.
+### Variable Source Strengths
 
-#### Set focal node currents to zero
+In one-to-all and all-to-one modes, set `use_variable_source_strengths = True` and provide `variable_source_file` with focal node IDs and corresponding source strengths. The file should be a text list with two columns (ID followed by source strength). All nodes not in the list will default to 1 Amp.
 
-When running raster data in pairwise, all-to-one, and one-to all modes, focal nodes will have zero current in output maps when they are activated. For pairwise mode, cumulative maps will still show currents flowing through focal regions that results from other pairs being activated. This helps to show current flowing through a focal region as it moves between other focal regions in cumulative current maps. This current passing through a focal region can give an idea of the importance of the focal region for connecting other focal region pairs (for an example, see Fig. 5 in Dickson et al. 2013).
+### Include/Exclude Focal Node Pairs
 
-### Optional Input Files
+Set `use_included_pairs = True` and provide `included_pairs_file` to restrict calculations to a subset of focal node pairs. Users can either identify pairs to include or pairs to exclude, as specified in the first line of the file. This affects all modes except advanced mode. Files should be in tab-delimited text with a .txt extension.
 
-#### Read raster mask file
+## Input Raster Format
 
-When checked, a dialog will open to select a raster mask file. Cells with negative, zero, or NODATA values in the mask will be dropped from the corresponding resistance map (i.e., treated as complete barriers). Positive integer cells will be retained. File should only contain integers and be in raster format.
-
-#### Load a raster short-circuit region map
-
-Short-circuit regions act as areas of zero resistance, essentially providing patches through which current is given a "free ride" as it flows across the landscape. Each short-circuit region should have a unique positive integer identifier; cells within each region are merged into a single node with all other cells in the region, including non-adjacent cells (i.e., regions need not be contiguous). Non-short-circuit-region areas should be stored as NODATA values. The file must have the same cell size and extent as the resistance grid.
-
-#### One-to-all and All-to-One modes: Read source strength file
-
-When checked, a dialog will open to select a text list of focal node IDs and corresponding source strengths. For any focal node in this list, the amount of current injected into that node when it is a source node will be set to the strength specified in the list. All nodes not in the list will default to 1 Amp. This should be in the same file format as the Text List File Format given below, but with two columns (ID followed by source strength). File should have a .txt extension.
-
-#### Read file with focal node pairs to include/exclude
-
-This option allows users to only perform calculations on a subset of focal node pairs. Users can either identify pairs to include in calculations, or pairs to exclude, as specified in the first line of the file.
-
-This affects all modes except the Advanced Mode. Files should be in tab-delimited text with a .txt extension. See formatting information in the _Input file formats_ section below.
-
-
-## Input raster format
-
-Raster input maps should be stored in Arc/Info ASCII grid of GeoTIFF format, as exported by standard GIS packages. For focal nodes, the value stored in each grid location refers to the focal node ID, and a single ID can occupy more than one cell (IDs must be positive integers). For current sources, the grid value specifies the source strength in amps. For grounds, the grid value specifies either the resistance or conductance of the resistor tying each ground node to ground, as specified in the Options window.
+Raster input maps should be stored in Arc/Info ASCII grid or GeoTIFF format, as exported by standard GIS packages. Set `write_as_tif = True` to produce GeoTIFF output instead of ASCII grids. For focal nodes, the value stored in each grid location refers to the focal node ID, and a single ID can occupy more than one cell (IDs must be positive integers). For current sources, the grid value specifies the source strength in amps. For grounds, the grid value specifies either the resistance or conductance of the resistor tying each ground node to ground.
 
 The ASCII raster format is as follows:
 
@@ -267,7 +248,7 @@ Numeric data only. Columns are delimited with tabs and rows are delimited with n
 
 **Examples**
 
-Below is a 10 x10 resistance map. Cells with infinite resistance are assigned NODATA values (-9999):
+Below is a 10 x 10 resistance map. Cells with infinite resistance are assigned NODATA values (-9999):
 
     ncols         10
     nrows         10
@@ -286,7 +267,7 @@ Below is a 10 x10 resistance map. Cells with infinite resistance are assigned NO
     -9999  11     12     11     10     12    167    157    181    157
     -9999  -9999  122    134    12     157   192    184    190    172
 
-Below is a 10 x 10 focal region map. Here, groups of cells have been coded as focal regions- so these will be treated as "core area polygons" to be connected in circuit analyses. All cells within each focal region will be collapsed into a single node (even the non-contiguous cell in region #1) when that region is activated in pairwise, one-to-all, or all-to-one analyses. This format is identical to the short-circuit region file format.
+Below is a 10 x 10 focal region map. Groups of cells have been coded as focal regions that will be treated as "core area polygons" to be connected in circuit analyses. All cells within each focal region will be collapsed into a single node (even the non-contiguous cell in region #1) when that region is activated in pairwise, one-to-all, or all-to-one analyses. This format is identical to the short-circuit region file format.
 
     ncols                10
     nrows                10
@@ -307,11 +288,11 @@ Below is a 10 x 10 focal region map. Here, groups of cells have been coded as fo
 
 Note that regions 1 and 2 are well-connected by a low-resistance corridor in the resistance map above. Region 3 is connected to the other two regions only if cells are connected to their eight neighbors. In the four-neighbor case, region 3 would be completely isolated.
 
-## Text list file format
+## Text List File Format
 
 For network/graph operations, resistor networks, focal nodes, current sources, and grounds should be stored as text lists (saved with a ".txt" extension). To specify a network of resistors, three columns are used. The first and second columns give the node IDs being connected by a resistor, and the third column gives the resistance value. For example, the simple circuit:
 
-![](https://raw.github.com/Circuitscape/Circuitscape/master/docs/4.0/images/SimpleNetworkWithNumbers2.png)
+![](assets/SimpleNetworkWithNumbers2.png)
 
 can be defined by the following text list:
 
@@ -346,7 +327,7 @@ To tie node 4 directly to ground (i.e. to connect it to ground with a wire that 
 
 The resulting circuit would look like this (from McRae et al. 2008):
 
-![](https://raw.github.com/Circuitscape/Circuitscape/master/docs/4.0/images/AdvancedNetwork.png)
+![](assets/AdvancedNetwork.png)
 
 For **raster** operations, you can also store focal nodes, current sources, and grounds as text lists (saved with a ".txt" extension). For each node referenced in a text list, a value and X and Y coordinates are specified as shown below.
 
@@ -362,17 +343,17 @@ Example text list (a partial list of the cell locations in the focal region map 
         1    3.5    9.5
         1    2.5    8.5
         1    3.5    8.5
-        1    2.5    7.5  
+        1    2.5    7.5
         1    3.5    7.5
         1    2.5    5.5
         2    6.5    4.5
         ...
 
-For focal nodes, the value field references the focal node ID; values must be positive integers, and a single ID can occupy more than one pair of coordinates (and more than one cell in the underlying resistance grid). For current sources, the value field references the source strength in amps. For grounds, the value field references either the resistance or conductance of the resistor tying each ground node to ground, as set in the Options window.
+For focal nodes, the value field references the focal node ID; values must be positive integers, and a single ID can occupy more than one pair of coordinates (and more than one cell in the underlying resistance grid). For current sources, the value field references the source strength in amps. For grounds, the value field references either the resistance or conductance of the resistor tying each ground node to ground.
 
-## Include/exclude file format
+## Include/Exclude File Format
 
-This file will be loaded when the 'Read file with focal node pairs to include/exclude' option is checked, and affects all modes except the advanced mode. There are two file formats that can be used. The first is the simplest, and gives a list of pairs to include in calculations, or pairs to exclude, as specified in the first line of the file. For example, if there are five focal nodes, numbered 1-5, and the following list is entered, only pairs (1,2), (1,3), and (1,5) will be analyzed:
+This file is used when `use_included_pairs = True`, and affects all modes except advanced mode. There are two file formats that can be used. The first is the simplest, and gives a list of pairs to include in calculations, or pairs to exclude, as specified in the first line of the file. For example, if there are five focal nodes, numbered 1-5, and the following list is entered, only pairs (1,2), (1,3), and (1,5) will be analyzed:
 
     mode    include
     1        2
@@ -385,15 +366,14 @@ Similarly, if the first line in the above file read:
 
 all pairs except (1,2), (1,3), and (1,5) would be analyzed.
 
-The second method uses a matrix identifying which pairs of focal nodes to connect. The file specifies minimum and maximum values in the matrix to consider a pair connected. This method can be useful when used with a distance matrix to only run analyses between points separated by a minimum distance, or by a distance equal to or less than a maximum distance. Note: any focal node not in the matrix will be dropped from analyses. Entries on the diagonal are ignored. For example, in the following matrix, only pairs with entries between 2 and 50 are connected. Pairs (1,2), (2,4), and (3,4) will not be analyzed.  
-Focal node 5 will be dropped entirely:
+The second method uses a matrix identifying which pairs of focal nodes to connect. The file specifies minimum and maximum values in the matrix to consider a pair connected. This method can be useful when used with a distance matrix to only run analyses between points separated by a minimum distance, or by a distance equal to or less than a maximum distance. Note: any focal node not in the matrix will be dropped from analyses. Entries on the diagonal are ignored. For example, in the following matrix, only pairs with entries between 2 and 50 are connected. Pairs (1,2), (2,4), and (3,4) will not be analyzed. Focal node 5 will be dropped entirely:
 
     min    2
     max    50
-    0     1     2     3     4     5    
-    1     0     100   6.67  7     1    
+    0     1     2     3     4     5
+    1     0     100   6.67  7     1
     2     100   0     11    1     60
-    3     6.67  11    0     -1    100    
+    3     6.67  11    0     -1    100
     4     7     1     -1    0     0
     5     1     60     100  0     0
 
@@ -401,36 +381,32 @@ Make sure to include a zero in the upper-left corner of the matrix.
 
 Files should be in tab-delimited text with a .txt extension.
 
-# 9\. Output files
+## Output Files
 
-## Current and voltage data
+### Current and Voltage Data
 
-Current and voltage data for networks will be written in text list formats.
+Current and voltage data for networks are written in text list formats. Raster voltage and current maps are written in ASCII raster format (or GeoTIFF if `write_as_tif = True`).
 
-When using the ArcGIS toolbox, current and voltage maps will be written in the raster format chosen by the user.
-
-When not using the ArcGIS toolbox, raster voltage and current maps are written using the ASCII raster format described above.
-
-## Resistance files
+### Resistance Files
 
 Resistance data are written in both matrix and 3-column formats.
 
 Here are pairwise resistances written to the output directory for the eight neighbor case (using per-cell resistances and average resistances for cell connection calculations). The first row and column contain the focal node IDs:
 
-      0          1            2            3  
+      0          1            2            3
       1          0            11.93688471  15.03634473
       2          11.93688471  0            11.57640568
       3          15.03634473  11.57640568  0
 
 Here are pairwise resistances written to the output directory for the four neighbor case, in which focal node 3 was completely isolated (-1 indicates infinite resistance):
 
-      0          1            2            3  
+      0          1            2            3
       1          0            33.55792693  -1
       2          33.55792693  0            -1
       3          -1           -1           0
 
 For convenience, resistances are also written to a separate file in a 3-column format, e.g.:
 
-      1      2       33.55792693           
+      1      2       33.55792693
       1      3       -1
       2      3       -1
