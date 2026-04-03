@@ -1,5 +1,120 @@
 # Options and Flags
 
+## INI Argument Reference
+
+All Circuitscape configuration is done through an `.ini` file. Below is a complete reference of all arguments, organized by section, with their types, default values, and descriptions.
+
+### Circuitscape Mode
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `data_type` | String | `raster` | Input data type. Values: `raster`, `network`. |
+| `scenario` | String | `not entered` | Modeling mode. Values: `pairwise`, `advanced`, `one-to-all`, `all-to-one`. |
+
+### Habitat Raster or Graph
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `habitat_file` | Path | — | Path to the resistance/conductance map file (raster or network). |
+| `habitat_map_is_resistances` | Boolean | `True` | If `True`, habitat map values are resistances. If `False`, values are conductances. |
+
+### Connection Scheme for Raster Habitat Data
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `connect_four_neighbors_only` | Boolean | `False` | If `True`, connect each cell to 4 cardinal neighbors only. If `False`, connect to all 8 neighbors. |
+| `connect_using_avg_resistances` | Boolean | `False` | If `True`, use average resistance for cell connections. If `False`, use average conductance. |
+
+### Short-Circuit Regions (Polygons)
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `use_polygons` | Boolean | `False` | If `True`, read a short-circuit region file. Cells within each region are collapsed into a single node with zero resistance. |
+| `polygon_file` | Path | — | Path to the short-circuit region map. Must have the same cell size and extent as the resistance grid. |
+
+### Options for Advanced Mode
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `source_file` | Path | — | Path to the current source file (raster or text list). Values specify source strength in amps. |
+| `ground_file` | Path | — | Path to the ground point file (raster or text list). Values specify resistance or conductance to ground. |
+| `ground_file_is_resistances` | Boolean | `True` | If `True`, ground file values are resistances. If `False`, conductances. Set to `False` with value 0 to connect directly to ground. |
+| `use_unit_currents` | Boolean | `False` | If `True`, all current sources are set to 1 Amp regardless of values in the source file. |
+| `use_direct_grounds` | Boolean | `False` | If `True`, all ground nodes are tied directly to ground (R=0) regardless of values in the ground file. |
+| `remove_src_or_gnd` | String | `keepall` | When a source and ground are at the same node: `keepall`, `rmvsrc`, `rmvgnd`, or `rmvall`. |
+
+### Options for Pairwise, One-to-All, and All-to-One Modes
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `point_file` | Path | — | Path to focal node file (raster or text list). Each focal node must have a unique positive integer ID. |
+| `use_included_pairs` | Boolean | `False` | If `True`, only run calculations on a subset of focal node pairs specified in the included pairs file. |
+| `included_pairs_file` | Path | — | Path to file specifying pairs to include or exclude from calculations. |
+
+### Options for One-to-All and All-to-One Modes
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `use_variable_source_strengths` | Boolean | `False` | If `True`, read per-node source strengths from a file instead of using 1 Amp for all. |
+| `variable_source_file` | Path | `None` | Path to text file with focal node IDs and corresponding source strengths. |
+
+### Mask File
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `use_mask` | Boolean | `False` | If `True`, apply a mask to the resistance map. Cells with negative, zero, or NODATA values in the mask are dropped. |
+| `mask_file` | Path | `None` | Path to the raster mask file. |
+
+### Output Options
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `output_file` | Path | — | Base path and filename for all output files. |
+| `write_cur_maps` | Boolean | `False` | If `True`, write current maps for each iteration and a cumulative map. |
+| `write_volt_maps` | Boolean | `False` | If `True`, write voltage maps for each iteration. |
+| `write_cum_cur_map_only` | Boolean | `False` | If `True`, calculate current maps for each iteration but only write the cumulative (summed) map to disk. |
+| `write_max_cur_maps` | Boolean | `False` | If `True`, write a map showing the maximum current value at each cell across all iterations. |
+| `set_null_currents_to_nodata` | Boolean | `False` | If `True`, set cells with zero current to NODATA in output current maps. |
+| `set_null_voltages_to_nodata` | Boolean | `False` | If `True`, set cells with zero voltage to NODATA in output voltage maps. |
+| `set_focal_node_currents_to_zero` | Boolean | `False` | If `True`, set current at focal nodes to zero in output maps. *Note: not yet implemented in Circuitscape 5.* |
+| `compress_grids` | Boolean | `False` | If `True`, compress output ASCII grids using gzip. |
+| `log_transform_maps` | Boolean | `False` | If `True`, log10-transform values in output current maps. Cells with zero current are set to NODATA. |
+| `write_as_tif` | Boolean | `False` | If `True`, write output rasters as GeoTIFF instead of ASCII grid format. |
+
+### Calculation Options
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `solver` | String | `cg+amg` | Linear solver to use. Values: `cg+amg` (iterative, recommended for large grids), `cholmod` (direct, uses more memory). |
+| `precision` | String | `Double` | Floating-point precision. Values: `Double`, `Single`. CHOLMOD requires double precision. |
+| `use_64bit_indexing` | Boolean | `True` | If `True`, use 64-bit integer indexing. Required for very large grids. |
+| `cholmod_batch_size` | Integer | `1000` | Number of pairs to solve simultaneously when using CHOLMOD in pairwise mode. |
+| `parallelize` | Boolean | `False` | If `True`, run iterations in parallel. |
+| `max_parallel` | Integer | `0` | Number of parallel workers to use. |
+| `low_memory_mode` | Boolean | `False` | If `True`, reduce memory usage at the cost of computation time. |
+| `preemptive_memory_release` | Boolean | `False` | If `True`, release memory more aggressively during computation. |
+
+### Reclassification
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `use_reclass_table` | Boolean | `False` | If `True`, reclassify resistance values using a lookup table. *Note: not yet implemented in Circuitscape 5.* |
+| `reclass_file` | Path | — | Path to file with reclassification data. |
+
+### Logging
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `log_file` | Path | `None` | Path to log file. If `None`, no file logging. |
+| `log_level` | String | `INFO` | Logging level. Values: `DEBUG`, `INFO`, `WARNING`, `CRITICAL`. |
+| `screenprint_log` | Boolean | `False` | If `True`, print log messages to the screen. |
+| `print_timings` | Boolean | `False` | If `True`, print timing information for each solve. |
+| `print_rusages` | Boolean | `False` | If `True`, print resource usage statistics. |
+| `suppress_messages` | Boolean | `False` | If `True`, suppress all informational messages. |
+| `profiler_log_file` | Path | `None` | Path to profiler log file. |
+
+---
+
 To start the user interface using Windows, run Circuitscape as you would any other installed program. In Mac OS X, double-click on Circuitscape.app. The user interface shown in the Introduction section above will appear. You can also call Circuitscape from the Circuitscape for ArcGIS Toolbox, available from the Circuitscape website, or from the command line.
 
 ## Step 1: Choose your input data type

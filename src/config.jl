@@ -99,7 +99,7 @@ function write_config(cfg)
 
         [Short circuit regions (aka polygons)]
         use_polygons = $(cfg["use_polygons"] in TRUELIST)
-        polygon_file = $(cfg["use_polygons"])
+        polygon_file = $(cfg["polygon_file"])
 
         [Options for advanced mode]
         ground_file_is_resistances = $(cfg["ground_file_is_resistances"] in TRUELIST)
