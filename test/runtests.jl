@@ -1,7 +1,6 @@
 using Circuitscape
 using Test
 using Logging
-Logging.disable_logging(Logging.Info)
 
 include("test_utils.jl")
 
@@ -10,7 +9,7 @@ include("test_utils.jl")
     include("internal.jl")
 end
 
-for f in (compute,)
+for f in (compute, compute_cholmod, compute_parallel)
     runtests(f)
 end
 
