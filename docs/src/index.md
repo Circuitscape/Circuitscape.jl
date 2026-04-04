@@ -154,12 +154,19 @@ to use beyond a certain problem size because of a phenomenon called
 ### Pardiso Solver
 
 Circuitscape also supports the [Pardiso](https://github.com/JuliaSparse/Pardiso.jl)
-direct solver as a package extension. To use it, install and load Pardiso.jl:
+direct solver as a package extension. Pardiso requires Intel MKL, so it is
+only available on systems where MKL is installed. To use it, first install
+Pardiso.jl, then load it before Circuitscape:
 
 ```julia
-using Pardiso
+using Pkg
+Pkg.add("Pardiso")
+```
+
+```julia
+using Pardiso         # must be loaded before or alongside Circuitscape
 using Circuitscape
-compute("myjob.ini")
+compute("myjob.ini")  # with solver = pardiso in the INI file
 ```
 
 And set the solver in your INI file:
@@ -167,7 +174,9 @@ And set the solver in your INI file:
 solver = pardiso
 ```
 
-Pardiso requires double precision and will automatically switch if single precision is requested.
+Pardiso requires double precision and will automatically switch if single
+precision is requested. Like CHOLMOD, it is a direct solver best suited
+for small to medium problem sizes.
 
 ### Parallel on All Platforms
 

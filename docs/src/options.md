@@ -85,8 +85,8 @@ All Circuitscape configuration is done through an `.ini` file. Below is a comple
 
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|
-| `solver` | String | `cg+amg` | Linear solver to use. Values: `cg+amg` (iterative, recommended for large grids), `cholmod` (direct, uses more memory). |
-| `precision` | String | `Double` | Floating-point precision. Values: `Double`, `Single`. CHOLMOD requires double precision. |
+| `solver` | String | `cg+amg` | Linear solver to use. Values: `cg+amg` (iterative, recommended for large grids), `cholmod` (direct, uses more memory), `pardiso` (direct, requires [Pardiso.jl](https://github.com/JuliaSparse/Pardiso.jl)). |
+| `precision` | String | `Double` | Floating-point precision. Values: `Double`, `Single`. CHOLMOD and Pardiso require double precision. |
 | `use_64bit_indexing` | Boolean | `True` | If `True`, use 64-bit integer indexing. Required for very large grids. |
 | `cholmod_batch_size` | Integer | `1000` | Number of pairs to solve simultaneously when using CHOLMOD in pairwise mode. |
 | `parallelize` | Boolean | `False` | If `True`, run iterations in parallel. |

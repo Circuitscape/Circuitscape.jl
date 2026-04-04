@@ -29,4 +29,9 @@ Set `suppress_messages = True` in your INI file to suppress informational messag
 
 ## Log Level
 
-Set `log_level` in your INI file to control verbosity: `DEBUG`, `INFO` (default), `WARNING`, or `CRITICAL`.
+Set `log_level` in your INI file to control verbosity:
+
+- **`DEBUG`** — Most verbose. Includes all messages from lower levels plus additional diagnostic output.
+- **`INFO`** (default) — Reports solver selection, timing, progress through pair solves, and job completion.
+- **`WARNING`** — Only warnings (e.g., precision overrides when using direct solvers with single precision).
+- **`CRITICAL`** — Only critical errors.

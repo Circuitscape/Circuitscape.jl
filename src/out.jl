@@ -58,7 +58,7 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
 			return nothing
 		end
 
-        # TODO: implement cumulative maps for netowrk mode
+        # TODO: implement cumulative maps for network mode
 		cum_branch_curr = output.cum.cum_branch_curr
 		cum_node_curr = output.cum.cum_node_curr
 

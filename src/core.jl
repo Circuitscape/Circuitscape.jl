@@ -53,7 +53,7 @@ end
 struct AMGSolver <: Solver
 end
 
-struct MKLPardisoSolver <: Solver
+struct PardisoSolver <: Solver
     bs::Int
 end
 """
@@ -75,10 +75,10 @@ function get_solver(cfg)
         csinfo("Solver used: CHOLMOD", cfg["suppress_messages"] in TRUELIST)
         bs = parse(Int, cfg["cholmod_batch_size"])
         return CholmodSolver(bs)
-    elseif s in MKLPARDISO
-        csinfo("Solver used: MKLPardiso", cfg["suppress_messages"] in TRUELIST)
+    elseif s in PARDISO
+        csinfo("Solver used: Pardiso", cfg["suppress_messages"] in TRUELIST)
         bs = parse(Int, cfg["cholmod_batch_size"])
-        return MKLPardisoSolver(bs)
+        return PardisoSolver(bs)
     end
 
 end
@@ -284,7 +284,7 @@ struct CholmodNode{T}
     points_idx::Tuple{T,T}
 end
 
-function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, MKLPardisoSolver}, flags,
+function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, PardisoSolver}, flags,
                                   cfg, log) where {T,V}
 
     # Data
@@ -360,7 +360,7 @@ function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, MKLPardisoS
 
         component_data = ComponentData(comp, matrix, local_nodemap, hbmeta, cellmap)
 
-        ret = Vector{Tuple{V,V,Float64}}()
+        ret = Vector{Tuple{V,V,T}}()
 
         cholmod_batch = CholmodNode[]
 
@@ -602,7 +602,7 @@ function solve_linear_system(
             G::SparseMatrixCSC{T,V},
             curr::Vector{T}, M)::Vector{T} where {T,V}
     v = cg(G, curr, Pl = M, reltol = T(1e-6), maxiter = 100_000)
-	@assert norm(G*v .- curr) / norm(curr) < 1e-4
+    @assert norm(G*v .- curr) / norm(curr) < 1e-4
     v
 end
 
@@ -610,7 +610,7 @@ end
 function solve_linear_system(factor::SuiteSparse.CHOLMOD.Factor, matrix, rhs)
     lhs = factor \ rhs
     for i = 1:size(rhs, 2)
-		@assert (norm(matrix*lhs[:,i] .- rhs[:,i]) / norm(rhs[:,i])) < 1e-4
+        @assert (norm(matrix*lhs[:,i] .- rhs[:,i]) / norm(rhs[:,i])) < 1e-4
     end
     lhs
 end
