@@ -11,7 +11,7 @@ There are several ways to increase the solvable grid size:
 - Connect cells to their four neighbors only (`connect_four_neighbors_only = True`)
 - Disable current and voltage maps (`write_cur_maps = False`, `write_volt_maps = False`)
 - Use the one-to-all or all-to-one modes, which typically use less memory and run more quickly than pairwise mode
-- Use the `cg+amg` solver instead of `cholmod` for large grids (CHOLMOD uses significantly more memory)
+- Use the `cg+amg` solver instead of `cholmod` or `pardiso` for large grids (direct solvers use significantly more memory)
 - Coarsen your grids (use larger cell sizes) -- this often produces qualitatively similar results (see McRae et al. 2008)
 
 The all-to-one mode can be an alternative to pairwise mode when the goal is to produce a cumulative map of important connectivity areas among multiple source/target patches.
