@@ -162,7 +162,12 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
         component_data = ComponentData(comp, matrix, local_nodemap, hbmeta, cellmap)
 
         function f(i)
-            P = deepcopy(P)
+            # Each task needs its own workspace (mutable scratch vectors)
+            # but shares the AMG hierarchy (levels, operators) which is read-only
+            ml = P.ml
+            local_P = aspreconditioner(AlgebraicMultigrid.MultiLevel(
+                ml.levels, ml.final_A, ml.coarse_solver,
+                ml.presmoother, ml.postsmoother, deepcopy(ml.workspace)))
 
             # Generate return type
             ret = Vector{Tuple{V,V,T}}()
@@ -213,7 +218,7 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
                         # Solve system
                         # csinfo("Solving points $pi and $pj")
                         log && csinfo("Solving pair $(d[(pi,pj)]) of $num", cfg.suppress_messages)
-                        t2 = @elapsed v = solve_linear_system(matrix, current, P)
+                        t2 = @elapsed v = solve_linear_system(matrix, current, local_P)
                         csinfo("Time taken to solve linear system = $t2 seconds", cfg.suppress_messages)
 
                         v .= v .- v[comp_i]

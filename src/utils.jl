@@ -53,7 +53,6 @@ function get_output_flags(cfg)
                     compress_grids, log_transform_maps)
 end
 
-function myaddprocs(n) end
 
 # Reads the directory with the current maps
 # and accumulates all current maps
