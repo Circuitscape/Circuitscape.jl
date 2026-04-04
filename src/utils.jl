@@ -2,6 +2,8 @@ export  accumulate_current_maps,
         calculate_cum_current_map,
         calculate_max_current_map
 
+const CUM_LOCK = ReentrantLock()
+
 mutable struct MutablePair{T,V}
 	first::T
 	second::V
@@ -51,11 +53,7 @@ function get_output_flags(cfg)
                     compress_grids, log_transform_maps)
 end
 
-# Helps start new processes from the INI file
-function myaddprocs(n)
-    addprocs(n)
-    @everywhere Core.eval(Main, :(using Circuitscape))
-end
+function myaddprocs(n) end
 
 # Reads the directory with the current maps
 # and accumulates all current maps
@@ -138,42 +136,31 @@ function postprocess_cum_curmap!(accum)
     end
 end
 
-mycsid() = myid() - minimum(workers()) + 1
+mycsid() = 1
 
 function initialize_cum_maps(cellmap::Matrix{T}, max = false) where T
-    cum_curr = Vector{SharedMatrix{T}}(undef,nprocs())
-    for i = 1:nprocs()
-        cum_curr[i] = SharedArray(zeros(T, size(cellmap)...))
-    end
-    max_curr = Vector{SharedMatrix{T}}()
+    cum_curr = [zeros(T, size(cellmap)...)]
+    max_curr = Vector{Matrix{T}}()
     if max
-        max_curr = Vector{SharedMatrix{T}}(undef,nprocs())
-        for i = 1:nprocs()
-            max_curr[i] = SharedArray(fill(T(-9999), size(cellmap)...))
-        end
+        max_curr = [fill(T(-9999), size(cellmap)...)]
     end
-    cum_branch_curr = Vector{SharedVector{T}}()
-    cum_node_curr = Vector{SharedVector{T}}()
+    cum_branch_curr = Vector{Vector{T}}()
+    cum_node_curr = Vector{Vector{T}}()
 
     Cumulative(cum_curr, max_curr,
 			   cum_branch_curr, cum_node_curr, Vector{Tuple{Int,Int}}())
 end
 
 function initialize_cum_vectors(coords::Tuple{Vector{V},Vector{V},Vector{T}}, num_nodes::Int64) where {T,V}
-    cum_curr = Vector{SharedMatrix{T}}()
-    max_curr = Vector{SharedMatrix{T}}()
-	cum_branch_curr = Vector{SharedVector{T}}(undef,nprocs())
-	cum_node_curr = Vector{SharedVector{T}}(undef,nprocs())
+    cum_curr = Vector{Matrix{T}}()
+    max_curr = Vector{Matrix{T}}()
 	_i, _j, _v = coords
-    for i = 1:nprocs()
-        #cum_branch_curr[i] = SharedArray(zeros(T, size(v)...))
-		cum_branch_curr[i] = SharedVector(zeros(T,length(_v)))
-		cum_node_curr[i] = SharedVector(zeros(T,num_nodes))
-    end
+	cum_branch_curr = [zeros(T, length(_v))]
+	cum_node_curr = [zeros(T, num_nodes)]
 
-	coords = map((x,y) -> (x,y), _i, _j)
+	pair_coords = map((x,y) -> (x,y), _i, _j)
     Cumulative(cum_curr, max_curr,
-			   cum_branch_curr, cum_node_curr, coords)
+			   cum_branch_curr, cum_node_curr, pair_coords)
 end
 
 # Function to calculate current for Omniscape moving window solves

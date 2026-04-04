@@ -62,6 +62,7 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
 		cum_branch_curr = output.cum.cum_branch_curr
 		cum_node_curr = output.cum.cum_node_curr
 
+        lock(CUM_LOCK) do
         # Accumulate branch currents
         # cum_branch_curr[mycsid()] .+= branch_currents_array[:,3]
 		bca = branch_currents_array
@@ -76,11 +77,12 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
 
 
         # Accumulate node currents
-        cnc = cum_node_curr[mycsid()] 
+        cnc = cum_node_curr[mycsid()]
 		nca = node_currents_array
 		@inbounds for i = 1:size(nca, 1)
 			cnc[Int(nca[i,1])] += nca[i,2]
 		end
+        end
 
         # !write_cum_cur_map_only &&
         write_currents(node_currents_array, branch_currents_array, name, cfg)
@@ -96,11 +98,13 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
                             set_null_to_nodata = set_null_currents_to_nodata)
 
         # Accumulate by default
-        cum_curr[mycsid()] .+= cmap
+        lock(CUM_LOCK) do
+            cum_curr[mycsid()] .+= cmap
 
-        # Max current if user asks for it
-        if write_max_cur_maps
-            max_curr[mycsid()] .= max.(max_curr[mycsid()], cmap)
+            # Max current if user asks for it
+            if write_max_cur_maps
+                max_curr[mycsid()] .= max.(max_curr[mycsid()], cmap)
+            end
         end
 
         # Write current maps
@@ -466,19 +470,13 @@ end
 function write_cum_maps(cum, cellmap::Matrix{T}, cfg, hbmeta, write_max, write_cum) where T
 
     if write_cum || cfg.write_cur_maps
-        cum_curr = zeros(T, size(cellmap)...)
-        for i = 1:nprocs()
-            cum_curr .+= cum.cum_curr[i]
-        end
+        cum_curr = cum.cum_curr[1]
         postprocess_cum_curmap!(cum_curr)
         write_grid(cum_curr, "", cfg, hbmeta, cum = true)
     end
 
     if write_max
-        max_curr = fill(T(-9999), size(cellmap)...)
-        for i = 1:nprocs()
-            max_curr .= max.(cum.max_curr[i], max_curr)
-        end
+        max_curr = cum.max_curr[1]
         postprocess_cum_curmap!(max_curr)
         write_grid(max_curr, "", cfg, hbmeta, max = true)
     end
