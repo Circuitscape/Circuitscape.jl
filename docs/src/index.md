@@ -64,7 +64,7 @@ compute(cfg)
 
 ## Building a Circuitscape Job
 
-![](assets/inibuilder.png)
+![](https://raw.githubusercontent.com/Circuitscape/www.circuitscape.org/RA/inibuilder/assets/inibuilder.gif)
 
 The builder is kicked off by calling the `start()` function from the Julia prompt. It will
 build an INI file for you step by step, and either run the job directly or write the
