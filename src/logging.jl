@@ -31,21 +31,21 @@ function cswarn(msg)
     end
 end
 
-function update_logging!(cfg)
+function update_logging!(cfg::CSConfig)
 
-    log_level = cfg["log_level"]
-    log_file = cfg["log_file"]
+    log_level = cfg.log_level
+    log_file = cfg.log_file
 
-    if log_level in DEBUG
+    if log_level == ll_debug
         Logging.LogLevel(Logging.Debug)
-    elseif log_level in WARNING
+    elseif log_level == ll_warning
         Logging.LogLevel(Logging.Warn)
     end
 
-    if log_file != "None"
+    if log_file != ""
         logging["file_logger"] = SimpleLogger(open(log_file, "w+"))
         logging["log_to_file"] = true
-        csinfo("Logs will recorded to file: log_file", cfg["suppress_messages"] in TRUELIST)
+        csinfo("Logs will recorded to file: $log_file", cfg.suppress_messages)
     else
         logging["file_logger"] = SimpleLogger()
         logging["log_to_file"] = false

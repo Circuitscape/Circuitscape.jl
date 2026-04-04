@@ -243,7 +243,7 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, flags, cfg)::Tuple{Matrix
         return v, outcurr
     end
 
-    scenario = cfg["scenario"]
+    scenario = cfg.scenario
     if !solver_called
         ret = Matrix{T}(undef,1,1)
         ret[1] = -1
@@ -288,7 +288,7 @@ function multiple_solver(cfg, solver, a::SparseMatrixCSC{T,V}, sources, grounds,
     deleteat!(r, dst_del)
     asolve = asolve[r, r]
 
-    volt = multiple_solve(solver, asolve, sources, cfg["suppress_messages"] in TRUELIST)
+    volt = multiple_solve(solver, asolve, sources, cfg.suppress_messages)
 
     # Replace the inf with 0
     voltages = zeros(eltype(a), length(volt) + length(infgrounds))

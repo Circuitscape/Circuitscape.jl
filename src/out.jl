@@ -112,7 +112,7 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
 end
 
 function write_currents(node_curr_arr, branch_curr_arr, name, cfg)
-   pref = split(cfg["output_file"], ".out")[1]
+   pref = split(cfg.output_file, ".out")[1]
    # 1e-6 because we guarantee only 6 digits of precision on solve
    idx = findall(x -> !isapprox(x, 0.0, atol = 1e-6), branch_curr_arr[:,3])
    branch_curr_arr = branch_curr_arr[idx, :]
@@ -148,7 +148,7 @@ function _create_current_maps(G, voltages, finitegrounds, cfg; nodemap = Matrix{
 
     node_currents = get_node_currents(G, voltages, finitegrounds)
 
-    if cfg["data_type"] == "network"
+    if cfg.data_type == dt_network
 
         branch_currents = _get_branch_currents(G, voltages, true)
         branch_currents = abs.(branch_currents)
@@ -329,10 +329,10 @@ function write_grid(cmap, name, cfg, hbmeta;
         str = "voltmap"
     end
 
-    pref = split(cfg["output_file"], ".out")[1]
+    pref = split(cfg.output_file, ".out")[1]
     filename = "$(pref)_$(str)$(name)"
 
-    cfg["write_as_tif"] in TRUELIST ? (file_format = "tif") :
+    cfg.write_as_tif ? (file_format = "tif") :
             (file_format = "asc")
 
     write_raster(filename,
@@ -347,7 +347,7 @@ function write_grid(cmap, name, cfg, hbmeta, cellmap;
                         voltage = false, cum = false, max = false,
                         log_transform = false, set_null_to_nodata = false)
 
-    pref = split(cfg["output_file"], ".out")[1]
+    pref = split(cfg.output_file, ".out")[1]
 
     if log_transform
         map!(x -> x > 0 ? log10(x) : float(hbmeta.nodata), cmap, cmap)
@@ -372,7 +372,7 @@ function write_grid(cmap, name, cfg, hbmeta, cellmap;
 
     filename = "$(pref)_$(str)$(name)"
 
-    cfg["write_as_tif"] in TRUELIST ? (file_format = "tif") :
+    cfg.write_as_tif ? (file_format = "tif") :
             (file_format = "asc")
 
     write_raster(filename,
@@ -389,7 +389,7 @@ function write_volt_maps(name, output, component_data, flags, cfg)
     if !flags.is_raster
 
         cc = component_data.cc
-        write_voltages(cfg["output_file"], name, voltages, cc)
+        write_voltages(cfg.output_file, name, voltages, cc)
 
     else
 
@@ -451,7 +451,7 @@ function accum_currents!(base, newcurr, cfg, G, voltages, finitegrounds, nodemap
 end
 
 function save_resistances(r, cfg)
-    pref = split(cfg["output_file"], ".out")[1]
+    pref = split(cfg.output_file, ".out")[1]
     filename = "$(pref)_resistances.out"
     filename_3col = "$(pref)_resistances_3columns.out"
     rcol = compute_3col(r)
@@ -465,7 +465,7 @@ end
 
 function write_cum_maps(cum, cellmap::Matrix{T}, cfg, hbmeta, write_max, write_cum) where T
 
-    if write_cum || cfg["write_cur_maps"] in TRUELIST
+    if write_cum || cfg.write_cur_maps
         cum_curr = zeros(T, size(cellmap)...)
         for i = 1:nprocs()
             cum_curr .+= cum.cum_curr[i]
