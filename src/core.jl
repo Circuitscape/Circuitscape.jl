@@ -360,7 +360,7 @@ function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, PardisoSolv
 
         component_data = ComponentData(comp, matrix, local_nodemap, hbmeta, cellmap)
 
-        ret = Vector{Tuple{V,V,Float64}}()
+        ret = Vector{Tuple{V,V,T}}()
 
         cholmod_batch = CholmodNode[]
 

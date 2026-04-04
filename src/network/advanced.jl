@@ -22,9 +22,9 @@ function compute_advanced_data(data::NetworkData{T,V},
     i,j,v = data.coords
 
     idx = findfirst(x -> x < 1, i)
-    idx != nothing && throw("Indices no good")
+    idx !== nothing && throw("Indices no good")
     idx = findfirst(x -> x < 1, j)
-    idx != nothing && throw("Indices no good")
+    idx !== nothing && throw("Indices no good")
 
     m = max(maximum(i), maximum(j))
     A = sparse(i,j,v,m,m)

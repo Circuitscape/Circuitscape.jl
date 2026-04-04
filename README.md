@@ -105,7 +105,7 @@ Circuitscape.jl is up to **4x faster** than the legacy Python version (Circuitsc
 on 16 parallel processes, with the CHOLMOD solver providing the best performance on
 suitable problem sizes.
 
-<img src="docs/src/benchmark/benchmark.png" width=650 height=450>
+<img src="https://raw.githubusercontent.com/Circuitscape/Circuitscape.jl/master/docs/src/benchmark/benchmark.png" width=650 height=450>
 
 Benchmarks were run on a Linux (Ubuntu) server with an Intel Xeon Silver 4114 CPU
 (2.20 GHz, 20 cores, 384 GB RAM) using problems from the
