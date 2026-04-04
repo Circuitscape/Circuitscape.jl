@@ -113,7 +113,7 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
 
     csinfo("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components", cfg.suppress_messages)
 
-    num, d = get_num_pairs(cc, points, exclude)
+    num, d = get_num_pairs(cc, points, exclude, orig_pts)
     log && csinfo("Total number of pair solves = $num", cfg.suppress_messages)
 
     # Initialize pairwise resistance
@@ -130,7 +130,7 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
             isempty(exclude)
         get_shortcut_resistances = true
         csinfo("Triggering resistance calculation shortcut", cfg.suppress_messages)
-        num, d = get_num_pairs_shortcut(cc, points, exclude)
+        num, d = get_num_pairs_shortcut(cc, points, exclude, orig_pts)
         csinfo("Total number of pair solves has been reduced to $num ", cfg.suppress_messages)
     end
     shortcut = Shortcut(get_shortcut_resistances, voltmatrix, shortcut_res)
@@ -186,7 +186,7 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
             if Threads.nthreads() > 1
                 for j in rng
                     pj = csub[j]
-                    csinfo("Scheduling pair $(d[(pi,pj)]) of $num to be solved", cfg.suppress_messages)
+                    haskey(d, (pi,pj)) && csinfo("Scheduling pair $(d[(pi,pj)]) of $num to be solved", cfg.suppress_messages)
                 end
             end
 
@@ -206,7 +206,7 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
                 ex = false
                 for c_i in I
                     for c_j in J
-                        if (c_i, c_j) in exclude
+                        if (orig_pts[c_i], orig_pts[c_j]) in exclude
                             continue
                         end
 
@@ -320,7 +320,7 @@ function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, PardisoSolv
 
     csinfo("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components", cfg.suppress_messages)
 
-    num, d = get_num_pairs(cc, points, exclude)
+    num, d = get_num_pairs(cc, points, exclude, orig_pts)
     log && csinfo("Total number of pair solves = $num", cfg.suppress_messages)
 
     # Initialize pairwise resistance
@@ -337,7 +337,7 @@ function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, PardisoSolv
             isempty(exclude)
         get_shortcut_resistances = true
         csinfo("Triggering resistance calculation shortcut", cfg.suppress_messages)
-        num, d = get_num_pairs_shortcut(cc, points, exclude)
+        num, d = get_num_pairs_shortcut(cc, points, exclude, orig_pts)
         csinfo("Total number of pair solves has been reduced to $num ", cfg.suppress_messages)
     end
     shortcut = Shortcut(get_shortcut_resistances, voltmatrix, shortcut_res)
@@ -392,7 +392,7 @@ function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, PardisoSolv
 
                 # Forget excluded pairs
                 for c_i in I, c_j in J
-                    if (c_i, c_j) in exclude
+                    if (orig_pts[c_i], orig_pts[c_j]) in exclude
                         continue
                     else
                         push!(cholmod_batch,
@@ -505,10 +505,12 @@ Input:
 Output:
 * n - total number of pairs
 """
-function get_num_pairs(ccs, fp::Vector{V}, exclude_pairs) where V
+function get_num_pairs(ccs, fp::Vector{V}, exclude_pairs, user_points::Vector{V}=fp) where V
 
     num = 0
     d = Dict{Tuple{V,V}, V}()
+    # Map graph node indices to user point IDs for exclude comparison
+    g2u = Dict(fp[i] => user_points[i] for i in 1:length(fp))
 
     for (i,cc) in enumerate(ccs)
         sub_fp = filter(x -> x in cc, fp) |> unique
@@ -517,7 +519,7 @@ function get_num_pairs(ccs, fp::Vector{V}, exclude_pairs) where V
             pt1 = sub_fp[ii]
             for jj = ii+1:l
                 pt2 = sub_fp[jj]
-                if (pt1, pt2) in exclude_pairs
+                if (get(g2u, pt1, pt1), get(g2u, pt2, pt2)) in exclude_pairs
                     continue
                 else
                     num += 1
@@ -529,10 +531,11 @@ function get_num_pairs(ccs, fp::Vector{V}, exclude_pairs) where V
     num, d
 end
 
-function get_num_pairs_shortcut(ccs, fp::Vector{V}, exclude_pairs) where V
+function get_num_pairs_shortcut(ccs, fp::Vector{V}, exclude_pairs, user_points::Vector{V}=fp) where V
 
     num = 0
     d = Dict{Tuple{V,V}, V}()
+    g2u = Dict(fp[i] => user_points[i] for i in 1:length(fp))
 
     for (i,cc) in enumerate(ccs)
         sub_fp = filter(x -> x in cc, fp) |> unique
@@ -542,7 +545,7 @@ function get_num_pairs_shortcut(ccs, fp::Vector{V}, exclude_pairs) where V
             pt1 = sub_fp[ii]
             for jj = ii+1:l
                 pt2 = sub_fp[jj]
-                if (pt1, pt2) in exclude_pairs
+                if (get(g2u, pt1, pt1), get(g2u, pt2, pt2)) in exclude_pairs
                     continue
                 else
                     num += 1

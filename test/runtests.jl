@@ -9,6 +9,10 @@ include("test_utils.jl")
     include("internal.jl")
 end
 
+@testset "Issue 341: included pairs" begin
+    include("issue341.jl")
+end
+
 for f in (compute, compute_cholmod, compute_parallel)
     runtests(f)
 end
