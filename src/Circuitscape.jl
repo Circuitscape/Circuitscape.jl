@@ -4,7 +4,7 @@ using AlgebraicMultigrid
 using ArchGDAL
 using Graphs
 using SimpleWeightedGraphs
-using IterativeSolvers
+using Krylov
 using GZip
 
 using LinearAlgebra
