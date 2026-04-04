@@ -1,110 +1,38 @@
 # Circuitscape
 
 [![Documentation](https://img.shields.io/badge/docs-stable-blue.svg)](https://docs.circuitscape.org/Circuitscape.jl/latest/)
-[![Build Status](https://github.com/Circuitscape/Circuitscape.jl/workflows/CI/badge.svg)](https://github.com/Circuitscape/Circuitscape.jl/actions?query=workflow%3ACI) 
-[![codecov.io](http://codecov.io/github/Circuitscape/Circuitscape.jl/coverage.svg?branch=master)](http://codecov.io/github/Circuitscape/Circuitscape.jl?branch=master)
+[![Build Status](https://github.com/Circuitscape/Circuitscape.jl/workflows/CI/badge.svg)](https://github.com/Circuitscape/Circuitscape.jl/actions?query=workflow%3ACI)
+[![codecov.io](https://codecov.io/github/Circuitscape/Circuitscape.jl/coverage.svg?branch=master)](https://codecov.io/github/Circuitscape/Circuitscape.jl?branch=master)
 
-> [!NOTE]  
-> Please note that to run the latest version of Circuitscape.jl, you need to install [Julia v1.11](https://julialang.org/downloads/) or up. 
+Circuitscape is an open-source program that uses circuit theory to model connectivity
+in heterogeneous landscapes. Its most common applications include modeling movement and gene flow
+of plants and animals, as well as identifying areas important for connectivity conservation.
 
-Circuitscape is an open-source program that uses circuit theory to model connectivity 
-in heterogeneous landscapes. Its most common applications include modeling movement and gene flow 
-of plants and animals, as well as identifying areas important for connectivity conservation. 
+Circuitscape is written in [Julia](https://julialang.org) for high performance and scalability.
+More detail about the implementation can be found in the
+[JuliaCon paper](https://proceedings.juliacon.org/papers/10.21105/jcon.00058).
 
-Circuitscape has now been rewritten in [Julia](https://julialang.org) for better performance and scalability. 
-This work is based on the Python implemention in [Circuitscape.py](https://github.com/Circuitscape/Circuitscape.py).
+> [!NOTE]
+> Circuitscape.jl requires [Julia v1.11](https://julialang.org/downloads/) or later.
 
-## The New Circuitscape - Modern, Fast and Flexible
+## Installation
 
-The new Circuitscape is built entirely in the Julia language, a new
-programming language for technical computing. Julia is built from the
-ground up to be [fast](http://julialang.org/benchmarks). As such, this offers a
-number of advantages over the previous version, and these are detailed below.
+1. [Install Julia](https://julialang.org/downloads/).
 
-### Faster and More Scalable
-
-We benchmarked `Circuitscape.jl` (v0.1.0) with the Python version (v4.0.5) to obtain the
-following results. We started up Circuitscape with 16 parallel processes,
-and used benchmark problems from the standard Circuitscape 
-[benchmark suite.](https://github.com/Circuitscape/BigTests)
-
-<img src="docs/src/benchmark/benchmark.png" width=650 height=450>
-
-These benchmarks were run on a Linux (Ubuntu) server machine with the following specs: 
-* Name: Intel(R) Xeon(R) Silver 4114 CPU 
-* Clock Speed: 2.20GHz
-* Number of cores: 20  
-* RAM: 384 GB
-
-From the benchmark, we see that the new version is upto *4x faster*
-on 16 processes. However, the best performing bar in the chart is 
-_Julia-CHOLMOD_, which is a new feature introduced.
-
-### New Solver Mode - CHOLMOD
-
-Julia-CHOLMOD is a new solver mode used in the new Circuitscape. It performs a [cholesky
-decomposition](https://en.wikipedia.org/wiki/Cholesky_decomposition) on the graph 
-constructed, and performs a batched back substitution
-to compute the voltages. It plugs into the 
-[CHOLMOD](http://faculty.cse.tamu.edu/davis/suitesparse.html) library, 
-which is part of the SuiteSparse collection of high performance sparse 
-matrix algorithms.
-
-To use the this new mode, include a line in your Circuitscape 
-INI file:
-```
-solver = cholmod
-```
-
-The cholesky decomposition is a direct solver method, unlike the algebraic
-multigrid method used by default in both the old and the new version.
-The advantage with this new direct method is that it can be much faster than
-the iterative solution, within a particular problem size. 
-
-*Word of caution*: The cholesky decomposition is not practical
-to use beyond a certain problem size because of phenomenon called
-[fill-in](https://algowiki-project.org/en/Cholesky_method#Reordering_to_reduce_the_number_of_fill-in_elements), which results in loss of sparsity and large memory consumption.
-
-### Parallel, everywhere 
-
-The old Circuitscape had limited support for parallelism, which worked on Mac and
-Linux, but didn't work on Windows. 
-
-Julia as a programming language is built from the ground up to be parallel,
-and as a result the new Circuitscape natively supports parallelism on all three
-platforms.
-
-### Single Precision (Experimental)
-
-The new Circuitscape introduces the ability to run problems in
-single precision as opposed to the standard double precision.
-
-Single precision usually takes much less memory, but trades off
-against solution accuracy. 
-
-Use this new feature by including a line in your config file:
-```
-precision = single
-```
-
-## Installation 
-
-1. You will need to [install](https://julialang.org/downloads/) Julia on your system first.  
-
-2. Once you start Julia, install Circuitscape by: 
+2. At the Julia prompt, install Circuitscape:
 
 ```julia
 julia> using Pkg
 julia> Pkg.add("Circuitscape")
 ```
 
-If you want the latest development version, you can additionally do: 
+To install the latest development version:
 
 ```julia
 julia> Pkg.add(PackageSpec(name="Circuitscape", rev="master"))
 ```
 
-Check if all the tests are passing by doing the following:
+Run the test suite with:
 
 ```julia
 julia> Pkg.test("Circuitscape")
@@ -112,24 +40,84 @@ julia> Pkg.test("Circuitscape")
 
 ## Usage
 
-The current interface to Circuitscape is through the Julia terminal. 
+Circuitscape jobs are configured via INI files. See the
+[documentation](https://docs.circuitscape.org/Circuitscape.jl/latest/) for a full guide
+on data types, calculation modes, and all available options.
 
 ```julia
-julia> using Circuitscape # loads the package into your environment
+julia> using Circuitscape
 julia> compute("path/to/config/file.ini")
 ```
 
+You can also build INI files interactively using the built-in terminal UI:
+
+```julia
+julia> using Circuitscape
+julia> Circuitscape.INIBuilder.start()
+```
+
+Or construct a configuration programmatically:
+
+```julia
+julia> using Circuitscape
+julia> cfg = Circuitscape.init_config()
+julia> cfg["habitat_file"] = "resistance_map.asc"
+julia> cfg["point_file"] = "focal_nodes.asc"
+julia> cfg["scenario"] = "pairwise"
+julia> cfg["output_file"] = "output/results.out"
+julia> compute(cfg)
+```
+
+Example INI files can be found in the
+[test folder](https://github.com/Circuitscape/Circuitscape.jl/tree/master/test/input).
+
+## Features
+
+### Solver Modes
+
+Circuitscape supports two solver modes:
+
+- **CG+AMG** (default) — an iterative solver using algebraic multigrid preconditioning. Scales well to large problems.
+- **CHOLMOD** — a direct solver using [Cholesky decomposition](https://en.wikipedia.org/wiki/Cholesky_decomposition) via the [SuiteSparse](https://people.engr.tamu.edu/davis/suitesparse.html) library. Can be significantly faster for smaller problems, but memory use grows quickly with problem size due to [fill-in](https://algowiki-project.org/en/Cholesky_method#Reordering_to_reduce_the_number_of_fill-in_elements).
+
+To use CHOLMOD, add to your INI file:
+```
+solver = cholmod
+```
+
+### Parallel Computing
+
+Circuitscape supports parallel computation on Linux, macOS, and Windows using Julia's
+built-in distributed computing.
+
+### Single Precision
+
+Circuitscape can run in single precision for reduced memory use at the cost of solution
+accuracy. Add to your INI file:
+```
+precision = single
+```
+
+## Performance
+
+Circuitscape.jl is up to **4x faster** than the legacy Python version (Circuitscape v4.0.5)
+on 16 parallel processes, with the CHOLMOD solver providing the best performance on
+suitable problem sizes.
+
+<img src="docs/src/benchmark/benchmark.png" width=650 height=450>
+
+Benchmarks were run on a Linux (Ubuntu) server with an Intel Xeon Silver 4114 CPU
+(2.20 GHz, 20 cores, 384 GB RAM) using problems from the
+[benchmark suite](https://github.com/Circuitscape/BigTests).
+
+## Related Projects
+
+- [Omniscape.jl](https://github.com/Circuitscape/Omniscape.jl) — Omnidirectional connectivity analysis built on Circuitscape
+- [AlgebraicMultigrid.jl](https://github.com/JuliaLinearAlgebra/AlgebraicMultigrid.jl) — The default iterative solver used by Circuitscape
+
 ## Contributing
 
-If you have encounter any issues or would like to ask a question, please file 
-a report [here](https://github.com/ranjanan/Circuitscape.jl/issues).
-Contributions in the form of 
-[pull requests](https://github.com/ranjanan/Circuitscape.jl/pulls) are also welcome! 
-
-## Notes on INI files 
-
-Circuitscape takes as input INI files, which contain paths to the raster map, sources, grounds,
-and other inputs, as well as flags for each run. If you're using the [GUI](https://circuitscape.org/downloads/)
-the INI file will automatically be generated for you and then fed into Circuitscape. But if you're 
-using the Julia prompt, then you must write one yourself. The easiest way to do this is to copy 
-an INI file [from the tests](https://github.com/Circuitscape/Circuitscape.jl/tree/master/test/input) and then modify it depending on your problem. 
+If you encounter any issues or would like to ask a question, please file
+a report [here](https://github.com/Circuitscape/Circuitscape.jl/issues).
+Contributions in the form of
+[pull requests](https://github.com/Circuitscape/Circuitscape.jl/pulls) are welcome!

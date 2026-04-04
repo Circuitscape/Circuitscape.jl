@@ -81,17 +81,15 @@ from the [test folder](https://github.com/Circuitscape/Circuitscape.jl/tree/mast
 Please use the following to cite Circuitscape: 
 
 ```bibtex
-@article{Anantharaman2020,
-  doi = {10.21105/jcon.00058},
-  url = {https://doi.org/10.21105/jcon.00058},
-  year = {2020},
-  publisher = {The Open Journal},
-  volume = {1},
-  number = {1},
-  pages = {58},
-  author = {Ranjan Anantharaman and Kimberly Hall and Viral B. Shah and Alan Edelman},
-  title = {Circuitscape in Julia: High Performance Connectivity Modelling to Support Conservation Decisions},
-  journal = {Proceedings of the JuliaCon Conferences}
+@article{hall2021circuitscape,
+  title={Circuitscape in julia: empowering dynamic approaches to connectivity assessment},
+  author={Hall, Kimberly R and Anantharaman, Ranjan and Landau, Vincent A and Clark, Melissa and Dickson, Brett G and Jones, Aaron and Platt, Jim and Edelman, Alan and Shah, Viral B},
+  journal={Land},
+  volume={10},
+  number={3},
+  pages={301},
+  year={2021},
+  publisher={Multidisciplinary Digital Publishing Institute}
 }
 ```
 
