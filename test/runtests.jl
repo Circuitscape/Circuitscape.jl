@@ -1,6 +1,5 @@
 using Circuitscape
 using Test
-using Pardiso
 using Logging
 Logging.disable_logging(Logging.Info)
 
@@ -15,4 +14,14 @@ for f in (compute,)
     runtests(f)
 end
 
-runtests(compute_pardiso)
+# Run Pardiso tests only if Pardiso.jl is available and MKL is present
+pardiso_available = try
+    @eval using Pardiso
+    Pardiso.MKLPardisoSolver()
+    true
+catch
+    false
+end
+if pardiso_available
+    runtests(compute_pardiso)
+end
