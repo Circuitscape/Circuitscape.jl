@@ -217,14 +217,11 @@ function read_point_map(V, file, habitatmeta)
         (i,j,v) =  (getindex.(_I, 1), getindex.(_I, 2), _points_rc[_I])
     end
 
-    ind = findall(x -> x < 0, v)
-
     # Get rid of negative resistances
-    for index in ind
-        deleteat!(i, index)
-        deleteat!(j, index)
-        deleteat!(v, index)
-    end
+    keep = v .>= 0
+    i = i[keep]
+    j = j[keep]
+    v = v[keep]
 
     # Sort them
     idx = sortperm(v)
