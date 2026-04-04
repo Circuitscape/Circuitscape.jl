@@ -64,7 +64,15 @@ compute(cfg)
 
 ## Building a Circuitscape Job
 
-![](assets/inibuilder.gif)
+```@raw html
+<img src="assets/inibuilder.gif" alt="INIBuilder demo" width="650">
+```
+
+```@raw latex
+\begin{figure}[h]
+\includegraphics[width=\textwidth]{assets/inibuilder.png}
+\end{figure}
+```
 
 The builder is kicked off by calling the `start()` function from the Julia prompt. It will
 build an INI file for you step by step, and either run the job directly or write the
@@ -142,6 +150,24 @@ the iterative solution for smaller problem sizes.
 *Word of caution*: The Cholesky decomposition is not practical
 to use beyond a certain problem size because of a phenomenon called
 [fill-in](https://algowiki-project.org/en/Cholesky_method#Reordering_to_reduce_the_number_of_fill-in_elements), which results in loss of sparsity and large memory consumption.
+
+### Pardiso Solver
+
+Circuitscape also supports the [Pardiso](https://github.com/JuliaSparse/Pardiso.jl)
+direct solver as a package extension. To use it, install and load Pardiso.jl:
+
+```julia
+using Pardiso
+using Circuitscape
+compute("myjob.ini")
+```
+
+And set the solver in your INI file:
+```
+solver = pardiso
+```
+
+Pardiso requires double precision and will automatically switch if single precision is requested.
 
 ### Parallel on All Platforms
 
