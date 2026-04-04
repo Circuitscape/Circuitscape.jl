@@ -1,5 +1,7 @@
 abstract type Data end
 
+_open(file) = endswith(file, "gz") ? GZip.open(file, "r") : open(file, "r")
+
 struct IncludeExcludePairs{V}
     mode::Symbol
     point_ids::Vector{V}
@@ -134,7 +136,7 @@ function _guess_file_type(filename, f)
     hdr = readline(f)
     seek(f, 0) #TODO I think this is not necessary? -VL
 
-    f2 = endswith(filename, "gz") ? GZip.open(filename, "r") : open(filename, "r")
+    f2 = _open(filename)
     bytes = read(f2, 4)[3:4]
     close(f2)
 
@@ -198,7 +200,7 @@ function read_point_map(V, file, habitatmeta)
         return (V[], V[], V[])
     end
 
-    f = endswith(file, ".gz") ? GZip.open(file, "r") : open(file, "r")
+    f = _open(file)
     filetype = _guess_file_type(file, f)
     _points_rc = filetype == FILE_TYPE_TXTLIST ? readdlm(file) :
                         read_polymap(V, file, habitatmeta)
@@ -255,7 +257,7 @@ function read_source_and_ground_maps(T, V, source_file, ground_file, habitatmeta
 	use_unit_currents = cfg["use_unit_currents"] in TRUELIST
 	use_direct_grounds = cfg["use_direct_grounds"] in TRUELIST
 
-    f = endswith(ground_file, "gz") ? GZip.open(ground_file, "r") : open(ground_file, "r")
+    f = _open(ground_file)
     filetype = _guess_file_type(ground_file, f)
 
     if filetype == FILE_TYPE_AAGRID || filetype == FILE_TYPE_GEOTIFF
@@ -272,7 +274,7 @@ function read_source_and_ground_maps(T, V, source_file, ground_file, habitatmeta
     end
     close(f)
 
-    f = endswith(source_file, "gz") ? GZip.open(source_file, "r") : open(source_file, "r")
+    f = _open(source_file)
     filetype = _guess_file_type(source_file, f)
 
     if filetype == FILE_TYPE_AAGRID || filetype == FILE_TYPE_GEOTIFF
@@ -325,7 +327,7 @@ end
 
 function read_included_pairs(V, filename)
 
-    f = endswith(filename, "gz") ? GZip.open(filename, "r") : open(filename, "r")
+    f = _open(filename)
     filetype = _guess_file_type(filename, f)
     close(f)
     minval = 0
