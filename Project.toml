@@ -1,6 +1,6 @@
 name = "Circuitscape"
 uuid = "2b7a1792-8151-5239-925d-e2b8fdfa3201"
-version = "5.15.0"
+version = "5.16.0"
 
 [deps]
 AlgebraicMultigrid = "2169fc97-5a83-5252-b627-83903c6c433c"
@@ -18,9 +18,15 @@ SharedArrays = "1a1011a3-84de-559e-8e89-a11a2f7dc383"
 SimpleWeightedGraphs = "47aef6b3-ad0c-573a-a1e2-d07658019622"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 SuiteSparse = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[weakdeps]
+Pardiso = "46dd5b70-b6fb-5a00-ae2d-e8fea33afaf2"
+
+[extensions]
+CircuitscapePardisoExt = "Pardiso"
 
 [compat]
+Pardiso = "0.5"
 AlgebraicMultigrid = "1"
 ArchGDAL = "0.10"
 DelimitedFiles = "1"
@@ -29,3 +35,10 @@ Graphs = "1"
 IterativeSolvers = "0.9"
 SimpleWeightedGraphs = "1"
 julia = "1.11"
+
+[extras]
+Pardiso = "46dd5b70-b6fb-5a00-ae2d-e8fea33afaf2"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Pardiso", "Test"]

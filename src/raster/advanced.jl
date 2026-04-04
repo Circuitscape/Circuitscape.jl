@@ -324,7 +324,7 @@ function multiple_solve(s::CholmodSolver, matrix::SparseMatrixCSC{T,V}, sources:
     volt
 end
 
-function multiple_solve(s::MKLPardisoSolver, matrix::SparseMatrixCSC{T,V}, sources::Vector{T}, suppress_info::Bool) where {T,V}
+function multiple_solve(s::PardisoSolver, matrix::SparseMatrixCSC{T,V}, sources::Vector{T}, suppress_info::Bool) where {T,V}
     factor = construct_cholesky_factor(matrix, s, suppress_info)
     t1 = @elapsed volt = solve_linear_system(factor, matrix, sources)
     # @assert norm(matrix*volt .- sources) < (eltype(sources) == Float64 ? TOL_DOUBLE : TOL_SINGLE)
