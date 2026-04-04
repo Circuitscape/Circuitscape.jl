@@ -601,7 +601,7 @@ function sum_off_diag(G, i)
 function solve_linear_system(
             G::SparseMatrixCSC{T,V},
             curr::Vector{T}, M)::Vector{T} where {T,V}
-    v = cg(G, curr, Pl = M, reltol = T(1e-6), maxiter = 100_000)
+    v, stats = Krylov.cg(G, curr, M=M, ldiv=true, rtol=T(1e-6), itmax=100_000)
     @assert norm(G*v .- curr) / norm(curr) < 1e-4
     v
 end
