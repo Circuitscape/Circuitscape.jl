@@ -34,16 +34,15 @@ function get_raster_flags(cfg)
 
     # Computation flags
     is_raster = true
-    is_pairwise = cfg["scenario"] in PAIRWISE
-    is_advanced = cfg["scenario"] in ADVANCED
-    is_onetoall = cfg["scenario"] in ONETOALL
-    is_alltoone = cfg["scenario"] in ALLTOONE
-    four_neighbors = cfg["connect_four_neighbors_only"] in TRUELIST
-    avg_res = cfg["connect_using_avg_resistances"] in TRUELIST
-    solver = cfg["solver"]
-    ground_file_is_resistances =
-        cfg["ground_file_is_resistances"] in TRUELIST
-    policy = Symbol(cfg["remove_src_or_gnd"])
+    is_pairwise = cfg.scenario == sc_pairwise
+    is_advanced = cfg.scenario == sc_advanced
+    is_onetoall = cfg.scenario == sc_onetoall
+    is_alltoone = cfg.scenario == sc_alltoone
+    four_neighbors = cfg.connect_four_neighbors_only
+    avg_res = cfg.connect_using_avg_resistances
+    solver = _solver_str(cfg.solver)
+    ground_file_is_resistances = cfg.ground_file_is_resistances
+    policy = _remove_policy_symbol(cfg.remove_src_or_gnd)
 
     # Output Flags
     o = get_output_flags(cfg)
@@ -102,14 +101,14 @@ function _pt_file_polygons_path(rasterdata::RasterData{T,V},
     resistances = -1 * ones(length(pts), length(pts))
 
     n = calc_num_pairs(pts)
-    csinfo("Total number of pair solves = $n", cfg["suppress_messages"] in TRUELIST)
+    csinfo("Total number of pair solves = $n", cfg.suppress_messages)
 
     k = 1
     for i = 1:size(pts, 1)
         pt1 = pts[i]
         for j = i+1:size(pts, 1)
             pt2 = pts[j]
-            csinfo("Solving pair $k of $n", cfg["suppress_messages"] in TRUELIST)
+            csinfo("Solving pair $k of $n", cfg.suppress_messages)
             k += 1
 			if (pt1,pt2) in exclude_pairs || (pt2, pt1) in exclude_pairs 
 				continue

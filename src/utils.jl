@@ -36,14 +36,14 @@ end
 function get_output_flags(cfg)
 
     # Output flags
-    write_volt_maps = cfg["write_volt_maps"] in TRUELIST
-    write_cur_maps = cfg["write_cur_maps"] in TRUELIST
-    write_cum_cur_map_only = cfg["write_cum_cur_map_only"] in TRUELIST
-    write_max_cur_maps = cfg["write_max_cur_maps"] in TRUELIST
-    set_null_currents_to_nodata = cfg["set_null_currents_to_nodata"] in TRUELIST
-    set_null_voltages_to_nodata = cfg["set_null_voltages_to_nodata"] in TRUELIST
-    compress_grids = cfg["compress_grids"] in TRUELIST
-    log_transform_maps = cfg["log_transform_maps"] in TRUELIST
+    write_volt_maps = cfg.write_volt_maps
+    write_cur_maps = cfg.write_cur_maps
+    write_cum_cur_map_only = cfg.write_cum_cur_map_only
+    write_max_cur_maps = cfg.write_max_cur_maps
+    set_null_currents_to_nodata = cfg.set_null_currents_to_nodata
+    set_null_voltages_to_nodata = cfg.set_null_voltages_to_nodata
+    compress_grids = cfg.compress_grids
+    log_transform_maps = cfg.log_transform_maps
 
     o = OutputFlags(write_volt_maps, write_cur_maps,
                     write_cum_cur_map_only, write_max_cur_maps,
@@ -97,7 +97,7 @@ function accumulate_current_maps(path, f)
 
     accum = zeros(nrow, ncol)
     for file in cmap_list
-        csinfo("Accumulating $file", cfg["suppress_messages"] in TRUELIST)
+        csinfo("Accumulating $file", cfg.suppress_messages)
         cmap_path = joinpath(dir, file)
         cmap = readdlm(cmap_path, skipstart = 6)
         f_in_place!(accum, cmap, f)
@@ -115,7 +115,7 @@ function accumulate_current_maps(path, f)
             end
 
     accum_path = joinpath(dir, name * "_$(name)_curmap.asc")
-    csinfo("Writing to $accum_path", cfg["suppress_messages"] in TRUELIST)
+    csinfo("Writing to $accum_path", cfg.suppress_messages)
     open(accum_path, "w") do f
         write(f, headers)
         writedlm(f, round.(accum, digits=8), ' ')
@@ -223,13 +223,15 @@ function compute_omniscape_current(
         false, false, false, false
     )
 
+    cfg = CSConfig(cs_cfg)
+
     flags = RasterFlags(
         true, false, true, false, false, false, Symbol("rmvsrc"),
-        cs_cfg["connect_four_neighbors_only"] in TRUELIST, false, 
-        cs_cfg["solver"], o
+        cfg.connect_four_neighbors_only, false, 
+        _solver_str(cfg.solver), o
     )
 
-    data = compute_advanced_data(rasterdata, flags, cs_cfg)
+    data = compute_advanced_data(rasterdata, flags, cfg)
 
     G = data.G
     nodemap = data.nodemap
@@ -267,7 +269,7 @@ function compute_omniscape_current(
             f_local = finitegrounds
         end
 
-        voltages = multiple_solver(cs_cfg,
+        voltages = multiple_solver(cfg,
                                    data.solver,
                                    a_local,
                                    s_local,
@@ -280,7 +282,7 @@ function compute_omniscape_current(
 
         accum_currents!(outcurr,
                         voltages,
-                        cs_cfg,
+                        cfg,
                         a_local,
                         voltages,
                         f_local,

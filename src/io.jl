@@ -254,8 +254,8 @@ function read_source_and_ground_maps(T, V, source_file, ground_file, habitatmeta
 
     ground_map = Matrix{T}(undef,0,0)
     source_map = Matrix{T}(undef,0,0)
-	use_unit_currents = cfg["use_unit_currents"] in TRUELIST
-	use_direct_grounds = cfg["use_direct_grounds"] in TRUELIST
+	use_unit_currents = cfg.use_unit_currents
+	use_direct_grounds = cfg.use_direct_grounds
 
     f = _open(ground_file)
     filetype = _guess_file_type(ground_file, f)
@@ -386,13 +386,13 @@ end
 
 function get_network_data(T, V, cfg)::NetworkData{T,V}
 
-    hab_is_res = cfg["habitat_map_is_resistances"] in TRUELIST
-    hab_file = cfg["habitat_file"]
-    fp_file = cfg["point_file"]
-    source_file = cfg["source_file"]
-    ground_file = cfg["ground_file"]
+    hab_is_res = cfg.habitat_map_is_resistances
+    hab_file = cfg.habitat_file
+    fp_file = cfg.point_file
+    source_file = cfg.source_file
+    ground_file = cfg.ground_file
 
-    is_pairwise = cfg["scenario"] in PAIRWISE
+    is_pairwise = cfg.scenario == sc_pairwise
 
     i,j,v,starts_from_zero = load_graph(V, hab_file, T)
 
@@ -420,45 +420,45 @@ end
 function load_raster_data(T, V, cfg)::RasterData{T,V}
 
     # Habitat file
-    hab_file = cfg["habitat_file"]
-    hab_is_res = cfg["habitat_map_is_resistances"] in TRUELIST
+    hab_file = cfg.habitat_file
+    hab_is_res = cfg.habitat_map_is_resistances
 
     # Polygons
-    use_polygons = cfg["use_polygons"] in TRUELIST
-    polygon_file = cfg["polygon_file"]
+    use_polygons = cfg.use_polygons
+    polygon_file = cfg.polygon_file
 
     # Mask file
-    use_mask = cfg["use_mask"] in TRUELIST
-    mask_file = cfg["mask_file"]
+    use_mask = cfg.use_mask
+    mask_file = cfg.mask_file
 
     # Point file
-    point_file = cfg["point_file"]
+    point_file = cfg.point_file
 
     # Variable source strengths
-    use_var_source = cfg["use_variable_source_strengths"] in TRUELIST
-    var_source_file = cfg["variable_source_file"]
+    use_var_source = cfg.use_variable_source_strengths
+    var_source_file = cfg.variable_source_file
 
     # Included Pairs
-    use_inc_pairs = cfg["use_included_pairs"] in TRUELIST
-    inc_pairs_file = cfg["included_pairs_file"]
+    use_inc_pairs = cfg.use_included_pairs
+    inc_pairs_file = cfg.included_pairs_file
 
     # Advanced mode
-    is_pairwise = cfg["scenario"] in PAIRWISE
-    is_advanced = cfg["scenario"] in ADVANCED
-    source_file = cfg["source_file"]
-    ground_file = cfg["ground_file"]
-    ground_is_res = cfg["ground_file_is_resistances"] in TRUELIST
+    is_pairwise = cfg.scenario == sc_pairwise
+    is_advanced = cfg.scenario == sc_advanced
+    source_file = cfg.source_file
+    ground_file = cfg.ground_file
+    ground_is_res = cfg.ground_file_is_resistances
 
-    csinfo("Reading maps", cfg["suppress_messages"] in TRUELIST)
+    csinfo("Reading maps", cfg.suppress_messages)
 
     # Read cell map
     cellmap, hbmeta = read_cellmap(hab_file, hab_is_res, T)
     c = count(x -> x > 0, cellmap)
     ncells = length(cellmap)
-    if ncells > 5_000_000 && cfg["solver"] in CHOLMOD
+    if ncells > 5_000_000 && cfg.solver == st_cholmod
         cswarn("The landscape has $(ncells) cells and the CHOLMOD solver is selected. CHOLMOD is a sparse direct solver that consumes a lot of memory on large grids. Consider using solver = cg+amg instead.")
     end
-    csinfo("Resistance/Conductance map has $c nodes", cfg["suppress_messages"] in TRUELIST)
+    csinfo("Resistance/Conductance map has $c nodes", cfg.suppress_messages)
 
     # Read polymap
     if use_polygons

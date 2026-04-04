@@ -2,51 +2,63 @@ using Circuitscape
 using Test
 using DelimitedFiles
 
-import Circuitscape: parse_config, _compute, SINGLE, CHOLMOD, PARDISO, TRUELIST, cswarn
+import Circuitscape: parse_config, _compute, SINGLE, CHOLMOD, PARDISO, TRUELIST, cswarn,
+                     CSConfig, pr_single, st_cholmod, st_pardiso, _precision_str
 
 function compute_cholmod(str, batch_size = 5)
     cfg = parse_config(str)
-    T = cfg["precision"] in SINGLE ? Float32 : Float64
-    V = cfg["use_64bit_indexing"] in TRUELIST ? Int64 : Int32
+    T = cfg.precision == pr_single ? Float32 : Float64
+    V = cfg.use_64bit_indexing ? Int64 : Int32
     if T == Float32
         cswarn("Cholmod supports only double precision. Changing precision to double.")
         T = Float64
     end
-    cfg["solver"] = "cholmod"
-    cfg["cholmod_batch_size"] = string(batch_size)
-    _compute(T, V, cfg)
+    # Rebuild config with cholmod solver and batch size
+    d = Dict{String,String}(cfg)
+    d["solver"] = "cholmod"
+    d["cholmod_batch_size"] = string(batch_size)
+    cfg2 = CSConfig(d)
+    _compute(T, V, cfg2)
 end
 
 function compute_pardiso(str, batch_size = 5)
     cfg = parse_config(str)
-    T = cfg["precision"] in SINGLE ? Float32 : Float64
-    V = cfg["use_64bit_indexing"] in TRUELIST ? Int64 : Int32
+    T = cfg.precision == pr_single ? Float32 : Float64
+    V = cfg.use_64bit_indexing ? Int64 : Int32
     if T == Float32
         cswarn("Pardiso supports only double precision. Changing precision to double.")
         T = Float64
     end
-    cfg["solver"] = "pardiso"
-    cfg["cholmod_batch_size"] = string(batch_size)
-    _compute(T, V, cfg)
+    # Rebuild config with pardiso solver and batch size
+    d = Dict{String,String}(cfg)
+    d["solver"] = "pardiso"
+    d["cholmod_batch_size"] = string(batch_size)
+    cfg2 = CSConfig(d)
+    _compute(T, V, cfg2)
 end
 
 function compute_single(str)
     cfg = parse_config(str)
-    cfg["precision"] = "single"
-    V = cfg["use_64bit_indexing"] in TRUELIST ? Int64 : Int32
+    # Rebuild config with single precision
+    d = Dict{String,String}(cfg)
+    d["precision"] = "single"
+    cfg2 = CSConfig(d)
+    V = cfg2.use_64bit_indexing ? Int64 : Int32
     T = Float32
-    if cfg["solver"] in CHOLMOD || cfg["solver"] in PARDISO
+    if cfg2.solver == st_cholmod || cfg2.solver == st_pardiso
         cswarn("Cholmod and Pardiso support only double precision. Changing precision to double.")
         T = Float64
     end
-    _compute(T, V, cfg)
+    _compute(T, V, cfg2)
 end
 
 function compute_parallel(str, n_processes = 2)
     cfg = parse_config(str)
-    cfg["parallelize"] = "true"
-    cfg["max_parallel"] = "$(n_processes)"
-    compute(cfg)
+    # Rebuild config with parallel settings
+    d = Dict{String,String}(cfg)
+    d["parallelize"] = "true"
+    d["max_parallel"] = "$(n_processes)"
+    compute(d)
 end
 
 function model_problem(T, s)

@@ -48,10 +48,10 @@ function compute_graph_data(data::NetworkData{T,V}, cfg)::GraphProblem{T,V} wher
 
     cc = connected_components(SimpleWeightedGraph(A))
 	c = size(A,1)
-	csinfo("Graph has $c nodes and $(length(cc)) connected components", cfg["suppress_messages"] in TRUELIST)
+	csinfo("Graph has $c nodes and $(length(cc)) connected components", cfg.suppress_messages)
 
     t = @elapsed G = laplacian(A)
-    csinfo("Time taken to construct graph laplacian = $t", cfg["suppress_messages"] in TRUELIST)
+    csinfo("Time taken to construct graph laplacian = $t", cfg.suppress_messages)
 
     # T = eltype(i)
     exclude_pairs = Tuple{V,V}[]
@@ -73,27 +73,15 @@ function get_network_flags(cfg)
 
     # Computation flags
     is_raster = false
-    is_advanced = cfg["scenario"] in ADVANCED
+    is_advanced = cfg.scenario == sc_advanced
     is_alltoone = false
     is_onetoall = false
-    grnd_file_is_res = cfg["ground_file_is_resistances"] in TRUELIST
-    policy = Symbol(cfg["remove_src_or_gnd"])
-    solver = cfg["solver"]
+    grnd_file_is_res = cfg.ground_file_is_resistances
+    policy = _remove_policy_symbol(cfg.remove_src_or_gnd)
+    solver = _solver_str(cfg.solver)
 
     # Output flags
-    write_volt_maps = cfg["write_volt_maps"] in TRUELIST
-    write_cur_maps = cfg["write_cur_maps"] in TRUELIST
-    write_cum_cur_maps_only = cfg["write_cum_cur_map_only"] in TRUELIST
-    write_max_cur_maps = cfg["write_max_cur_maps"] in TRUELIST
-    set_null_currents_to_nodata = cfg["set_null_currents_to_nodata"] in TRUELIST
-    set_null_voltages_to_nodata = cfg["set_null_voltages_to_nodata"] in TRUELIST
-    compress_grids = cfg["compress_grids"] in TRUELIST
-    log_transform_maps = cfg["log_transform_maps"] in TRUELIST
-
-    o = OutputFlags(write_volt_maps, write_cur_maps,
-                    write_cum_cur_maps_only, write_max_cur_maps,
-                    set_null_currents_to_nodata, set_null_voltages_to_nodata,
-                    compress_grids, log_transform_maps)
+    o = get_output_flags(cfg)
 
     NetworkFlags(is_raster, is_advanced, is_alltoone, is_onetoall,
                 grnd_file_is_res, policy, solver, o)
