@@ -15,3 +15,20 @@ There are several ways to increase the solvable grid size:
 - Coarsen your grids (use larger cell sizes) -- this often produces qualitatively similar results (see McRae et al. 2008)
 
 The all-to-one mode can be an alternative to pairwise mode when the goal is to produce a cumulative map of important connectivity areas among multiple source/target patches.
+
+## Multi-threading
+
+Circuitscape uses Julia's native threading for parallel computation. Start Julia
+with multiple threads to take advantage of this:
+
+```bash
+julia -t 4    # use 4 threads
+```
+
+The `cg+amg` solver benefits most from threading — each focal point pair is solved
+independently on a separate thread. For problems with many focal points, this can
+provide near-linear speedup.
+
+The `cholmod` and `pardiso` solvers perform batched direct solves that already use
+BLAS-level parallelism internally. Threading in these modes parallelizes the
+postprocessing step (current map accumulation and output writing).

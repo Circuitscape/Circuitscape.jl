@@ -88,8 +88,9 @@ solver = cholmod   # or pardiso
 
 ### Parallel Computing
 
-Circuitscape supports parallel computation on Linux, macOS, and Windows using Julia's
-built-in distributed computing.
+Circuitscape supports multi-threaded computation on Linux, macOS, and Windows.
+Start Julia with `julia -t N` to use N threads, or set `parallelize = True` in
+your INI file.
 
 ### Single Precision
 

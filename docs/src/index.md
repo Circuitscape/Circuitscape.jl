@@ -178,9 +178,29 @@ Pardiso requires double precision and will automatically switch if single
 precision is requested. Like CHOLMOD, it is a direct solver best suited
 for small to medium problem sizes.
 
-### Parallel on All Platforms
+### Parallel Computing
 
-Circuitscape.jl natively supports parallelism on Linux, macOS, and Windows.
+Circuitscape.jl supports multi-threaded computation on Linux, macOS, and Windows
+using Julia's native threading. To run with multiple threads, start Julia with the
+`-t` flag:
+
+```bash
+julia -t 4    # use 4 threads
+```
+
+Or set the `JULIA_NUM_THREADS` environment variable before starting Julia.
+
+You can also enable parallelism from the INI file:
+```
+parallelize = True
+```
+
+The AMG solver (default) parallelizes individual pair solves across threads,
+which can provide significant speedups for pairwise and one-to-all/all-to-one
+modes with many focal points. The CHOLMOD and Pardiso solvers perform batched
+direct solves which are already efficient via BLAS-level parallelism; threading
+is used for postprocessing (current map accumulation and output writing) in
+these modes.
 
 ### Single Precision (Experimental)
 

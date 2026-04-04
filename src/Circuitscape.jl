@@ -9,8 +9,6 @@ using GZip
 
 using LinearAlgebra
 using SparseArrays
-using SharedArrays
-using Distributed
 using DelimitedFiles
 using Logging
 using Dates

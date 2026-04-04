@@ -1,8 +1,8 @@
 struct Cumulative{T,V}
-    cum_curr::Vector{SharedMatrix{T}}
-    max_curr::Vector{SharedMatrix{T}}
-	cum_branch_curr::Vector{SharedVector{T}}
-	cum_node_curr::Vector{SharedVector{T}}
+    cum_curr::Vector{Matrix{T}}
+    max_curr::Vector{Matrix{T}}
+	cum_branch_curr::Vector{Vector{T}}
+	cum_node_curr::Vector{Vector{T}}
 	coords::Vector{Tuple{V,V}}
 end
 
@@ -162,6 +162,12 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
         component_data = ComponentData(comp, matrix, local_nodemap, hbmeta, cellmap)
 
         function f(i)
+            # Each task needs its own workspace (mutable scratch vectors)
+            # but shares the AMG hierarchy (levels, operators) which is read-only
+            ml = P.ml
+            local_P = aspreconditioner(AlgebraicMultigrid.MultiLevel(
+                ml.levels, ml.final_A, ml.coarse_solver,
+                ml.presmoother, ml.postsmoother, deepcopy(ml.workspace)))
 
             # Generate return type
             ret = Vector{Tuple{V,V,T}}()
@@ -177,7 +183,7 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
 
             # Iteration space through all possible pairs
             rng = i+1:size(csub, 1)
-            if nprocs() > 1
+            if Threads.nthreads() > 1
                 for j in rng
                     pj = csub[j]
                     csinfo("Scheduling pair $(d[(pi,pj)]) of $num to be solved", cfg.suppress_messages)
@@ -212,7 +218,7 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
                         # Solve system
                         # csinfo("Solving points $pi and $pj")
                         log && csinfo("Solving pair $(d[(pi,pj)]) of $num", cfg.suppress_messages)
-                        t2 = @elapsed v = solve_linear_system(matrix, current, P)
+                        t2 = @elapsed v = solve_linear_system(matrix, current, local_P)
                         csinfo("Time taken to solve linear system = $t2 seconds", cfg.suppress_messages)
 
                         v .= v .- v[comp_i]
@@ -233,9 +239,6 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
                 end
             end
 
-        # matrix[comp_i, comp_i] = d
-        GC.gc()
-
         ret
         end
 
@@ -246,9 +249,9 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
         else
             is_parallel = cfg.parallelize
             if is_parallel
-                X = pmap(x ->f(x), 1:size(csub,1))
+                X = fetch.(map(x -> Threads.@spawn(f(x)), 1:size(csub,1)))
             else
-                X = map(x ->f(x), 1:size(csub,1))
+                X = map(f, 1:size(csub,1))
             end
 
             # Set all resistances
@@ -446,7 +449,7 @@ function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, PardisoSolv
 
             is_parallel = cfg.parallelize
             if is_parallel
-                X = pmap(x -> f(x, rng, lhs), 1:length(rng))
+                X = fetch.(map(x -> Threads.@spawn(f(x, rng, lhs)), 1:length(rng)))
             else
                 X = map(x -> f(x, rng, lhs), 1:length(rng))
             end

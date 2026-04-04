@@ -62,7 +62,7 @@ function onetoall_kernel(data::RasterData{T,V}, flags, cfg)::Matrix{T} where {T,
     cum = initialize_cum_maps(gmap, flags.outputflags.write_max_cur_maps)
 
     point_ids = included_pairs.point_ids
-    res = zeros(eltype(a), size(points_unique, 1)) |> SharedArray
+    res = zeros(eltype(a), size(points_unique, 1))
     num_points_to_solve = size(points_unique, 1)
     original_point_map = copy(point_map)
     unique_point_map = zeros(V, size(gmap))
@@ -75,12 +75,9 @@ function onetoall_kernel(data::RasterData{T,V}, flags, cfg)::Matrix{T} where {T,
 
     # @distributed for i = 1:num_points_to_solve
     function f(i)
-        # copyto!(point_map, original_point_map)
-        point_map = copy(original_point_map)
+        let point_map = copy(original_point_map), s = copy(z), strength_map = copy(strength_map), source_map = source_map, newpoly = newpoly, nodemap = nodemap, a = a
         str = use_variable_strengths ? strengths[i,2] : 1
         csinfo("Solving point $i of $num_points_to_solve", cfg.suppress_messages)
-        # copyto!(s, z)
-        s = copy(z)
         n = points_unique[i]
         if use_included_pairs
             for j = 1:size(point_ids,1)
@@ -89,27 +86,24 @@ function onetoall_kernel(data::RasterData{T,V}, flags, cfg)::Matrix{T} where {T,
                     map!(x -> x == exclude ? 0 : x, point_map, point_map)
                 end
             end
-            # polymap = create_new_polymap(gmap, Polymap(polymap), points_rc, point_map = point_map)
             newpoly = create_new_polymap(gmap, polymap, points_rc, 0, 0, point_map)
             nodemap = construct_node_map(gmap, polymap)
             a = construct_graph(gmap, nodemap, avg_res, four_neighbors)
         end
         if use_variable_strengths
-            _tmp = [point_map[f(1,x), f(2,x)] for x = 1:size(points_rc[1], 1)]
+            _tmp = [point_map[points_rc[1][x], points_rc[2][x]] for x = 1:size(points_rc[1], 1)]
             idx = findall(x -> x == 0, _tmp)
             _strengths = deepcopy(strengths)
             _strengths[idx, 2] .= 1
             for x = 1:size(points_rc[1], 1)
-                strength_map[f(1,x), f(2,x)] = _strengths[x,2]
+                strength_map[points_rc[1][x], points_rc[2][x]] = _strengths[x,2]
             end
         end
-        # T = eltype(a)
         if sum(point_map) == n
             res[i] = -1
             return nothing
         end
         if one_to_all
-            #source_map = map(x -> x == n ? str : 0, point_map)
             source_map = map(x -> x == n ? T(str) : T(0), unique_point_map)
             ground_map = map(x -> x == n ? T(0) : T(x), point_map)
             map!(x -> x > 0 ? Inf : x, ground_map, ground_map)
@@ -119,7 +113,6 @@ function onetoall_kernel(data::RasterData{T,V}, flags, cfg)::Matrix{T} where {T,
             else
                 source_map = map(x -> x != 0 ? T(1) : T(0), unique_point_map)
                 source_map = map((x,y) -> x == n ? T(0) : y, point_map, source_map)
-                # map!(x -> x != 0 ? 1 : x, source_map, source_map)
             end
             ground_map = map(x -> x == n ? Inf : T(0), point_map)
         end
@@ -133,28 +126,36 @@ function onetoall_kernel(data::RasterData{T,V}, flags, cfg)::Matrix{T} where {T,
 
 
         solver = get_solver(cfg)
-      
+
         advanced_data = AdvancedProblem(G, cc, nodemap, newpoly, hbmeta,
-                        sources, grounds, source_map, finite_grounds, 
+                        sources, grounds, source_map, finite_grounds,
                         check_node, n, gmap, solver)
 
 
         if one_to_all
-            # v = advanced(cfg, a, source_map, ground_map; nodemap = nodemap, policy = :rmvgnd,
-            #                check_node = check_node, src = n, polymap = Polymap(newpoly), hbmeta = hbmeta)
             v, curr = advanced_kernel(advanced_data, flags, cfg)
         else
-            # v = advanced(cfg, a, source_map, ground_map; nodemap = nodemap, policy = :rmvsrc,
-            #                check_node = check_node, src = n, polymap = Polymap(newpoly), hbmeta = hbmeta)
             v, curr = advanced_kernel(advanced_data, flags, cfg)
         end
         res[i] = v[1]
 
-        cum.cum_curr[mycsid()] .+= curr
-        flags.outputflags.write_max_cur_maps && (cum.max_curr[mycsid()] .= max.(cum.max_curr[mycsid()], curr))
+        return curr
+        end
     end
 
-    pmap(x -> f(x), 1:num_points_to_solve)
+    is_parallel = cfg.parallelize
+    if is_parallel
+        results = fetch.(map(x -> Threads.@spawn(f(x)), 1:num_points_to_solve))
+    else
+        results = map(f, 1:num_points_to_solve)
+    end
+
+    # Reduce: accumulate current maps on main thread
+    for curr in results
+        curr === nothing && continue
+        cum.cum_curr[1] .+= curr
+        flags.outputflags.write_max_cur_maps && (cum.max_curr[1] .= max.(cum.max_curr[1], curr))
+    end
 
     if flags.outputflags.write_cur_maps || flags.outputflags.write_cum_cur_map_only
         write_cum_maps(cum, gmap, cfg, hbmeta,

@@ -89,8 +89,8 @@ All Circuitscape configuration is done through an `.ini` file. Below is a comple
 | `precision` | String | `Double` | Floating-point precision. Values: `Double`, `Single`. CHOLMOD and Pardiso require double precision. |
 | `use_64bit_indexing` | Boolean | `True` | If `True`, use 64-bit integer indexing. Required for very large grids. |
 | `cholmod_batch_size` | Integer | `1000` | Number of pairs to solve simultaneously when using CHOLMOD in pairwise mode. |
-| `parallelize` | Boolean | `False` | If `True`, run iterations in parallel. |
-| `max_parallel` | Integer | `0` | Number of parallel workers to use. |
+| `parallelize` | Boolean | `False` | If `True`, run iterations in parallel using Julia threads. Start Julia with `julia -t N` for N threads. |
+| `max_parallel` | Integer | `0` | Number of parallel workers (legacy setting, threads are now controlled by Julia's `-t` flag). |
 | `low_memory_mode` | Boolean | `False` | If `True`, reduce memory usage at the cost of computation time. |
 | `preemptive_memory_release` | Boolean | `False` | If `True`, release memory more aggressively during computation. |
 
@@ -139,7 +139,7 @@ For raster analyses, focal nodes may occur at points (single cells on the resist
 
 ### Parallelism
 
-Circuitscape can run iterations in parallel for pairwise mode when focal points (not focal regions) are used. Set `parallelize = True` and `max_parallel` to the desired number of processes.
+Circuitscape uses Julia's native threading for parallel computation. Set `parallelize = True` and start Julia with `julia -t N` for N threads. Parallelism benefits pairwise, one-to-all, and all-to-one modes.
 
 ## Advanced Mode Options
 

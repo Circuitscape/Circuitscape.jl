@@ -25,13 +25,11 @@ function compute(path::String)
     is_parallel = cfg.parallelize
     if is_parallel
         n = cfg.max_parallel
-        csinfo("Starting up Circuitscape to use $n processes in parallel", cfg.suppress_messages)
-        myaddprocs(n)
+        csinfo("Starting up Circuitscape to use $n threads in parallel", cfg.suppress_messages)
     end
     t = @elapsed r = _compute(T, V, cfg)
 
     csinfo("Time taken to complete job = $t", cfg.suppress_messages)
-    is_parallel && rmprocs(workers())
     r
 end
 
@@ -69,13 +67,11 @@ function compute(dict)
     is_parallel = cfg.parallelize
     if is_parallel
         n = cfg.max_parallel
-        csinfo("Starting up Circuitscape to use $n processes in parallel", cfg.suppress_messages)
-        myaddprocs(n)
+        csinfo("Starting up Circuitscape to use $n threads in parallel", cfg.suppress_messages)
     end
     t = @elapsed r = _compute(T, V, cfg)
 
     csinfo("Time taken to complete job = $t", cfg.suppress_messages)
-    is_parallel && rmprocs(workers())
 
     r
 end
