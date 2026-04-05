@@ -201,8 +201,6 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
                     continue
                 end
 
-                # Forget excluded pairs
-                ex = false
                 for c_i in I
                     for c_j in J
                         if (orig_pts[c_i], orig_pts[c_j]) in exclude
