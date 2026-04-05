@@ -2,62 +2,29 @@ using Circuitscape
 using Test
 using DelimitedFiles
 
-import Circuitscape: parse_config, _compute, SINGLE, CHOLMOD, PARDISO, TRUELIST, cswarn,
-                     CSConfig, pr_single, st_cholmod, st_pardiso, _precision_str
+import Circuitscape: parse_config, CSConfig
 
-function compute_cholmod(str, batch_size = 5)
-    cfg = parse_config(str)
-    T = cfg.precision == pr_single ? Float32 : Float64
-    V = cfg.use_64bit_indexing ? Int64 : Int32
-    if T == Float32
-        cswarn("Cholmod supports only double precision. Changing precision to double.")
-        T = Float64
-    end
-    # Rebuild config with cholmod solver and batch size
-    d = Dict{String,String}(cfg)
-    d["solver"] = "cholmod"
-    d["cholmod_batch_size"] = string(batch_size)
-    cfg2 = CSConfig(d)
-    _compute(T, V, cfg2)
+"""Clean the test output directory."""
+function clean_output()
+    outdir = joinpath(@__DIR__, "output")
+    rm(outdir, force=true, recursive=true)
+    mkpath(outdir)
 end
 
-function compute_pardiso(str, batch_size = 5)
-    cfg = parse_config(str)
-    T = cfg.precision == pr_single ? Float32 : Float64
-    V = cfg.use_64bit_indexing ? Int64 : Int32
-    if T == Float32
-        cswarn("Pardiso supports only double precision. Changing precision to double.")
-        T = Float64
-    end
-    # Rebuild config with pardiso solver and batch size
-    d = Dict{String,String}(cfg)
-    d["solver"] = "pardiso"
-    d["cholmod_batch_size"] = string(batch_size)
-    cfg2 = CSConfig(d)
-    _compute(T, V, cfg2)
-end
+"""
+    compute_with(str; solver, precision, parallel)
 
-function compute_single(str)
+Run a Circuitscape job with overridden settings.
+"""
+function compute_with(str::String;
+                      solver::String = "",
+                      precision::String = "",
+                      parallel::Bool = false)
     cfg = parse_config(str)
-    # Rebuild config with single precision
     d = Dict{String,String}(cfg)
-    d["precision"] = "single"
-    cfg2 = CSConfig(d)
-    V = cfg2.use_64bit_indexing ? Int64 : Int32
-    T = Float32
-    if cfg2.solver == st_cholmod || cfg2.solver == st_pardiso
-        cswarn("Cholmod and Pardiso support only double precision. Changing precision to double.")
-        T = Float64
-    end
-    _compute(T, V, cfg2)
-end
-
-function compute_parallel(str, n_processes = 2)
-    cfg = parse_config(str)
-    # Rebuild config with parallel settings
-    d = Dict{String,String}(cfg)
-    d["parallelize"] = "true"
-    d["max_parallel"] = "$(n_processes)"
+    solver != "" && (d["solver"] = solver)
+    precision != "" && (d["precision"] = precision)
+    parallel && (d["parallelize"] = "true")
     compute(d)
 end
 
@@ -87,22 +54,28 @@ function test_problem(str)
     end
 end
 
-function runtests(f = compute)
+"""
+    runtests(; solver, precision, parallel, label)
 
-    str = if f == compute_single
-            "Single"
-          else
-            "Double"
-          end
+Run the full Circuitscape test suite with the given settings.
+"""
+function runtests(; solver::String = "", precision::String = "",
+                    parallel::Bool = false, label::String = "")
+    if label == ""
+        parts = String[]
+        push!(parts, solver == "" ? "CG+AMG" : uppercase(solver))
+        push!(parts, parallel ? "parallel" : "sequential")
+        push!(parts, precision == "single" ? "Float32" : "Float64")
+        label = join(parts, ", ")
+    end
 
-    is_single = false
-    tol = 1e-6
-    str == "Single" && (is_single = true; tol = 1e-4)
+    is_single = precision == "single"
+    tol = is_single ? 1e-4 : 1e-6
+    f(str) = compute_with(str; solver, precision, parallel)
 
-    @testset "$str Precision Tests" begin
+    @testset "$label" begin
         @testset "Network Pairwise" begin
             for i = 1:3
-                @info("Testing sgNetworkVerify$i")
                 r = f("input/network/sgNetworkVerify$(i).ini")
                 x = readdlm("output_verify/sgNetworkVerify$(i)_resistances.out")
                 valx = x[2:end, 2:end]
@@ -112,19 +85,16 @@ function runtests(f = compute)
                 pts_r = r[2:end,1]
                 @test pts_x .+ 1 == pts_r
                 compare_all_output("sgNetworkVerify$(i)", is_single)
-                @info("Test sgNetworkVerify$i passed")
             end
         end
 
         @testset "Network Advanced" begin
             for i = 1:3
-                @info("Testing mgNetworkVerify$i")
                 r = f("input/network/mgNetworkVerify$(i).ini")
                 x = readdlm("output_verify/mgNetworkVerify$(i)_voltages.txt")
                 @. x[:,1] = x[:,1] + 1
                 @test sum(abs2, x - r) < tol
                 compare_all_output("mgNetworkVerify$(i)", is_single)
-                @info("Test mgNetworkVerify$i passed")
             end
         end
 
@@ -134,52 +104,43 @@ function runtests(f = compute)
                     continue
                 end
 
-                @info("Testing sgVerify$i")
                 r = f("input/raster/pairwise/$i/sgVerify$(i).ini")
                 x = readdlm("output_verify/sgVerify$(i)_resistances.out")
                 _x = readdlm("output/sgVerify$(i)_resistances.out")
                 @test sum(abs2, _x - r) < tol
                 @test sum(abs2, x - r) < tol
                 compare_all_output("sgVerify$(i)", is_single)
-                @info("Test sgVerify$i passed")
             end
         end
 
         @testset "Raster Advanced" begin
             for i in 1:6
-                @info("Testing mgVerify$i")
                 r = f("input/raster/advanced/$i/mgVerify$(i).ini")
                 compare_all_output("mgVerify$(i)")
-                @info("Test mgVerify$i passed")
             end
         end
 
         @testset "Raster One to All" begin
             for i in 1:13
-                @info("Testing oneToAllVerify$i")
                 r = f("input/raster/one_to_all/$i/oneToAllVerify$(i).ini")
                 x = readdlm("output_verify/oneToAllVerify$(i)_resistances.out")
                 @test sum(abs2, x - r) < tol
                 compare_all_output("oneToAllVerify$(i)", is_single)
-                @info("Test oneToAllVerify$i passed")
             end
         end
 
         @testset "Raster All to One" begin
             for i in 1:12
-                @info("Testing allToOneVerify$i")
                 r = f("input/raster/all_to_one/$i/allToOneVerify$(i).ini")
                 x = readdlm("output_verify/allToOneVerify$(i)_resistances.out")
                 @test sum(abs2, x - r) < tol
                 compare_all_output("allToOneVerify$(i)", is_single)
-                @info("Test allToOneVerify$i passed")
             end
         end
     end
 end
 
 function compare_all_output(str, is_single = false)
-
     gen_list, list_to_comp = generate_lists(str)
     tol = is_single ?  1e-4 : 1e-6
 
@@ -187,38 +148,29 @@ function compare_all_output(str, is_single = false)
         !occursin("_", f) && continue
         occursin("resistances", f) && continue
 
-        @info("Testing $f")
-
         if endswith(f, "asc")
             r = read_aagrid("output/$f")
             x = get_comp(list_to_comp, f)
             @test compare_aagrid(r, x, tol)
-            @info("Test $f passed")
-
         elseif occursin("Network", f)
             if occursin("branch", f)
                 r = read_branch_currents("output/$f")
                 x = !startswith(f, "mg") ? get_network_comp(list_to_comp, f) : readdlm("output_verify/$f")
                 @test compare_branch(r, x, tol)
-                @info("Test $f passed")
             else
                 r = read_node_currents("output/$f")
                 x = !startswith(f, "mg") ? get_network_comp(list_to_comp, f) : readdlm("output_verify/$f")
                 @test compare_node(r, x, tol)
-                @info("Test $f passed")
             end
         end
     end
-
 end
 
 list_of_files(str, pref) = readdir(pref) |> y -> filter(x -> startswith(x, "$(str)_"), y)
 generate_lists(str) = list_of_files(str, "output/"), list_of_files(str, "output_verify/")
 read_branch_currents(str) = readdlm(str)
 read_node_currents(str) = readdlm(str)
-
 read_aagrid(file) = readdlm(file, skipstart = 6)
-
 compare_aagrid(r::Matrix{T}, x::Matrix{T}, tol = 1e-6) where T = sum(abs2, x - r) < tol
 
 function get_comp(list_to_comp, f)
@@ -249,18 +201,4 @@ end
 function compare_node(r, x, tol = 1e-6)
     @. x[:,1] = x[:,1] + 1
     sum(abs2, sortslices(r, dims=1) - sortslices(x, dims=1)) < tol
-end
-
-function change_to_test_path()
-    origpath = pwd()
-    pkgpath = Base.pathof(Circuitscape)
-    cd(joinpath(dirname(pkgpath), "..", "test"))
-    origpath
-end
-
-function runtest(str)
-    origpath = change_to_test_path()
-    prob = test_problem(str)
-    compute(prob)
-    cd(origpath)
 end

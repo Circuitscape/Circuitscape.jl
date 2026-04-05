@@ -162,8 +162,7 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
         component_data = ComponentData(comp, matrix, local_nodemap, hbmeta, cellmap)
 
         function f(i)
-            # Each task needs its own workspace (mutable scratch vectors)
-            # but shares the AMG hierarchy (levels, operators) which is read-only
+            # Each task needs its own workspace (scratch vectors are mutable)
             ml = P.ml
             local_P = aspreconditioner(AlgebraicMultigrid.MultiLevel(
                 ml.levels, ml.final_A, ml.coarse_solver,
@@ -217,7 +216,7 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
 
                         # Solve system
                         # csinfo("Solving points $pi and $pj")
-                        log && csinfo("Solving pair $(d[(pi,pj)]) of $num", cfg.suppress_messages)
+                        log && haskey(d, (pi,pj)) && csinfo("Solving pair $(d[(pi,pj)]) of $num", cfg.suppress_messages)
                         t2 = @elapsed v = solve_linear_system(matrix, current, local_P)
                         csinfo("Time taken to solve linear system = $t2 seconds", cfg.suppress_messages)
 
@@ -488,7 +487,8 @@ end
 # TODO: In the pardiso case, we're not really constructing the factor
 # So can we make this consistent?
 function construct_cholesky_factor(matrix, ::CholmodSolver, suppress_info::Bool)
-    t = @elapsed factor = cholesky(matrix + sparse(10eps()*I,size(matrix)...))
+    T = eltype(matrix)
+    t = @elapsed factor = cholesky(matrix + sparse(T(10)*eps(T)*I,size(matrix)...))
     csinfo("Time taken to construct cholesky factor = $t", suppress_info)
     factor
 end
