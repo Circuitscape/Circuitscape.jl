@@ -1,6 +1,6 @@
 name: CI
 env:
-  JULIA_NUM_THREADS: 2
+  JULIA_NUM_THREADS: 4
 on:
   pull_request:
     branches:
@@ -20,6 +20,7 @@ jobs:
           - '1'
         os:
           - windows-latest
+          - ubuntu-latest
         arch:
           - x64
         include:

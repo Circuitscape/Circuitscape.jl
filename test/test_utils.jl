@@ -24,7 +24,7 @@ function compute_with(str::String;
     d = Dict{String,String}(cfg)
     solver != "" && (d["solver"] = solver)
     precision != "" && (d["precision"] = precision)
-    parallel && (d["parallelize"] = "true")
+    d["parallelize"] = parallel ? "true" : "false"
     compute(d)
 end
 
