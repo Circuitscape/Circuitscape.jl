@@ -1,6 +1,6 @@
 name: CI
 env:
-  JULIA_NUM_THREADS: 2
+  JULIA_NUM_THREADS: 4
 on:
   pull_request:
     branches:
@@ -19,13 +19,9 @@ jobs:
         version:
           - '1'
         os:
-          - windows-latest
+          - macOS-latest
         arch:
-          - x64
-        include:
-          - os: macOS-latest
-            arch: aarch64
-            version: '1'
+          - aarch64
     steps:
       - uses: actions/checkout@v6
       - uses: julia-actions/setup-julia@v2
@@ -50,6 +46,7 @@ jobs:
         version:
           - '1'
         os:
+          - windows-latest
           - ubuntu-latest
         arch:
           - x64

@@ -10,3 +10,4 @@ local
 .Trash-0/
 docs/build
 test/output/
+build/

@@ -30,7 +30,7 @@ function compute_advanced_data(data::NetworkData{T,V},
     A = sparse(i,j,v,m,m)
     A = A + A'
 
-    cc = connected_components(SimpleWeightedGraph(A))
+    cc = connected_components(SimpleGraph(A))
 	c = size(A,1)
 	csinfo("Graph has $c nodes and $(length(cc)) connected components", cfg.suppress_messages)
 

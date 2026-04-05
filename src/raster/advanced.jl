@@ -56,7 +56,7 @@ function compute_advanced_data(data::RasterData{T,V},
     G = laplacian(A)
 
     # Connected Components
-    cc = connected_components(SimpleWeightedGraph(G))
+    cc = connected_components(SimpleGraph(G))
 
     # Advanced mode specific stuff
     sources, grounds, finitegrounds =
