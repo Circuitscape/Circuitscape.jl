@@ -3,6 +3,7 @@ export  accumulate_current_maps,
         calculate_max_current_map
 
 const CUM_LOCK = ReentrantLock()
+const IO_LOCK = ReentrantLock()
 
 mutable struct MutablePair{T,V}
 	first::T

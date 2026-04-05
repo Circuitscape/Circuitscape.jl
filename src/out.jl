@@ -116,12 +116,14 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
 end
 
 function write_currents(node_curr_arr, branch_curr_arr, name, cfg)
-   pref = split(cfg.output_file, ".out")[1]
-   # 1e-6 because we guarantee only 6 digits of precision on solve
-   idx = findall(x -> !isapprox(x, 0.0, atol = 1e-6), branch_curr_arr[:,3])
-   branch_curr_arr = branch_curr_arr[idx, :]
-   writedlm("$(pref)_node_currents$(name).txt", node_curr_arr, '\t')
-   writedlm("$(pref)_branch_currents$(name).txt", branch_curr_arr, '\t')
+    lock(IO_LOCK) do
+        pref = split(cfg.output_file, ".out")[1]
+        # 1e-6 because we guarantee only 6 digits of precision on solve
+        idx = findall(x -> !isapprox(x, 0.0, atol = 1e-6), branch_curr_arr[:,3])
+        branch_curr_arr = branch_curr_arr[idx, :]
+        writedlm("$(pref)_node_currents$(name).txt", node_curr_arr, '\t')
+        writedlm("$(pref)_branch_currents$(name).txt", branch_curr_arr, '\t')
+    end
 end
 
 _append_name_to_node_currents(node_currents, cc) = [cc node_currents]
@@ -411,14 +413,14 @@ function write_volt_maps(name, output, component_data, flags, cfg)
 end
 
 function write_voltages(output, name, voltages::Vector{T}, cc) where {T}
+    lock(IO_LOCK) do
+        volt_arr = zeros(T, size(voltages, 1), 2)
+        volt_arr[:,1] = cc
+        volt_arr[:,2] = voltages
 
-    volt_arr = zeros(T, size(voltages, 1), 2)
-    volt_arr[:,1] = cc
-    volt_arr[:,2] = voltages
-
-    pref = split(output, ".out")[1]
-    writedlm("$(pref)_voltages$(name).txt", volt_arr)
-
+        pref = split(output, ".out")[1]
+        writedlm("$(pref)_voltages$(name).txt", volt_arr)
+    end
 end
 
 function _create_voltage_map(voltages::Vector{T}, nodemap, hbmeta) where {T}
@@ -490,6 +492,12 @@ function write_raster(fn_prefix::String,
                       wkt::String,
                       transform,
                       file_format::String)
+    lock(IO_LOCK) do
+        _write_raster(fn_prefix, array, wkt, transform, file_format)
+    end
+end
+
+function _write_raster(fn_prefix, array, wkt, transform, file_format)
     # transponse array back to columns by rows
     array_t = permutedims(array, [2, 1])
 

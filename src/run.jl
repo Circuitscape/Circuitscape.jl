@@ -16,8 +16,8 @@ function compute(path::String)
     update_logging!(cfg)
     write_config(cfg)
     T = cfg.precision == pr_single ? Float32 : Float64
-    if T == Float32 && (cfg.solver == st_cholmod || cfg.solver == st_pardiso)
-        cswarn("Cholmod & Pardiso solver modes work only in double precision. Switching precision to double.")
+    if T == Float32 && cfg.solver == st_pardiso
+        cswarn("Pardiso solver works only in double precision. Switching precision to double.")
         T = Float64
     end
     V = cfg.use_64bit_indexing ? Int64 : Int32
