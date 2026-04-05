@@ -25,7 +25,7 @@ Pardiso = "46dd5b70-b6fb-5a00-ae2d-e8fea33afaf2"
 CircuitscapePardisoExt = "Pardiso"
 
 [compat]
-Pardiso = "0.5"
+Pardiso = "1"
 AlgebraicMultigrid = "1"
 ArchGDAL = "0.10"
 DelimitedFiles = "1"
