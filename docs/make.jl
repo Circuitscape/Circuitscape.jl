@@ -2,9 +2,6 @@ using Circuitscape, Documenter
 
 makedocs(
     sitename = "Circuitscape.jl Documentation",
-    format = Documenter.HTML(
-        logo = "assets/logo.png"
-    ),
     pages = ["Home" => "index.md",
              "User Guide" => "usage.md",
              "Inputs, Outputs and Options" => "options.md", 
