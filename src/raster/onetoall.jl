@@ -153,8 +153,8 @@ function onetoall_kernel(data::RasterData{T,V}, flags, cfg)::Matrix{T} where {T,
     # Reduce: accumulate current maps on main thread
     for curr in results
         curr === nothing && continue
-        cum.cum_curr[1] .+= curr
-        flags.outputflags.write_max_cur_maps && (cum.max_curr[1] .= max.(cum.max_curr[1], curr))
+        cum.cum_curr .+= curr
+        flags.outputflags.write_max_cur_maps && (cum.max_curr .= max.(cum.max_curr, curr))
     end
 
     if flags.outputflags.write_cur_maps || flags.outputflags.write_cum_cur_map_only

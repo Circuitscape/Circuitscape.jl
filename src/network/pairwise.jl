@@ -17,8 +17,8 @@ function network_pairwise(T, V, cfg)::Matrix{T}
 
 	# Write cum maps
 	if flags.outputflags.write_cur_maps
-		cum_node_curr = graphdata.cum.cum_node_curr[1]
-		cum_branch_curr = graphdata.cum.cum_branch_curr[1]
+		cum_node_curr = graphdata.cum.cum_node_curr
+		cum_branch_curr = graphdata.cum.cum_branch_curr
 		cum_node_curr = hcat(1:length(cum_node_curr), cum_node_curr)
 		coords = graphdata.cum.coords
 		cum_branch_curr = hcat(getindex.(coords, 1), getindex.(coords, 2), cum_branch_curr)
