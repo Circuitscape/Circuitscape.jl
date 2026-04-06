@@ -224,6 +224,8 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
                         # Calculate resistance
                         r = v[comp_j] - v[comp_i]
 
+                        println("SOLVE task=$i pi=$pi pj=$pj comp_i=$comp_i comp_j=$comp_j c_i=$c_i c_j=$c_j r=$r")
+
                         # Return resistance value
                         push!(ret, (c_i, c_j, r))
                         if get_shortcut_resistances
