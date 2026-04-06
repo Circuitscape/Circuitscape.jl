@@ -208,8 +208,7 @@ function compute_omniscape_current(
 
     flags = RasterFlags(
         true, false, true, false, false, false, Symbol("rmvsrc"),
-        cfg.connect_four_neighbors_only, false, 
-        _solver_str(cfg.solver), o
+        cfg.connect_four_neighbors_only, false, o
     )
 
     data = compute_advanced_data(rasterdata, flags, cfg)
