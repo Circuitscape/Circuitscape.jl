@@ -74,13 +74,12 @@ function get_network_flags(cfg)
     is_onetoall = false
     grnd_file_is_res = cfg.ground_file_is_resistances
     policy = _remove_policy_symbol(cfg.remove_src_or_gnd)
-    solver = _solver_str(cfg.solver)
 
     # Output flags
     o = get_output_flags(cfg)
 
     NetworkFlags(is_raster, is_advanced, is_alltoone, is_onetoall,
-                grnd_file_is_res, policy, solver, o)
+                grnd_file_is_res, policy, o)
 end
 
 struct NetworkFlags
@@ -90,7 +89,6 @@ struct NetworkFlags
     is_onetoall::Bool
     grnd_file_is_res::Bool
     policy::Symbol
-    solver::String
     outputflags::OutputFlags
 end
 

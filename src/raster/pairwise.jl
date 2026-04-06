@@ -8,7 +8,6 @@ struct RasterFlags
     policy::Symbol
     four_neighbors::Bool
     avg_res::Bool
-    solver::String
     outputflags::OutputFlags
 end
 
@@ -40,7 +39,6 @@ function get_raster_flags(cfg)
     is_alltoone = cfg.scenario == sc_alltoone
     four_neighbors = cfg.connect_four_neighbors_only
     avg_res = cfg.connect_using_avg_resistances
-    solver = _solver_str(cfg.solver)
     ground_file_is_resistances = cfg.ground_file_is_resistances
     policy = _remove_policy_symbol(cfg.remove_src_or_gnd)
 
@@ -50,7 +48,7 @@ function get_raster_flags(cfg)
     RasterFlags(is_raster, is_pairwise, is_advanced,
                 is_onetoall, is_alltoone,
                 ground_file_is_resistances, policy,
-                four_neighbors, avg_res, solver, o)
+                four_neighbors, avg_res, o)
 end
 
 
