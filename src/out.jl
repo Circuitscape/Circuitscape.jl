@@ -62,11 +62,10 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
 		cum_branch_curr = output.cum.cum_branch_curr
 		cum_node_curr = output.cum.cum_node_curr
 
-        lock(CUM_LOCK) do
+        lock(output.cum.lock) do
         # Accumulate branch currents
-        # cum_branch_curr[mycsid()] .+= branch_currents_array[:,3]
 		bca = branch_currents_array
-		cbc = cum_branch_curr[mycsid()]
+		cbc = cum_branch_curr
 
 		k = output.cum.coords
 		@inbounds for i = 1:size(branch_currents_array, 1)
@@ -77,7 +76,7 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
 
 
         # Accumulate node currents
-        cnc = cum_node_curr[mycsid()]
+        cnc = cum_node_curr
 		nca = node_currents_array
 		@inbounds for i = 1:size(nca, 1)
 			cnc[Int(nca[i,1])] += nca[i,2]
@@ -98,12 +97,12 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
                             set_null_to_nodata = set_null_currents_to_nodata)
 
         # Accumulate by default
-        lock(CUM_LOCK) do
-            cum_curr[mycsid()] .+= cmap
+        lock(output.cum.lock) do
+            cum_curr .+= cmap
 
             # Max current if user asks for it
             if write_max_cur_maps
-                max_curr[mycsid()] .= max.(max_curr[mycsid()], cmap)
+                max_curr .= max.(max_curr, cmap)
             end
         end
 
@@ -116,14 +115,12 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
 end
 
 function write_currents(node_curr_arr, branch_curr_arr, name, cfg)
-    lock(IO_LOCK) do
-        pref = split(cfg.output_file, ".out")[1]
-        # 1e-6 because we guarantee only 6 digits of precision on solve
-        idx = findall(x -> !isapprox(x, 0.0, atol = 1e-6), branch_curr_arr[:,3])
-        branch_curr_arr = branch_curr_arr[idx, :]
-        writedlm("$(pref)_node_currents$(name).txt", node_curr_arr, '\t')
-        writedlm("$(pref)_branch_currents$(name).txt", branch_curr_arr, '\t')
-    end
+    pref = split(cfg.output_file, ".out")[1]
+    # 1e-6 because we guarantee only 6 digits of precision on solve
+    idx = findall(x -> !isapprox(x, 0.0, atol = 1e-6), branch_curr_arr[:,3])
+    branch_curr_arr = branch_curr_arr[idx, :]
+    writedlm("$(pref)_node_currents$(name).txt", node_curr_arr, '\t')
+    writedlm("$(pref)_branch_currents$(name).txt", branch_curr_arr, '\t')
 end
 
 _append_name_to_node_currents(node_currents, cc) = [cc node_currents]
@@ -413,14 +410,12 @@ function write_volt_maps(name, output, component_data, flags, cfg)
 end
 
 function write_voltages(output, name, voltages::Vector{T}, cc) where {T}
-    lock(IO_LOCK) do
-        volt_arr = zeros(T, size(voltages, 1), 2)
-        volt_arr[:,1] = cc
-        volt_arr[:,2] = voltages
+    volt_arr = zeros(T, size(voltages, 1), 2)
+    volt_arr[:,1] = cc
+    volt_arr[:,2] = voltages
 
-        pref = split(output, ".out")[1]
-        writedlm("$(pref)_voltages$(name).txt", volt_arr)
-    end
+    pref = split(output, ".out")[1]
+    writedlm("$(pref)_voltages$(name).txt", volt_arr)
 end
 
 function _create_voltage_map(voltages::Vector{T}, nodemap, hbmeta) where {T}
@@ -472,13 +467,13 @@ end
 function write_cum_maps(cum, cellmap::Matrix{T}, cfg, hbmeta, write_max, write_cum) where T
 
     if write_cum || cfg.write_cur_maps
-        cum_curr = cum.cum_curr[1]
+        cum_curr = cum.cum_curr
         postprocess_cum_curmap!(cum_curr)
         write_grid(cum_curr, "", cfg, hbmeta, cum = true)
     end
 
     if write_max
-        max_curr = cum.max_curr[1]
+        max_curr = cum.max_curr
         postprocess_cum_curmap!(max_curr)
         write_grid(max_curr, "", cfg, hbmeta, max = true)
     end
@@ -492,13 +487,7 @@ function write_raster(fn_prefix::String,
                       wkt::String,
                       transform,
                       file_format::String)
-    lock(IO_LOCK) do
-        _write_raster(fn_prefix, array, wkt, transform, file_format)
-    end
-end
-
-function _write_raster(fn_prefix, array, wkt, transform, file_format)
-    # transponse array back to columns by rows
+    # Prepare data outside the lock
     array_t = permutedims(array, [2, 1])
 
     width, height = size(array_t)
@@ -513,28 +502,30 @@ function _write_raster(fn_prefix, array, wkt, transform, file_format)
     # Append file extention to filename
     fn = string(fn_prefix, ext)
 
-    # Create raster in memory *NEEDED* because no create driver for .asc
-    ArchGDAL.create(fn_prefix,
-                    driver = ArchGDAL.getdriver("MEM"),
-                    width = width,
-                    height = height,
-                    nbands = 1,
-                    dtype = eltype(array_t),
-                    options = options) do dataset
-        band = ArchGDAL.getband(dataset, 1)
-        # Write data to band
-        ArchGDAL.write!(band, array_t)
+    # Lock only the ArchGDAL calls (GDAL is not thread safe)
+    lock(IO_LOCK) do
+        # Create raster in memory *NEEDED* because no create driver for .asc
+        ArchGDAL.create(fn_prefix,
+                        driver = ArchGDAL.getdriver("MEM"),
+                        width = width,
+                        height = height,
+                        nbands = 1,
+                        dtype = eltype(array_t),
+                        options = options) do dataset
+            band = ArchGDAL.getband(dataset, 1)
+            # Write data to band
+            ArchGDAL.write!(band, array_t)
 
-        # Write nodata and projection info
-        ArchGDAL.setnodatavalue!(band, -9999.0)
-        ArchGDAL.setgeotransform!(dataset, transform)
-        ArchGDAL.setproj!(dataset, wkt)
+            # Write nodata and projection info
+            ArchGDAL.setnodatavalue!(band, -9999.0)
+            ArchGDAL.setgeotransform!(dataset, transform)
+            ArchGDAL.setproj!(dataset, wkt)
 
-        # Copy memory object to disk (necessary because ArchGDAL.create
-        # does not support creation of ASCII rasters)
-        ArchGDAL.write(dataset, fn,
-                       driver = ArchGDAL.getdriver(driver),
-                       options = options)
+            # Copy memory object to disk (necessary because ArchGDAL.create
+            # does not support creation of ASCII rasters)
+            ArchGDAL.write(dataset, fn,
+                           driver = ArchGDAL.getdriver(driver),
+                           options = options)
+        end
     end
-
 end

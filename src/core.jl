@@ -1,9 +1,10 @@
 struct Cumulative{T,V}
-    cum_curr::Vector{Matrix{T}}
-    max_curr::Vector{Matrix{T}}
-	cum_branch_curr::Vector{Vector{T}}
-	cum_node_curr::Vector{Vector{T}}
+    cum_curr::Matrix{T}
+    max_curr::Matrix{T}
+	cum_branch_curr::Vector{T}
+	cum_node_curr::Vector{T}
 	coords::Vector{Tuple{V,V}}
+    lock::ReentrantLock
 end
 
 struct GraphProblem{T,V,W}

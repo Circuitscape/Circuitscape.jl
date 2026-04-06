@@ -2,7 +2,6 @@ export  accumulate_current_maps,
         calculate_cum_current_map,
         calculate_max_current_map
 
-const CUM_LOCK = ReentrantLock()
 const IO_LOCK = ReentrantLock()
 
 mutable struct MutablePair{T,V}
@@ -136,31 +135,26 @@ function postprocess_cum_curmap!(accum)
     end
 end
 
-mycsid() = 1
-
 function initialize_cum_maps(cellmap::Matrix{T}, max = false) where T
-    cum_curr = [zeros(T, size(cellmap)...)]
-    max_curr = Vector{Matrix{T}}()
-    if max
-        max_curr = [fill(T(-9999), size(cellmap)...)]
-    end
-    cum_branch_curr = Vector{Vector{T}}()
-    cum_node_curr = Vector{Vector{T}}()
+    cum_curr = zeros(T, size(cellmap)...)
+    max_curr = max ? fill(T(-9999), size(cellmap)...) : zeros(T, 0, 0)
+    cum_branch_curr = Vector{T}()
+    cum_node_curr = Vector{T}()
 
     Cumulative(cum_curr, max_curr,
-			   cum_branch_curr, cum_node_curr, Vector{Tuple{Int,Int}}())
+			   cum_branch_curr, cum_node_curr, Vector{Tuple{Int,Int}}(), ReentrantLock())
 end
 
 function initialize_cum_vectors(coords::Tuple{Vector{V},Vector{V},Vector{T}}, num_nodes::Int64) where {T,V}
-    cum_curr = Vector{Matrix{T}}()
-    max_curr = Vector{Matrix{T}}()
+    cum_curr = zeros(T, 0, 0)
+    max_curr = zeros(T, 0, 0)
 	_i, _j, _v = coords
-	cum_branch_curr = [zeros(T, length(_v))]
-	cum_node_curr = [zeros(T, num_nodes)]
+	cum_branch_curr = zeros(T, length(_v))
+	cum_node_curr = zeros(T, num_nodes)
 
 	pair_coords = map((x,y) -> (x,y), _i, _j)
     Cumulative(cum_curr, max_curr,
-			   cum_branch_curr, cum_node_curr, pair_coords)
+			   cum_branch_curr, cum_node_curr, pair_coords, ReentrantLock())
 end
 
 # Function to calculate current for Omniscape moving window solves
