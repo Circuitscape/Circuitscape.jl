@@ -198,9 +198,8 @@ parallelize = True
 The AMG solver (default) parallelizes individual pair solves across threads,
 which can provide significant speedups for pairwise and one-to-all/all-to-one
 modes with many focal points. The CHOLMOD and Pardiso solvers perform batched
-direct solves which are already efficient via BLAS-level parallelism; threading
-is used for postprocessing (current map accumulation and output writing) in
-these modes.
+direct solves; threading is used for postprocessing (current map accumulation
+and output writing) in these modes.
 
 ### Single Precision (Experimental)
 

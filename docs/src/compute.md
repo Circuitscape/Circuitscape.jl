@@ -27,8 +27,13 @@ julia -t 4    # use 4 threads
 
 The `cg+amg` solver benefits most from threading — each focal point pair is solved
 independently on a separate thread. For problems with many focal points, this can
-provide near-linear speedup.
+provide significant speedups.
 
-The `cholmod` and `pardiso` solvers perform batched direct solves that already use
-BLAS-level parallelism internally. Threading in these modes parallelizes the
-postprocessing step (current map accumulation and output writing).
+The `cholmod` and `pardiso` solvers perform batched direct solves. Threading in
+these modes parallelizes the postprocessing step (current map accumulation and
+output writing).
+
+!!! note
+    Circuitscape sets BLAS to single-threaded at startup. Its workload is
+    predominantly sparse matrix operations which do not benefit from
+    multi-threaded BLAS.
