@@ -178,9 +178,6 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
             I = findall(x -> x == pi, points)
             smash_repeats!(ret, I)
 
-            # Preprocess matrix
-            # d = matrix[comp_i, comp_i]
-
             # Iteration space through all possible pairs
             rng = i+1:size(csub, 1)
             if Threads.nthreads() > 1
