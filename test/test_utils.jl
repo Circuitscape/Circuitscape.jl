@@ -150,14 +150,14 @@ function check_resistances(x, r, tol; label="")
                 # Print row/col headers (focal point IDs) if available
                 ri = size(r,1) >= i ? r[i,1] : i
                 rj = size(r,2) >= j ? r[1,j] : j
-                @warn "$label entry [$i,$j] (points $ri,$rj): expected=$(x[i,j]) got=$(r[i,j]) diff=$(abs(x[i,j]-r[i,j]))"
+                println("$label MISMATCH [$i,$j] (points $ri,$rj): expected=$(x[i,j]) got=$(r[i,j]) diff=$(abs(x[i,j]-r[i,j]))")
             end
         end
     end
     if nfail > 10
-        @warn "$label $nfail total entries differ (showing first 10)"
+        println("$label $nfail total entries differ (showing first 10)")
     elseif nfail > 0
-        @warn "$label $nfail entries differ"
+        println("$label $nfail entries differ")
     end
     nfail == 0
 end
