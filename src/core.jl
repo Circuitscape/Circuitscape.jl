@@ -80,8 +80,9 @@ function get_solver(cfg)
         @info("Solver used: Pardiso")
         bs = cfg.cholmod_batch_size
         return PardisoSolver(bs)
+    else
+        error("Unknown solver: $s")
     end
-
 end
 
 function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T} where {T,V}
@@ -171,7 +172,8 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
             results = Vector{Tuple{V,V,T}}()
 
             src_node = csub[point_idx]
-            comp_i = something(findfirst(isequal(src_node), comp), 0)
+            comp_i = findfirst(isequal(src_node), comp)
+            comp_i === nothing && error("Node $src_node not found in component")
             comp_i = V(comp_i)
             src_indices = findall(x -> x == src_node, points)
             smash_repeats!(results, src_indices)
@@ -189,7 +191,8 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
             for pair_idx in pair_range
 
                 dst_node = csub[pair_idx]
-                comp_j = something(findfirst(isequal(dst_node), comp), 0)
+                comp_j = findfirst(isequal(dst_node), comp)
+                comp_j === nothing && error("Node $dst_node not found in component")
                 comp_j = V(comp_j)
                 dst_indices = findall(x -> x == dst_node, points)
 
@@ -241,7 +244,8 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
         end
 
         if get_shortcut_resistances
-            idx = something(findfirst(isequal(csub[1]), points), 0)
+            idx = findfirst(isequal(csub[1]), points)
+            idx === nothing && error("Focal point $(csub[1]) not found in points list")
             solve_pairs_for_point(1)
             update_shortcut_resistances!(idx, shortcut, resistances, points, comp)
         else
@@ -318,7 +322,7 @@ function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, PardisoSolv
 
     @info("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
 
-    num_pairs, pair_numbers = get_num_pairs(cc, points, exclude, orig_pts)
+    num_pairs, _ = get_num_pairs(cc, points, exclude, orig_pts)
     log && @info("Total number of pair solves = $num_pairs")
 
     # Initialize pairwise resistance
@@ -335,7 +339,7 @@ function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, PardisoSolv
             isempty(exclude)
         get_shortcut_resistances = true
         @info("Triggering resistance calculation shortcut")
-        num_pairs, pair_numbers = get_num_pairs_shortcut(cc, points, exclude, orig_pts)
+        num_pairs, _ = get_num_pairs_shortcut(cc, points, exclude, orig_pts)
         @info("Total number of pair solves has been reduced to $num_pairs ")
     end
     shortcut = Shortcut(get_shortcut_resistances, voltmatrix, shortcut_res)
@@ -344,7 +348,6 @@ function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, PardisoSolv
 
         # Subset of points relevant to CC
         csub = filter(x -> x in comp, points) |> unique
-        #idx = findin(c, csub)
 
         if isempty(csub)
             continue
@@ -367,7 +370,9 @@ function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, PardisoSolv
         function build_cholmod_batch(point_idx)
 
             src_node = csub[point_idx]
-            comp_i = V(something(findfirst(isequal(src_node), comp), 0))
+            comp_i_raw = findfirst(isequal(src_node), comp)
+            comp_i_raw === nothing && error("Node $src_node not found in component")
+            comp_i = V(comp_i_raw)
             src_indices = findall(x -> x == src_node, points)
             smash_repeats!(resistances, src_indices)
 
@@ -378,7 +383,9 @@ function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, PardisoSolv
             for pair_idx in pair_range
 
                 dst_node = csub[pair_idx]
-                comp_j = V(something(findfirst(isequal(dst_node), comp), 0))
+                comp_j_raw = findfirst(isequal(dst_node), comp)
+                comp_j_raw === nothing && error("Node $dst_node not found in component")
+                comp_j = V(comp_j_raw)
                 dst_indices = findall(x -> x == dst_node, points)
 
                 if src_node == dst_node
@@ -408,7 +415,8 @@ function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, PardisoSolv
             postprocess(output, component_data, flags, shortcut, cfg)
         end
         if get_shortcut_resistances
-            idx = something(findfirst(isequal(csub[1]), points), 0)
+            idx = findfirst(isequal(csub[1]), points)
+            idx === nothing && error("Focal point $(csub[1]) not found in points list")
             build_cholmod_batch(1)
         else
             build_cholmod_batch.(1:size(csub, 1))
@@ -572,7 +580,7 @@ end
 """
 Calculate laplacian of the adjacency matrix of a graph
 """
-function laplacian(G::SparseMatrixCSC{T,V}) where {T,V}
+function laplacian!(G::SparseMatrixCSC{T,V}) where {T,V}
     n = size(G, 1)
     s = Vector{eltype(G)}(undef,n)
     for i = 1:n
@@ -604,15 +612,17 @@ function solve_linear_system(
             G::SparseMatrixCSC{T,V},
             curr::Vector{T}, M)::Vector{T} where {T,V}
     v, stats = Krylov.cg(G, curr, M=M, ldiv=true, rtol=T(1e-6), itmax=100_000)
-    @assert norm(G*v .- curr) / norm(curr) < 1e-4
+    residual = norm(G*v .- curr) / norm(curr)
+    residual < 1e-4 || error("CG solver did not converge: relative residual $residual exceeds tolerance 1e-4")
     v
 end
 
 
 function solve_linear_system(factor::SuiteSparse.CHOLMOD.Factor, matrix, rhs)
     lhs = factor \ rhs
-    for i = 1:size(rhs, 2)
-        @assert (norm(matrix*lhs[:,i] .- rhs[:,i]) / norm(rhs[:,i])) < 1e-4
+    for col = 1:size(rhs, 2)
+        residual = norm(matrix*lhs[:,col] .- rhs[:,col]) / norm(rhs[:,col])
+        residual < 1e-4 || error("CHOLMOD solver residual $residual exceeds tolerance 1e-4 for column $col")
     end
     lhs
 end
@@ -661,8 +671,8 @@ function update_voltmatrix!(shortcut, output, component_data)
     j = output.col
 
     for i = 2:size(c, 1)
-        ind = something(findfirst(isequal(c[i]), cc),0)
-        if ind != 0
+        ind = findfirst(isequal(c[i]), cc)
+        if ind !== nothing
             voltageAtPoint = voltages[ind]
             voltageAtPoint = 1 - (voltageAtPoint/r)
             voltmatrix[i,j] = voltageAtPoint
@@ -688,15 +698,15 @@ function update_shortcut_resistances!(anchor, sc, resistances, points, comp)
                     if check[point2]
                         R12 = resistances[anchor, point2]
                         if R12 != -1
-                            if R1x != -777
+                            if R1x != RESISTANCE_INVALID
                                 shortcut[anchor, point2] = shortcut[point2, anchor] = R12
                                 Vx = voltmatrix[pointx, point2]
                                 R2x = 2*R12*Vx + R1x - R12
-                                if shortcut[point2, pointx] != -777
+                                if shortcut[point2, pointx] != RESISTANCE_INVALID
                                     shortcut[point2, pointx] = shortcut[pointx, point2] = R2x
                                 end
                             else
-                                shortcut[pointx, :] = shortcut[:, pointx] = -777
+                                shortcut[pointx, :] = shortcut[:, pointx] = RESISTANCE_INVALID
                             end
                         end
                     end

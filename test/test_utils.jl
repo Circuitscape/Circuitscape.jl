@@ -32,7 +32,7 @@ function model_problem(T, s)
     cellmap = ones(T, s, s)
     nodemap = reshape(1:lastindex(cellmap), s, s) |> collect
     G = Circuitscape.construct_graph(cellmap, nodemap, true, true)
-    Circuitscape.laplacian(G)
+    Circuitscape.laplacian!(G)
 end
 model_problem(s::Integer) = model_problem(Float64, s)
 

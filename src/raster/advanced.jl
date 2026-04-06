@@ -53,7 +53,7 @@ function compute_advanced_data(data::RasterData{T,V},
     # Nodemap and graph construction
     nodemap = construct_node_map(cellmap, polymap)
     A = construct_graph(cellmap, nodemap, avg_res, four_neighbors)
-    G = laplacian(A)
+    G = laplacian!(A)
 
     # Connected Components
     cc = connected_components(SimpleGraph(G))
@@ -187,7 +187,6 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, flags, cfg)::Tuple{Matrix
             continue
         end
 
-        # a_local = laplacian(G[c, c])
         a_local = G[c,c]
         s_local = sources[c]
         g_local = grounds[c]
