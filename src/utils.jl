@@ -94,7 +94,7 @@ function accumulate_current_maps(path, f)
 
     accum = zeros(nrow, ncol)
     for file in cmap_list
-        csinfo("Accumulating $file", cfg.suppress_messages)
+        @info("Accumulating $file")
         cmap_path = joinpath(dir, file)
         cmap = readdlm(cmap_path, skipstart = 6)
         f_in_place!(accum, cmap, f)
@@ -112,7 +112,7 @@ function accumulate_current_maps(path, f)
             end
 
     accum_path = joinpath(dir, name * "_$(name)_curmap.asc")
-    csinfo("Writing to $accum_path", cfg.suppress_messages)
+    @info("Writing to $accum_path")
     open(accum_path, "w") do f
         write(f, headers)
         writedlm(f, round.(accum, digits=8), ' ')

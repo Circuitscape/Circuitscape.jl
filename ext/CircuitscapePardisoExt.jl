@@ -28,7 +28,7 @@ function (p::PardisoFactorize)(x, A, b, update_matrix=false; kwargs...)
     Pardiso.pardiso(p.ps, x, A, b)
 end
 
-construct_cholesky_factor(matrix, ::PardisoSolver, suppress_info::Bool) =
+construct_cholesky_factor(matrix, ::PardisoSolver) =
     PardisoFactorize()
 
 function solve_linear_system(factor::PardisoFactorize, matrix, rhs)

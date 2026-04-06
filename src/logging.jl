@@ -1,53 +1,59 @@
-# const fmt = "[{date} | {level} | {name}]: {msg}"
-const fmt = x -> Dates.format(x, "yyyy-mm-dd HH:MM:SS")
 const ui_interface = Ref{Function}((x,y) -> nothing)
-const logging = Dict{String,Any}()
-logging["log_to_file"] = false
-logging["file_logger"] = SimpleLogger()
 
-function csinfo(msg, suppress_messages::Bool = false)
-    log_to_file = logging["log_to_file"]
-    file_logger = logging["file_logger"]
-    msg = string(fmt(Dates.now())) * " : " * msg
-    !suppress_messages && @info(msg)
-    ui_interface[](msg, :info)
-    if log_to_file
-        with_logger(file_logger) do
-            @info(msg)
-        end
-    end
+struct CSLogger <: AbstractLogger
+    console_logger::ConsoleLogger
+    file_logger::Union{SimpleLogger, Nothing}
+    suppress_messages::Bool
 end
 
-function cswarn(msg)
-    log_to_file = logging["log_to_file"]
-    file_logger = logging["file_logger"]
-    msg = string(fmt(Dates.now())) * " : " * msg
-    @warn(msg)
-    ui_interface[](msg, :warn)
-    if log_to_file
-        with_logger(file_logger) do
-            @warn(msg)
+function CSLogger(; suppress_messages::Bool = false, file_logger::Union{SimpleLogger, Nothing} = nothing)
+    CSLogger(ConsoleLogger(stderr, Logging.Info), file_logger, suppress_messages)
+end
+
+Logging.min_enabled_level(logger::CSLogger) = Logging.Info
+Logging.shouldlog(logger::CSLogger, level, _module, group, id) = true
+Logging.catch_exceptions(logger::CSLogger) = false
+
+function Logging.handle_message(logger::CSLogger, level, message, _module, group, id, filepath, line; kwargs...)
+    ts = Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS")
+    msg = "$ts : $message"
+
+    # Forward to UI callback
+    ui_level = level >= Logging.Warn ? :warn : :info
+    ui_interface[](msg, ui_level)
+
+    # Log to console unless suppressed
+    if !logger.suppress_messages || level >= Logging.Warn
+        Logging.handle_message(logger.console_logger, level, msg, _module, group, id, filepath, line; kwargs...)
+    end
+
+    # Log to file if configured
+    if logger.file_logger !== nothing
+        with_logger(logger.file_logger) do
+            if level >= Logging.Warn
+                @warn(msg)
+            else
+                @info(msg)
+            end
         end
     end
+    nothing
 end
 
 function update_logging!(cfg::CSConfig)
-
-    log_level = cfg.log_level
-    log_file = cfg.log_file
-
-    if log_level == ll_debug
-        Logging.LogLevel(Logging.Debug)
-    elseif log_level == ll_warning
-        Logging.LogLevel(Logging.Warn)
+    file_logger = if cfg.log_file != ""
+        SimpleLogger(open(cfg.log_file, "w+"))
+    else
+        nothing
     end
 
-    if log_file != ""
-        logging["file_logger"] = SimpleLogger(open(log_file, "w+"))
-        logging["log_to_file"] = true
-        csinfo("Logs will recorded to file: $log_file", cfg.suppress_messages)
-    else
-        logging["file_logger"] = SimpleLogger()
-        logging["log_to_file"] = false
+    logger = CSLogger(
+        suppress_messages = cfg.suppress_messages,
+        file_logger = file_logger
+    )
+    global_logger(logger)
+
+    if cfg.log_file != ""
+        @info("Logs will recorded to file: $(cfg.log_file)")
     end
 end

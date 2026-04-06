@@ -53,7 +53,7 @@ function onetoall_kernel(data::RasterData{T,V}, flags, cfg)::Matrix{T} where {T,
     a = construct_graph(gmap, nodemap, avg_res, four_neighbors)
     cc = connected_components(SimpleGraph(a))
     G = laplacian(a)
-    csinfo("There are $(size(a, 1)) points and $(length(cc)) connected components", cfg.suppress_messages)
+    @info("There are $(size(a, 1)) points and $(length(cc)) connected components")
 
     # source_map = Matrix{eltype(a)}(0, 0)
     # ground_map = Matrix{eltype(a)}(0, 0)
@@ -77,7 +77,7 @@ function onetoall_kernel(data::RasterData{T,V}, flags, cfg)::Matrix{T} where {T,
     function f(i)
         let point_map = copy(original_point_map), s = copy(z), strength_map = copy(strength_map), source_map = source_map, newpoly = newpoly, nodemap = nodemap, a = a
         str = use_variable_strengths ? strengths[i,2] : 1
-        csinfo("Solving point $i of $num_points_to_solve", cfg.suppress_messages)
+        @info("Solving point $i of $num_points_to_solve")
         n = points_unique[i]
         if use_included_pairs
             for j = 1:size(point_ids,1)

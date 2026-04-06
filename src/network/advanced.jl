@@ -32,10 +32,10 @@ function compute_advanced_data(data::NetworkData{T,V},
 
     cc = connected_components(SimpleGraph(A))
 	c = size(A,1)
-	csinfo("Graph has $c nodes and $(length(cc)) connected components", cfg.suppress_messages)
+	@info("Graph has $c nodes and $(length(cc)) connected components")
 
     t = @elapsed G = laplacian(A)
-    csinfo("Time taken to construct graph laplacian = $t", cfg.suppress_messages)
+    @info("Time taken to construct graph laplacian = $t")
 
     nodemap, polymap = Matrix{V}(undef,0,0), Matrix{V}(undef,0,0)
     cellmap = Matrix{T}(undef,0,0)
