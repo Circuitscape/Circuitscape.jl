@@ -80,7 +80,7 @@ function runtests(; solver::String = "", precision::String = "",
                 x = readdlm("output_verify/sgNetworkVerify$(i)_resistances.out")
                 valx = x[2:end, 2:end]
                 valr = r[2:end, 2:end]
-                @test sum(abs2, valx - valr) < tol
+                @test check_resistances(valx, valr, tol, label="sgNetworkVerify$(i)")
                 pts_x = x[2:end,1]
                 pts_r = r[2:end,1]
                 @test pts_x .+ 1 == pts_r
@@ -93,7 +93,7 @@ function runtests(; solver::String = "", precision::String = "",
                 r = f("input/network/mgNetworkVerify$(i).ini")
                 x = readdlm("output_verify/mgNetworkVerify$(i)_voltages.txt")
                 @. x[:,1] = x[:,1] + 1
-                @test sum(abs2, x - r) < tol
+                @test check_resistances(x, r, tol, label="mgNetworkVerify$(i)")
                 compare_all_output("mgNetworkVerify$(i)", is_single)
             end
         end
@@ -107,8 +107,8 @@ function runtests(; solver::String = "", precision::String = "",
                 r = f("input/raster/pairwise/$i/sgVerify$(i).ini")
                 x = readdlm("output_verify/sgVerify$(i)_resistances.out")
                 _x = readdlm("output/sgVerify$(i)_resistances.out")
-                @test sum(abs2, _x - r) < tol
-                @test sum(abs2, x - r) < tol
+                @test check_resistances(_x, r, tol, label="sgVerify$(i) (written)")
+                @test check_resistances(x, r, tol, label="sgVerify$(i) (verify)")
                 compare_all_output("sgVerify$(i)", is_single)
             end
         end
@@ -124,7 +124,7 @@ function runtests(; solver::String = "", precision::String = "",
             for i in 1:13
                 r = f("input/raster/one_to_all/$i/oneToAllVerify$(i).ini")
                 x = readdlm("output_verify/oneToAllVerify$(i)_resistances.out")
-                @test sum(abs2, x - r) < tol
+                @test check_resistances(x, r, tol, label="oneToAllVerify$(i)")
                 compare_all_output("oneToAllVerify$(i)", is_single)
             end
         end
@@ -133,11 +133,33 @@ function runtests(; solver::String = "", precision::String = "",
             for i in 1:12
                 r = f("input/raster/all_to_one/$i/allToOneVerify$(i).ini")
                 x = readdlm("output_verify/allToOneVerify$(i)_resistances.out")
-                @test sum(abs2, x - r) < tol
+                @test check_resistances(x, r, tol, label="allToOneVerify$(i)")
                 compare_all_output("allToOneVerify$(i)", is_single)
             end
         end
     end
+end
+
+"""Check resistance matrices element-wise and report which entries differ."""
+function check_resistances(x, r, tol; label="")
+    nfail = 0
+    for j in axes(x, 2), i in axes(x, 1)
+        if abs(x[i,j] - r[i,j]) > sqrt(tol)
+            nfail += 1
+            if nfail <= 10
+                # Print row/col headers (focal point IDs) if available
+                ri = size(r,1) >= i ? r[i,1] : i
+                rj = size(r,2) >= j ? r[1,j] : j
+                @warn "$label MISMATCH [$i,$j] (points $ri,$rj): expected=$(x[i,j]) got=$(r[i,j]) diff=$(abs(x[i,j]-r[i,j]))"
+            end
+        end
+    end
+    if nfail > 10
+        @warn "$label $nfail total entries differ (showing first 10)"
+    elseif nfail > 0
+        @warn "$label $nfail entries differ"
+    end
+    nfail == 0
 end
 
 function compare_all_output(str, is_single = false)

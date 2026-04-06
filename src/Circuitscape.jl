@@ -13,6 +13,10 @@ using Logging
 using Dates
 using SuiteSparse
 
+function __init__()
+    LinearAlgebra.BLAS.set_num_threads(1)
+end
+
 include("consts.jl")
 include("config.jl")
 include("logging.jl")

@@ -114,8 +114,8 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
 
     @info("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
 
-    num, d = get_num_pairs(cc, points, exclude, orig_pts)
-    log && @info("Total number of pair solves = $num")
+    num_pairs, pair_numbers = get_num_pairs(cc, points, exclude, orig_pts)
+    log && @info("Total number of pair solves = $num_pairs")
 
     # Initialize pairwise resistance
     resistances = -1 * ones(T, numpoints, numpoints)::Matrix{T}
@@ -131,8 +131,8 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
             isempty(exclude)
         get_shortcut_resistances = true
         @info("Triggering resistance calculation shortcut")
-        num, d = get_num_pairs_shortcut(cc, points, exclude, orig_pts)
-        @info("Total number of pair solves has been reduced to $num ")
+        num_pairs, pair_numbers = get_num_pairs_shortcut(cc, points, exclude, orig_pts)
+        @info("Total number of pair solves has been reduced to $num_pairs ")
     end
     shortcut = Shortcut(get_shortcut_resistances, voltmatrix, shortcut_res)
 
@@ -140,7 +140,6 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
 
         # Subset of points relevant to CC
         csub = filter(x -> x in comp, points) |> unique
-        #idx = findin(c, csub)
 
         if isempty(csub)
             continue
@@ -162,101 +161,102 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
 
         component_data = ComponentData(comp, matrix, local_nodemap, hbmeta, cellmap)
 
-        function f(i)
+        function solve_pairs_for_point(point_idx)
             # Each task needs its own workspace (scratch vectors are mutable)
             ml = P.ml
             local_P = aspreconditioner(AlgebraicMultigrid.MultiLevel(
                 ml.levels, ml.final_A, ml.coarse_solver,
                 ml.presmoother, ml.postsmoother, deepcopy(ml.workspace)))
 
-            # Generate return type
-            ret = Vector{Tuple{V,V,T}}()
+            results = Vector{Tuple{V,V,T}}()
 
-            pi = csub[i]
-            comp_i = something(findfirst(isequal(pi),comp), 0)
+            src_node = csub[point_idx]
+            comp_i = something(findfirst(isequal(src_node), comp), 0)
             comp_i = V(comp_i)
-            I = findall(x -> x == pi, points)
-            smash_repeats!(ret, I)
-
-            # Preprocess matrix
-            # d = matrix[comp_i, comp_i]
+            src_indices = findall(x -> x == src_node, points)
+            smash_repeats!(results, src_indices)
 
             # Iteration space through all possible pairs
-            rng = i+1:size(csub, 1)
+            pair_range = point_idx+1:size(csub, 1)
             if Threads.nthreads() > 1
-                for j in rng
-                    pj = csub[j]
-                    haskey(d, (pi,pj)) && @info("Scheduling pair $(d[(pi,pj)]) of $num to be solved")
+                for pair_idx in pair_range
+                    dst_node = csub[pair_idx]
+                    haskey(pair_numbers, (src_node, dst_node)) && @debug("Scheduling pair $(pair_numbers[(src_node, dst_node)]) of $num_pairs to be solved")
                 end
             end
 
             # Loop through all possible pairs
-            for j in rng
+            for pair_idx in pair_range
 
-                pj = csub[j]
-                comp_j = something(findfirst(isequal(pj), comp), 0)
+                dst_node = csub[pair_idx]
+                comp_j = something(findfirst(isequal(dst_node), comp), 0)
                 comp_j = V(comp_j)
-                J = findall(x -> x == pj, points)
+                dst_indices = findall(x -> x == dst_node, points)
 
-                if pi == pj
+                if src_node == dst_node
                     continue
                 end
 
-                for c_i in I
-                    for c_j in J
+                # Check if all index combinations are excluded
+                any_included = false
+                for c_i in src_indices, c_j in dst_indices
+                    if (orig_pts[c_i], orig_pts[c_j]) ∉ exclude
+                        any_included = true
+                        break
+                    end
+                end
+                !any_included && continue
+
+                # Solve once per (src_node, dst_node) pair
+                current = zeros(T, size(matrix, 1))
+                current[comp_i] = -1
+                current[comp_j] = 1
+
+                log && haskey(pair_numbers, (src_node, dst_node)) && @debug("Solving pair $(pair_numbers[(src_node, dst_node)]) of $num_pairs")
+                solve_time = @elapsed voltages = solve_linear_system(matrix, current, local_P)
+                @debug("Time taken to solve linear system = $solve_time seconds")
+
+                voltages .= voltages .- voltages[comp_i]
+                resistance = voltages[comp_j] - voltages[comp_i]
+
+                # Store result for all non-excluded index combinations
+                for c_i in src_indices
+                    for c_j in dst_indices
                         if (orig_pts[c_i], orig_pts[c_j]) in exclude
                             continue
                         end
-
-                        # Initialize currents
-                        current = zeros(T, size(matrix, 1))
-                        current[comp_i] = -1
-                        current[comp_j] = 1
-
-                        # Solve system
-                        # @info("Solving points $pi and $pj")
-                        log && haskey(d, (pi,pj)) && @info("Solving pair $(d[(pi,pj)]) of $num")
-                        t2 = @elapsed v = solve_linear_system(matrix, current, local_P)
-                        @info("Time taken to solve linear system = $t2 seconds")
-
-                        v .= v .- v[comp_i]
-
-                        # Calculate resistance
-                        r = v[comp_j] - v[comp_i]
-
-                        # Return resistance value
-                        push!(ret, (c_i, c_j, r))
+                        push!(results, (c_i, c_j, resistance))
                         if get_shortcut_resistances
-                            resistances[c_i, c_j] = r
-                            resistances[c_j, c_i] = r
+                            resistances[c_i, c_j] = resistance
+                            resistances[c_j, c_i] = resistance
                         end
-                        output = Output(points, v, (orig_pts[c_i], orig_pts[c_j]),
-                                        (comp_i, comp_j), r, V(c_j), cum)
+                        output = Output(points, voltages, (orig_pts[c_i], orig_pts[c_j]),
+                                        (comp_i, comp_j), resistance, V(c_j), cum)
                         postprocess(output, component_data, flags, shortcut, cfg)
                     end
                 end
             end
 
-        ret
+        results
         end
 
         if get_shortcut_resistances
             idx = something(findfirst(isequal(csub[1]), points), 0)
-            f(1)
+            solve_pairs_for_point(1)
             update_shortcut_resistances!(idx, shortcut, resistances, points, comp)
         else
             is_parallel = cfg.parallelize
             if is_parallel
-                X = fetch.(map(x -> Threads.@spawn(f(x)), 1:size(csub,1)))
+                all_results = fetch.(map(pt -> Threads.@spawn(solve_pairs_for_point(pt)), 1:size(csub,1)))
             else
-                X = map(f, 1:size(csub,1))
+                all_results = map(solve_pairs_for_point, 1:size(csub,1))
             end
 
             # Set all resistances
-            for x in X
-                for i = 1:size(x, 1)
-                    resistances[x[i][1], x[i][2]] = x[i][3]
-                    resistances[x[i][2], x[i][1]] = x[i][3]
+            for task_result in all_results
+                for (ci, cj, rv) in task_result
+                    resistances[ci, cj] = rv
+                    resistances[cj, ci] = rv
                 end
             end
         end
@@ -318,8 +318,8 @@ function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, PardisoSolv
 
     @info("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
 
-    num, d = get_num_pairs(cc, points, exclude, orig_pts)
-    log && @info("Total number of pair solves = $num")
+    num_pairs, pair_numbers = get_num_pairs(cc, points, exclude, orig_pts)
+    log && @info("Total number of pair solves = $num_pairs")
 
     # Initialize pairwise resistance
     resistances = -1 * ones(eltype(a), numpoints, numpoints)
@@ -335,8 +335,8 @@ function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, PardisoSolv
             isempty(exclude)
         get_shortcut_resistances = true
         @info("Triggering resistance calculation shortcut")
-        num, d = get_num_pairs_shortcut(cc, points, exclude, orig_pts)
-        @info("Total number of pair solves has been reduced to $num ")
+        num_pairs, pair_numbers = get_num_pairs_shortcut(cc, points, exclude, orig_pts)
+        @info("Total number of pair solves has been reduced to $num_pairs ")
     end
     shortcut = Shortcut(get_shortcut_resistances, voltmatrix, shortcut_res)
 
@@ -361,35 +361,32 @@ function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, PardisoSolv
 
         component_data = ComponentData(comp, matrix, local_nodemap, hbmeta, cellmap)
 
-        ret = Vector{Tuple{V,V,T}}()
-
         cholmod_batch = CholmodNode[]
 
-        # Batched backsubstitution
-        function g(i)
+        # Build batch of pairs to solve
+        function build_cholmod_batch(point_idx)
 
-            pi = csub[i]
-            comp_i = V(something(findfirst(isequal(pi),comp),0))
-            I = findall(x -> x == pi, points)
-            # smash_repeats!(ret, I)
-            smash_repeats!(resistances, I)
+            src_node = csub[point_idx]
+            comp_i = V(something(findfirst(isequal(src_node), comp), 0))
+            src_indices = findall(x -> x == src_node, points)
+            smash_repeats!(resistances, src_indices)
 
             # Iteration space through all possible pairs
-            rng = i+1:size(csub, 1)
+            pair_range = point_idx+1:size(csub, 1)
 
             # Loop through all possible pairs
-            for j in rng
+            for pair_idx in pair_range
 
-                pj = csub[j]
-                comp_j = V(something(findfirst(isequal(pj), comp),0))
-                J = findall(x -> x == pj, points)
+                dst_node = csub[pair_idx]
+                comp_j = V(something(findfirst(isequal(dst_node), comp), 0))
+                dst_indices = findall(x -> x == dst_node, points)
 
-                if pi == pj
+                if src_node == dst_node
                     continue
                 end
 
                 # Forget excluded pairs
-                for c_i in I, c_j in J
+                for c_i in src_indices, c_j in dst_indices
                     if (orig_pts[c_i], orig_pts[c_j]) in exclude
                         continue
                     else
@@ -400,64 +397,64 @@ function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, PardisoSolv
             end
         end
 
-        function f(i, rng, lhs)
-            v = rng[i]
-            output = Output(points, lhs[:,i],
-                (orig_pts[cholmod_batch[v].points_idx[1]],
-                orig_pts[cholmod_batch[v].points_idx[2]]),
-                cholmod_batch[v].cc_idx,
-                lhs[cholmod_batch[v].cc_idx[2], i] - lhs[cholmod_batch[v].cc_idx[1], i],
-                V(cholmod_batch[v].points_idx[2]), cum)
+        function postprocess_pair(batch_idx, batch_range, lhs)
+            batch_pos = batch_range[batch_idx]
+            output = Output(points, lhs[:,batch_idx],
+                (orig_pts[cholmod_batch[batch_pos].points_idx[1]],
+                orig_pts[cholmod_batch[batch_pos].points_idx[2]]),
+                cholmod_batch[batch_pos].cc_idx,
+                lhs[cholmod_batch[batch_pos].cc_idx[2], batch_idx] - lhs[cholmod_batch[batch_pos].cc_idx[1], batch_idx],
+                V(cholmod_batch[batch_pos].points_idx[2]), cum)
             postprocess(output, component_data, flags, shortcut, cfg)
         end
         if get_shortcut_resistances
-            idx = something(findfirst(isequal(csub[1]), points),0)
-            g(1)
+            idx = something(findfirst(isequal(csub[1]), points), 0)
+            build_cholmod_batch(1)
         else
-            g.(1:size(csub, 1))
+            build_cholmod_batch.(1:size(csub, 1))
         end
 
-        l = length(cholmod_batch)
+        num_batched_pairs = length(cholmod_batch)
 
-        for st in 1:batch_size:l
+        for st in 1:batch_size:num_batched_pairs
 
-            rng = st + batch_size <= l ?
-                            (st:(st+batch_size-1)) : (st:l)
+            batch_range = st + batch_size <= num_batched_pairs ?
+                            (st:(st+batch_size-1)) : (st:num_batched_pairs)
 
-            @info("Solving points $(rng.start) to $(rng.stop)")
+            @debug("Solving points $(batch_range.start) to $(batch_range.stop)")
 
-            rhs = zeros(eltype(matrix), size(matrix, 1), length(rng))
+            rhs = zeros(eltype(matrix), size(matrix, 1), length(batch_range))
 
-            for (i,v) in enumerate(rng)
-                node = cholmod_batch[v]
-                rhs[node.cc_idx[1], i] = -1
-                rhs[node.cc_idx[2], i] = 1
+            for (col, batch_pos) in enumerate(batch_range)
+                node = cholmod_batch[batch_pos]
+                rhs[node.cc_idx[1], col] = -1
+                rhs[node.cc_idx[2], col] = 1
             end
 
             lhs = solve_linear_system(factor, matrix, rhs)
 
             # Normalisation step
-            for (i,val) in enumerate(rng)
-                n = cholmod_batch[val].cc_idx[1]
-                v = lhs[n,i]
-                for j = 1:size(matrix, 1)
-                    lhs[j,i] = lhs[j,i] - v
+            for (col, batch_pos) in enumerate(batch_range)
+                ref_node = cholmod_batch[batch_pos].cc_idx[1]
+                ref_volt = lhs[ref_node, col]
+                for row = 1:size(matrix, 1)
+                    lhs[row, col] = lhs[row, col] - ref_volt
                 end
             end
 
             is_parallel = cfg.parallelize
             if is_parallel
-                X = fetch.(map(x -> Threads.@spawn(f(x, rng, lhs)), 1:length(rng)))
+                fetch.(map(bi -> Threads.@spawn(postprocess_pair(bi, batch_range, lhs)), 1:length(batch_range)))
             else
-                X = map(x -> f(x, rng, lhs), 1:length(rng))
+                map(bi -> postprocess_pair(bi, batch_range, lhs), 1:length(batch_range))
             end
 
-            for (i,v) in enumerate(rng)
-                coords = cholmod_batch[v].points_idx
-                r = lhs[cholmod_batch[v].cc_idx[2], i] -
-                            lhs[cholmod_batch[v].cc_idx[1], i]
-                resistances[coords...] = r
-                resistances[reverse(coords)...] = r
+            for (col, batch_pos) in enumerate(batch_range)
+                coords = cholmod_batch[batch_pos].points_idx
+                resistance = lhs[cholmod_batch[batch_pos].cc_idx[2], col] -
+                            lhs[cholmod_batch[batch_pos].cc_idx[1], col]
+                resistances[coords...] = resistance
+                resistances[reverse(coords)...] = resistance
             end
         end
 
@@ -642,14 +639,14 @@ function postprocess(output, component_data, flags, shortcut, cfg)
 
     if flags.outputflags.write_volt_maps
         t = @elapsed write_volt_maps(name, output, component_data, flags, cfg)
-        @info("Time taken to write voltage maps = $t seconds")
+        @debug("Time taken to write voltage maps = $t seconds")
     end
 
     # TODO: Even though this function is called write_cur_maps
     # actually writing the calculated maps depends on some flags.
     t = @elapsed write_cur_maps(name, output, component_data,
                                 [-9999.], flags, cfg)
-    @info("Time taken to calculate current maps = $t seconds")
+    @debug("Time taken to calculate current maps = $t seconds")
     nothing
 end
 
