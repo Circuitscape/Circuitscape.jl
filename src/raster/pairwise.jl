@@ -99,14 +99,14 @@ function _pt_file_polygons_path(rasterdata::RasterData{T,V},
     resistances = -1 * ones(length(pts), length(pts))
 
     n = calc_num_pairs(pts)
-    csinfo("Total number of pair solves = $n", cfg.suppress_messages)
+    @info("Total number of pair solves = $n")
 
     k = 1
     for i = 1:size(pts, 1)
         pt1 = pts[i]
         for j = i+1:size(pts, 1)
             pt2 = pts[j]
-            csinfo("Solving pair $k of $n", cfg.suppress_messages)
+            @info("Solving pair $k of $n")
             k += 1
 			if (pt1,pt2) in exclude_pairs || (pt2, pt1) in exclude_pairs 
 				continue

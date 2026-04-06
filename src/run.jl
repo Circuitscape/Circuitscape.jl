@@ -17,19 +17,19 @@ function compute(path::String)
     write_config(cfg)
     T = cfg.precision == pr_single ? Float32 : Float64
     if T == Float32 && cfg.solver == st_pardiso
-        cswarn("Pardiso solver works only in double precision. Switching precision to double.")
+        @warn("Pardiso solver works only in double precision. Switching precision to double.")
         T = Float64
     end
     V = cfg.use_64bit_indexing ? Int64 : Int32
-    csinfo("Precision used: $(_precision_str(cfg.precision))", cfg.suppress_messages)
+    @info("Precision used: $(_precision_str(cfg.precision))")
     is_parallel = cfg.parallelize
     if is_parallel
         n = cfg.max_parallel
-        csinfo("Starting up Circuitscape to use $n threads in parallel", cfg.suppress_messages)
+        @info("Starting up Circuitscape to use $n threads in parallel")
     end
     t = @elapsed r = _compute(T, V, cfg)
 
-    csinfo("Time taken to complete job = $t", cfg.suppress_messages)
+    @info("Time taken to complete job = $t")
     r
 end
 
@@ -63,15 +63,15 @@ function compute(dict)
     write_config(cfg)
     T = cfg.precision == pr_single ? Float32 : Float64
     V = cfg.use_64bit_indexing ? Int64 : Int32
-    csinfo("Precision used: $(_precision_str(cfg.precision))", cfg.suppress_messages)
+    @info("Precision used: $(_precision_str(cfg.precision))")
     is_parallel = cfg.parallelize
     if is_parallel
         n = cfg.max_parallel
-        csinfo("Starting up Circuitscape to use $n threads in parallel", cfg.suppress_messages)
+        @info("Starting up Circuitscape to use $n threads in parallel")
     end
     t = @elapsed r = _compute(T, V, cfg)
 
-    csinfo("Time taken to complete job = $t", cfg.suppress_messages)
+    @info("Time taken to complete job = $t")
 
     r
 end

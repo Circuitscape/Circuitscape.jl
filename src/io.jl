@@ -61,7 +61,7 @@ function load_graph(V, gpath::String, ::Type{T}) where {T}
 							 from $min_node. Circuitscape.jl starts counting from 1. 
 							 Please rename your nodes to start from 1."""))
 	elseif min_node == 0
-		csinfo("""Circuitscape.jl starts counting nodes from 1, 
+		@info("""Circuitscape.jl starts counting nodes from 1, 
 			   not 0. This will be reflected in the outputs.""")
 		for iter = 1:size(g, 1)
 			i[iter] = g[iter,1] + 1
@@ -179,15 +179,15 @@ function read_polymap(T, file::String, habitatmeta;
     end
 
     if rastermeta.cellsize != habitatmeta.cellsize
-        cswarn("cellsize is not the same")
+        @warn("cellsize is not the same")
     elseif rastermeta.ncols != habitatmeta.ncols
-        cswarn("ncols is not the same")
+        @warn("ncols is not the same")
     elseif rastermeta.nrows != habitatmeta.nrows
-        cswarn("nrows is not the same")
+        @warn("nrows is not the same")
     elseif rastermeta.yllcorner != habitatmeta.yllcorner
-        cswarn("yllcorner is not the same")
+        @warn("yllcorner is not the same")
     elseif rastermeta.xllcorner != habitatmeta.xllcorner
-        cswarn("xllcorner is not the same")
+        @warn("xllcorner is not the same")
     end
 
     polymap
@@ -362,7 +362,7 @@ function read_included_pairs(V, filename)
         idx = findall(x -> x == 0 , point_ids)
         if length(idx) > 0
             deleteat!(point_ids, idx)
-            cswarn("Code to include pairs is activated, some entries did not match with focal node file. Some focal nodes may have been dropped")
+            @warn("Code to include pairs is activated, some entries did not match with focal node file. Some focal nodes may have been dropped")
         end
 
         mat = zeros(V, size(point_ids, 1), size(point_ids, 1))
@@ -449,16 +449,16 @@ function load_raster_data(T, V, cfg)::RasterData{T,V}
     ground_file = cfg.ground_file
     ground_is_res = cfg.ground_file_is_resistances
 
-    csinfo("Reading maps", cfg.suppress_messages)
+    @info("Reading maps")
 
     # Read cell map
     cellmap, hbmeta = read_cellmap(hab_file, hab_is_res, T)
     c = count(x -> x > 0, cellmap)
     ncells = length(cellmap)
     if ncells > 5_000_000 && cfg.solver == st_cholmod
-        cswarn("The landscape has $(ncells) cells and the CHOLMOD solver is selected. CHOLMOD is a sparse direct solver that consumes a lot of memory on large grids. Consider using solver = cg+amg instead.")
+        @warn("The landscape has $(ncells) cells and the CHOLMOD solver is selected. CHOLMOD is a sparse direct solver that consumes a lot of memory on large grids. Consider using solver = cg+amg instead.")
     end
-    csinfo("Resistance/Conductance map has $c nodes", cfg.suppress_messages)
+    @info("Resistance/Conductance map has $c nodes")
 
     # Read polymap
     if use_polygons

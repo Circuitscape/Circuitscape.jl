@@ -70,14 +70,14 @@ end
 function get_solver(cfg)
     s = cfg.solver
     if s == st_cg_amg
-        csinfo("Solver used: AMG accelerated by CG", cfg.suppress_messages)
+        @info("Solver used: AMG accelerated by CG")
         return AMGSolver()
     elseif s == st_cholmod
-        csinfo("Solver used: CHOLMOD", cfg.suppress_messages)
+        @info("Solver used: CHOLMOD")
         bs = cfg.cholmod_batch_size
         return CholmodSolver(bs)
     elseif s == st_pardiso
-        csinfo("Solver used: Pardiso", cfg.suppress_messages)
+        @info("Solver used: Pardiso")
         bs = cfg.cholmod_batch_size
         return PardisoSolver(bs)
     end
@@ -112,10 +112,10 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
 
     cum = prob.cum
 
-    csinfo("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components", cfg.suppress_messages)
+    @info("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
 
     num, d = get_num_pairs(cc, points, exclude, orig_pts)
-    log && csinfo("Total number of pair solves = $num", cfg.suppress_messages)
+    log && @info("Total number of pair solves = $num")
 
     # Initialize pairwise resistance
     resistances = -1 * ones(T, numpoints, numpoints)::Matrix{T}
@@ -130,9 +130,9 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
             !write_cum_cur_map_only && !write_max_cur_maps &&
             isempty(exclude)
         get_shortcut_resistances = true
-        csinfo("Triggering resistance calculation shortcut", cfg.suppress_messages)
+        @info("Triggering resistance calculation shortcut")
         num, d = get_num_pairs_shortcut(cc, points, exclude, orig_pts)
-        csinfo("Total number of pair solves has been reduced to $num ", cfg.suppress_messages)
+        @info("Total number of pair solves has been reduced to $num ")
     end
     shortcut = Shortcut(get_shortcut_resistances, voltmatrix, shortcut_res)
 
@@ -154,11 +154,11 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
 
         # Construct preconditioner *once* for every CC
         t1 = @elapsed P = aspreconditioner(smoothed_aggregation(matrix))
-        csinfo("Time taken to construct preconditioner = $t1 seconds", cfg.suppress_messages)
+        @info("Time taken to construct preconditioner = $t1 seconds")
 
         # Get local nodemap for CC - useful for output writing
         t2 = @elapsed local_nodemap = construct_local_node_map(nodemap, comp, polymap)
-        csinfo("Time taken to construct local nodemap = $t2 seconds", cfg.suppress_messages)
+        @info("Time taken to construct local nodemap = $t2 seconds")
 
         component_data = ComponentData(comp, matrix, local_nodemap, hbmeta, cellmap)
 
@@ -186,7 +186,7 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
             if Threads.nthreads() > 1
                 for j in rng
                     pj = csub[j]
-                    haskey(d, (pi,pj)) && csinfo("Scheduling pair $(d[(pi,pj)]) of $num to be solved", cfg.suppress_messages)
+                    haskey(d, (pi,pj)) && @info("Scheduling pair $(d[(pi,pj)]) of $num to be solved")
                 end
             end
 
@@ -214,10 +214,10 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
                         current[comp_j] = 1
 
                         # Solve system
-                        # csinfo("Solving points $pi and $pj")
-                        log && haskey(d, (pi,pj)) && csinfo("Solving pair $(d[(pi,pj)]) of $num", cfg.suppress_messages)
+                        # @info("Solving points $pi and $pj")
+                        log && haskey(d, (pi,pj)) && @info("Solving pair $(d[(pi,pj)]) of $num")
                         t2 = @elapsed v = solve_linear_system(matrix, current, local_P)
-                        csinfo("Time taken to solve linear system = $t2 seconds", cfg.suppress_messages)
+                        @info("Time taken to solve linear system = $t2 seconds")
 
                         v .= v .- v[comp_i]
 
@@ -316,10 +316,10 @@ function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, PardisoSolv
     # Get number of focal points
     numpoints = size(points, 1)
 
-    csinfo("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components", cfg.suppress_messages)
+    @info("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
 
     num, d = get_num_pairs(cc, points, exclude, orig_pts)
-    log && csinfo("Total number of pair solves = $num", cfg.suppress_messages)
+    log && @info("Total number of pair solves = $num")
 
     # Initialize pairwise resistance
     resistances = -1 * ones(eltype(a), numpoints, numpoints)
@@ -334,9 +334,9 @@ function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, PardisoSolv
             !write_cum_cur_map_only  && !write_max_cur_maps &&
             isempty(exclude)
         get_shortcut_resistances = true
-        csinfo("Triggering resistance calculation shortcut", cfg.suppress_messages)
+        @info("Triggering resistance calculation shortcut")
         num, d = get_num_pairs_shortcut(cc, points, exclude, orig_pts)
-        csinfo("Total number of pair solves has been reduced to $num ", cfg.suppress_messages)
+        @info("Total number of pair solves has been reduced to $num ")
     end
     shortcut = Shortcut(get_shortcut_resistances, voltmatrix, shortcut_res)
 
@@ -353,11 +353,11 @@ function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, PardisoSolv
         # Conductance matrix corresponding to CC
         matrix = comps[cid]
 
-        t = @elapsed factor = construct_cholesky_factor(matrix, solver, cfg.suppress_messages)
+        t = @elapsed factor = construct_cholesky_factor(matrix, solver)
 
         # Get local nodemap for CC - useful for output writing
         t2 = @elapsed local_nodemap = construct_local_node_map(nodemap, comp, polymap)
-        csinfo("Time taken to construct local nodemap = $t2 seconds", cfg.suppress_messages)
+        @info("Time taken to construct local nodemap = $t2 seconds")
 
         component_data = ComponentData(comp, matrix, local_nodemap, hbmeta, cellmap)
 
@@ -424,7 +424,7 @@ function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, PardisoSolv
             rng = st + batch_size <= l ?
                             (st:(st+batch_size-1)) : (st:l)
 
-            csinfo("Solving points $(rng.start) to $(rng.stop)", cfg.suppress_messages)
+            @info("Solving points $(rng.start) to $(rng.stop)")
 
             rhs = zeros(eltype(matrix), size(matrix, 1), length(rng))
 
@@ -485,10 +485,10 @@ end
 
 # TODO: In the pardiso case, we're not really constructing the factor
 # So can we make this consistent?
-function construct_cholesky_factor(matrix, ::CholmodSolver, suppress_info::Bool)
+function construct_cholesky_factor(matrix, ::CholmodSolver)
     T = eltype(matrix)
     t = @elapsed factor = cholesky(matrix + sparse(T(10)*eps(T)*I,size(matrix)...))
-    csinfo("Time taken to construct cholesky factor = $t", suppress_info)
+    @info("Time taken to construct cholesky factor = $t")
     factor
 end
 
@@ -642,14 +642,14 @@ function postprocess(output, component_data, flags, shortcut, cfg)
 
     if flags.outputflags.write_volt_maps
         t = @elapsed write_volt_maps(name, output, component_data, flags, cfg)
-        csinfo("Time taken to write voltage maps = $t seconds", cfg.suppress_messages)
+        @info("Time taken to write voltage maps = $t seconds")
     end
 
     # TODO: Even though this function is called write_cur_maps
     # actually writing the calculated maps depends on some flags.
     t = @elapsed write_cur_maps(name, output, component_data,
                                 [-9999.], flags, cfg)
-    csinfo("Time taken to calculate current maps = $t seconds", cfg.suppress_messages)
+    @info("Time taken to calculate current maps = $t seconds")
     nothing
 end
 
