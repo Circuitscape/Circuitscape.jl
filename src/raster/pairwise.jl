@@ -165,7 +165,7 @@ function compute_graph_data_polygons(rasterdata::RasterData{T,V},
 
     # Construct graph
     a = construct_graph(gmap, nodemap, avg_res, four_neighbors)
-    G = laplacian(a)
+    G = laplacian!(a)
 
     # Find connected components
     cc = connected_components(SimpleGraph(a))
@@ -208,7 +208,7 @@ function compute_graph_data_no_polygons(data::RasterData{T,V},
     # Nodemap and graph construction
     nodemap = construct_node_map(cellmap, polymap)
     G = construct_graph(cellmap, nodemap, avg_res, four_neighbors)
-    G = laplacian(G)
+    G = laplacian!(G)
 
     # Connected Components
     cc = connected_components(SimpleGraph(G))

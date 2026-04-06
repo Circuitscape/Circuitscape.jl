@@ -43,3 +43,6 @@ const CRITICAL = ["CRITICAL", "critical", "Critical"]
 # Constants for tolerance when checking matrix norms
 const TOL_SINGLE = 1e-3
 const TOL_DOUBLE = 1e-5
+
+# Sentinel value for invalid/unreachable resistance entries in shortcut mode
+const RESISTANCE_INVALID = -777

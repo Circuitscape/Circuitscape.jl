@@ -4,11 +4,6 @@ export  accumulate_current_maps,
 
 const IO_LOCK = ReentrantLock()
 
-mutable struct MutablePair{T,V}
-	first::T
-	second::V
-end
-
  """
  Construct nodemap specific to a connected component
  """
@@ -36,21 +31,10 @@ end
 
 
 function get_output_flags(cfg)
-
-    # Output flags
-    write_volt_maps = cfg.write_volt_maps
-    write_cur_maps = cfg.write_cur_maps
-    write_cum_cur_map_only = cfg.write_cum_cur_map_only
-    write_max_cur_maps = cfg.write_max_cur_maps
-    set_null_currents_to_nodata = cfg.set_null_currents_to_nodata
-    set_null_voltages_to_nodata = cfg.set_null_voltages_to_nodata
-    compress_grids = cfg.compress_grids
-    log_transform_maps = cfg.log_transform_maps
-
-    o = OutputFlags(write_volt_maps, write_cur_maps,
-                    write_cum_cur_map_only, write_max_cur_maps,
-                    set_null_currents_to_nodata, set_null_voltages_to_nodata,
-                    compress_grids, log_transform_maps)
+    OutputFlags(cfg.write_volt_maps, cfg.write_cur_maps,
+                cfg.write_cum_cur_map_only, cfg.write_max_cur_maps,
+                cfg.set_null_currents_to_nodata, cfg.set_null_voltages_to_nodata,
+                cfg.compress_grids, cfg.log_transform_maps)
 end
 
 
@@ -234,7 +218,6 @@ function compute_omniscape_current(
             continue
         end
 
-        # a_local = laplacian(G[c, c])
         a_local = G[c,c]
         s_local = sources[c]
         g_local = grounds[c]

@@ -1,4 +1,3 @@
-# __precompile__(false)
 module Circuitscape
 using AlgebraicMultigrid
 using ArchGDAL

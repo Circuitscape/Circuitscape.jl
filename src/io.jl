@@ -1,6 +1,6 @@
 abstract type Data end
 
-_open(file) = endswith(file, "gz") ? GZip.open(file, "r") : open(file, "r")
+_open(file) = endswith(lowercase(file), "gz") ? GZip.open(file, "r") : open(file, "r")
 
 struct IncludeExcludePairs{V}
     mode::Symbol

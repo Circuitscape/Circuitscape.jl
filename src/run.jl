@@ -13,6 +13,17 @@ Inputs:
 """
 function compute(path::String)
     cfg = parse_config(path)
+    _run(cfg)
+end
+
+function compute(dict)
+    cfg_dict = init_config()
+    update!(cfg_dict, dict)
+    cfg = CSConfig(cfg_dict)
+    _run(cfg)
+end
+
+function _run(cfg)
     update_logging!(cfg)
     write_config(cfg)
     T = cfg.precision == pr_single ? Float32 : Float64
@@ -22,13 +33,10 @@ function compute(path::String)
     end
     V = cfg.use_64bit_indexing ? Int64 : Int32
     @info("Precision used: $(_precision_str(cfg.precision))")
-    is_parallel = cfg.parallelize
-    if is_parallel
-        n = cfg.max_parallel
-        @info("Starting up Circuitscape to use $n threads in parallel")
+    if cfg.parallelize
+        @info("Starting up Circuitscape to use $(cfg.max_parallel) threads in parallel")
     end
     t = @elapsed r = _compute(T, V, cfg)
-
     @info("Time taken to complete job = $t")
     r
 end
@@ -53,25 +61,4 @@ function _compute(T, V, cfg)
             network_advanced(T, V, cfg)
         end
     end
-end
-
-function compute(dict)
-    cfg_dict = init_config()
-    update!(cfg_dict, dict)
-    cfg = CSConfig(cfg_dict)
-    update_logging!(cfg)
-    write_config(cfg)
-    T = cfg.precision == pr_single ? Float32 : Float64
-    V = cfg.use_64bit_indexing ? Int64 : Int32
-    @info("Precision used: $(_precision_str(cfg.precision))")
-    is_parallel = cfg.parallelize
-    if is_parallel
-        n = cfg.max_parallel
-        @info("Starting up Circuitscape to use $n threads in parallel")
-    end
-    t = @elapsed r = _compute(T, V, cfg)
-
-    @info("Time taken to complete job = $t")
-
-    r
 end
