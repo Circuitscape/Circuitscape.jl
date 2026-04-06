@@ -1,13 +1,16 @@
 # const fmt = "[{date} | {level} | {name}]: {msg}"
 const fmt = x -> Dates.format(x, "yyyy-mm-dd HH:MM:SS")
 const ui_interface = Ref{Function}((x,y) -> nothing)
-const logging = Dict{String,Any}()
-logging["log_to_file"] = false
-logging["file_logger"] = SimpleLogger()
+
+mutable struct LogState
+    log_to_file::Bool
+    file_logger::SimpleLogger
+end
+const logging = LogState(false, SimpleLogger())
 
 function csinfo(msg, suppress_messages::Bool = false)
-    log_to_file = logging["log_to_file"]
-    file_logger = logging["file_logger"]
+    log_to_file = logging.log_to_file
+    file_logger = logging.file_logger
     msg = string(fmt(Dates.now())) * " : " * msg
     !suppress_messages && @info(msg)
     ui_interface[](msg, :info)
@@ -19,8 +22,8 @@ function csinfo(msg, suppress_messages::Bool = false)
 end
 
 function cswarn(msg)
-    log_to_file = logging["log_to_file"]
-    file_logger = logging["file_logger"]
+    log_to_file = logging.log_to_file
+    file_logger = logging.file_logger
     msg = string(fmt(Dates.now())) * " : " * msg
     @warn(msg)
     ui_interface[](msg, :warn)
@@ -43,11 +46,11 @@ function update_logging!(cfg::CSConfig)
     end
 
     if log_file != ""
-        logging["file_logger"] = SimpleLogger(open(log_file, "w+"))
-        logging["log_to_file"] = true
+        logging.file_logger = SimpleLogger(open(log_file, "w+"))
+        logging.log_to_file = true
         csinfo("Logs will recorded to file: $log_file", cfg.suppress_messages)
     else
-        logging["file_logger"] = SimpleLogger()
-        logging["log_to_file"] = false
+        logging.file_logger = SimpleLogger()
+        logging.log_to_file = false
     end
 end
