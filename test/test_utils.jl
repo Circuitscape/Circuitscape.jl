@@ -93,7 +93,7 @@ function runtests(; solver::String = "", precision::String = "",
                 r = f("input/network/mgNetworkVerify$(i).ini")
                 x = readdlm("output_verify/mgNetworkVerify$(i)_voltages.txt")
                 @. x[:,1] = x[:,1] + 1
-                @test sum(abs2, x - r) < tol
+                @test check_resistances(x, r, tol, label="mgNetworkVerify$(i)")
                 compare_all_output("mgNetworkVerify$(i)", is_single)
             end
         end
@@ -150,14 +150,14 @@ function check_resistances(x, r, tol; label="")
                 # Print row/col headers (focal point IDs) if available
                 ri = size(r,1) >= i ? r[i,1] : i
                 rj = size(r,2) >= j ? r[1,j] : j
-                println("$label MISMATCH [$i,$j] (points $ri,$rj): expected=$(x[i,j]) got=$(r[i,j]) diff=$(abs(x[i,j]-r[i,j]))")
+                @warn "$label MISMATCH [$i,$j] (points $ri,$rj): expected=$(x[i,j]) got=$(r[i,j]) diff=$(abs(x[i,j]-r[i,j]))"
             end
         end
     end
     if nfail > 10
-        println("$label $nfail total entries differ (showing first 10)")
+        @warn "$label $nfail total entries differ (showing first 10)"
     elseif nfail > 0
-        println("$label $nfail entries differ")
+        @warn "$label $nfail entries differ"
     end
     nfail == 0
 end
