@@ -11,7 +11,7 @@ There are several ways to increase the solvable grid size:
 - Connect cells to their four neighbors only (`connect_four_neighbors_only = True`)
 - Disable current and voltage maps (`write_cur_maps = False`, `write_volt_maps = False`)
 - Use the one-to-all or all-to-one modes, which typically use less memory and run more quickly than pairwise mode
-- Use the `cg+amg` solver instead of `cholmod` or `pardiso` for large grids (direct solvers use significantly more memory)
+- Use the `cg+amg` solver instead of `cholmod`, `accelerate`, or `pardiso` for large grids (direct solvers use significantly more memory)
 - Coarsen your grids (use larger cell sizes) -- this often produces qualitatively similar results (see McRae et al. 2008)
 
 The all-to-one mode can be an alternative to pairwise mode when the goal is to produce a cumulative map of important connectivity areas among multiple source/target patches.
@@ -29,9 +29,32 @@ The `cg+amg` solver benefits most from threading — each focal point pair is so
 independently on a separate thread. For problems with many focal points, this can
 provide significant speedups.
 
-The `cholmod` and `pardiso` solvers perform batched direct solves. Threading in
-these modes parallelizes the postprocessing step (current map accumulation and
-output writing).
+The `cholmod`, `accelerate`, and `pardiso` solvers perform batched direct solves.
+Threading in these modes parallelizes the postprocessing step (current map
+accumulation and output writing).
+
+## Apple Accelerate Solver
+
+On macOS (13.4 or later), Circuitscape can use Apple's
+[Accelerate](https://developer.apple.com/documentation/accelerate/sparse_solvers)
+framework for sparse Cholesky factorization. This is a direct solver that can
+provide high performance on Apple Silicon hardware. To use it:
+
+```julia
+using AppleAccelerate
+using Circuitscape
+compute("config.ini")  # with solver = accelerate in the INI file
+```
+
+Or install `AppleAccelerate` first:
+
+```julia
+using Pkg
+Pkg.add("AppleAccelerate")
+```
+
+The Accelerate solver supports both single and double precision, and uses the
+same batched solve strategy as the CHOLMOD and Pardiso solvers.
 
 !!! note
     Circuitscape sets BLAS to single-threaded at startup. Its workload is

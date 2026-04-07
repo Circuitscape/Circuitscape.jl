@@ -15,6 +15,18 @@ end
 runtests(solver="cg+amg", parallel=true)
 runtests(solver="cholmod", parallel=true)
 
+accelerate_available = try
+    @eval using AppleAccelerate
+    true
+catch
+    false
+end
+if accelerate_available
+    runtests(solver="accelerate", parallel=true)
+else
+    println("Skipping Apple Accelerate tests (not available)")
+end
+
 pardiso_available = try
     @eval using Pardiso
     Pardiso.MKLPardisoSolver()

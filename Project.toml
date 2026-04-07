@@ -17,19 +17,22 @@ SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 SuiteSparse = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 
 [weakdeps]
+AppleAccelerate = "13e28ba4-7ad8-5781-acae-3021b1ed3924"
 Pardiso = "46dd5b70-b6fb-5a00-ae2d-e8fea33afaf2"
 
 [extensions]
+CircuitscapeAppleAccelerateExt = "AppleAccelerate"
 CircuitscapePardisoExt = "Pardiso"
 
 [compat]
-Pardiso = "1.1"
 AlgebraicMultigrid = "1.2"
+AppleAccelerate = "0.6"
 ArchGDAL = "0.10"
 DelimitedFiles = "1.9"
 GZip = "0.6"
 Graphs = "1"
 Krylov = "0.10"
+Pardiso = "1.1"
 julia = "1.11"
 
 [extras]

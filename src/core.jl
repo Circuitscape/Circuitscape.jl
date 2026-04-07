@@ -57,6 +57,10 @@ end
 struct PardisoSolver <: Solver
     bs::Int
 end
+
+struct AccelerateSolver <: Solver
+    bs::Int
+end
 """
 Core kernel of Circuitscape - used to solve several pairs
 
@@ -80,6 +84,10 @@ function get_solver(cfg)
         @info("Solver used: Pardiso")
         bs = cfg.cholmod_batch_size
         return PardisoSolver(bs)
+    elseif s == st_accelerate
+        @info("Solver used: Apple Accelerate")
+        bs = cfg.cholmod_batch_size
+        return AccelerateSolver(bs)
     else
         error("Unknown solver: $s")
     end
@@ -289,7 +297,7 @@ struct CholmodNode{T}
     points_idx::Tuple{T,T}
 end
 
-function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, PardisoSolver}, flags,
+function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, PardisoSolver, AccelerateSolver}, flags,
                                   cfg, log) where {T,V}
 
     # Data

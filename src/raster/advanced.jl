@@ -329,6 +329,14 @@ function multiple_solve(s::PardisoSolver, matrix::SparseMatrixCSC{T,V}, sources:
     volt
 end
 
+function multiple_solve(s::AccelerateSolver, matrix::SparseMatrixCSC{T,V}, sources::Vector{T}) where {T,V}
+    factor = construct_cholesky_factor(matrix, s)
+    t1 = @elapsed volt = solve_linear_system(factor, matrix, sources)
+    @assert (norm(matrix*volt .- sources) / norm(sources)) < 1e-4
+    @info("Time taken to solve linear system = $t1 seconds")
+    volt
+end
+
 struct FullGraph{T,V}
     matrix::SparseMatrixCSC{T,V}
     cc::Vector{V}

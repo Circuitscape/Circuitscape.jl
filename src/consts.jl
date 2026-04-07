@@ -12,6 +12,7 @@ const DOUBLE = ["double", "Double"]
 const AMG = ["cg+amg", "amg+cg"]
 const CHOLMOD = ["cholmod", "cholesky", "cholfact"]
 const PARDISO = ["mklpardiso", "MKLPardiso", "PARDISO", "pardiso"]
+const ACCELERATE = ["accelerate", "Accelerate", "ACCELERATE", "apple_accelerate"]
 
 # Constants used in IO
 const AAGRID = 2
