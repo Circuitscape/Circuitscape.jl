@@ -1,6 +1,6 @@
 @enum DataType dt_raster dt_network
 @enum Scenario sc_pairwise sc_advanced sc_onetoall sc_alltoone
-@enum SolverType st_cg_amg st_cholmod st_pardiso
+@enum SolverType st_cg_amg st_cholmod st_pardiso st_accelerate
 @enum Precision pr_single pr_double
 @enum LogLevel ll_none ll_info ll_debug ll_warning ll_critical
 @enum RemovePolicy rp_keepall rp_rmvsrc rp_rmvgnd rp_rmvall
@@ -70,7 +70,8 @@ end
 function _parse_solver(s)
     s in AMG ? st_cg_amg :
     s in CHOLMOD ? st_cholmod :
-    s in PARDISO ? st_pardiso : st_cg_amg
+    s in PARDISO ? st_pardiso :
+    s in ACCELERATE ? st_accelerate : st_cg_amg
 end
 
 _parse_precision(s) = s in SINGLE ? pr_single : pr_double
@@ -157,7 +158,8 @@ end
 function _solver_str(v::SolverType)
     v == st_cg_amg ? "cg+amg" :
     v == st_cholmod ? "cholmod" :
-    v == st_pardiso ? "mklpardiso" : "cg+amg"
+    v == st_pardiso ? "mklpardiso" :
+    v == st_accelerate ? "accelerate" : "cg+amg"
 end
 
 _precision_str(v::Precision) = v == pr_single ? "single" : "double"
