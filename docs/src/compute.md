@@ -33,6 +33,47 @@ The `cholmod`, `accelerate`, and `pardiso` solvers perform batched direct solves
 Threading in these modes parallelizes the postprocessing step (current map
 accumulation and output writing).
 
+## Default Solvers: CG+AMG and CHOLMOD
+
+Circuitscape ships with two solvers that work out of the box with no additional
+packages:
+
+- **CG+AMG** (`solver = cg+amg`, the default) — an iterative solver using
+  conjugate gradient with an algebraic multigrid preconditioner. This is the
+  best choice for large grids because memory usage scales well with problem
+  size. It also parallelizes individual pair solves across threads.
+
+- **CHOLMOD** (`solver = cholmod`) — a direct solver using Cholesky
+  factorization from SuiteSparse. It can be significantly faster than CG+AMG
+  for small to medium problems, but memory usage grows quickly due to fill-in,
+  making it impractical for very large grids. In pairwise mode it performs
+  batched solves controlled by the `cholmod_batch_size` parameter.
+
+## Pardiso Solver
+
+Circuitscape supports the [Pardiso](https://github.com/JuliaSparse/Pardiso.jl)
+direct solver as a package extension. Pardiso uses Intel MKL's sparse direct
+solver and can offer excellent performance on Intel hardware. To use it, first
+install Pardiso.jl:
+
+```julia
+using Pkg
+Pkg.add("Pardiso")
+```
+
+Then load it before (or alongside) Circuitscape:
+
+```julia
+using Pardiso
+using Circuitscape
+compute("config.ini")  # with solver = pardiso in the INI file
+```
+
+Pardiso requires double precision and will automatically switch if single
+precision is requested. Like CHOLMOD, it is a direct solver best suited for
+small to medium problem sizes, and uses the same batched solve strategy in
+pairwise mode.
+
 ## Apple Accelerate Solver
 
 On macOS (13.4 or later), Circuitscape can use Apple's

@@ -1,0 +1,56 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "Circuitscape.jl"
+authors:
+  - family-names: Anantharaman
+    given-names: Ranjan
+  - family-names: Shah
+    given-names: Viral B
+preferred-citation:
+  type: article
+  title: "Circuitscape in Julia: Empowering Dynamic Approaches to Connectivity Assessment"
+  authors:
+    - family-names: Hall
+      given-names: Kimberly R
+    - family-names: Anantharaman
+      given-names: Ranjan
+    - family-names: Landau
+      given-names: Vincent A
+    - family-names: Clark
+      given-names: Melissa
+    - family-names: Dickson
+      given-names: Brett G
+    - family-names: Jones
+      given-names: Aaron
+    - family-names: Platt
+      given-names: Jim
+    - family-names: Edelman
+      given-names: Alan
+    - family-names: Shah
+      given-names: Viral B
+  journal: Land
+  volume: 10
+  issue: 3
+  start: 301
+  year: 2021
+  publisher:
+    name: Multidisciplinary Digital Publishing Institute
+  doi: "10.3390/land10030301"
+references:
+  - type: article
+    title: "Using circuit theory to model connectivity in ecology and conservation"
+    authors:
+      - family-names: McRae
+        given-names: Brad H
+      - family-names: Dickson
+        given-names: Brett G
+      - family-names: Keitt
+        given-names: Timothy H
+      - family-names: Shah
+        given-names: Viral B
+    journal: Ecology
+    volume: 10
+    start: 2712
+    end: 2724
+    year: 2008

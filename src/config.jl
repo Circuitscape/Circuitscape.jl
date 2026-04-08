@@ -2,7 +2,6 @@
 @enum Scenario sc_pairwise sc_advanced sc_onetoall sc_alltoone
 @enum SolverType st_cg_amg st_cholmod st_pardiso st_accelerate
 @enum Precision pr_single pr_double
-@enum LogLevel ll_none ll_info ll_debug ll_warning ll_critical
 @enum RemovePolicy rp_keepall rp_rmvsrc rp_rmvgnd rp_rmvall
 
 Base.@kwdef struct CSConfig
@@ -25,7 +24,6 @@ Base.@kwdef struct CSConfig
     mask_file::String = ""
     solver::SolverType = st_cg_amg
     parallelize::Bool = false
-    max_parallel::Int = 0
     precision::Precision = pr_double
     use_64bit_indexing::Bool = true
     cholmod_batch_size::Int = 1000
@@ -50,7 +48,7 @@ Base.@kwdef struct CSConfig
     log_transform_maps::Bool = false
     write_as_tif::Bool = false
     log_file::String = ""
-    log_level::LogLevel = ll_info
+    log_level::Logging.LogLevel = Logging.Info
     suppress_messages::Bool = false
 end
 
@@ -77,11 +75,7 @@ end
 _parse_precision(s) = s in SINGLE ? pr_single : pr_double
 
 function _parse_log_level(s)
-    s in NONE ? ll_none :
-    s in INFO ? ll_info :
-    s in DEBUG ? ll_debug :
-    s in WARNING ? ll_warning :
-    s in CRITICAL ? ll_critical : ll_info
+    s in DEBUG ? Logging.Debug : Logging.Info
 end
 
 function _parse_remove_policy(s)
@@ -111,7 +105,6 @@ function CSConfig(dict::Dict{String,String})
         mask_file = get(dict, "mask_file", ""),
         solver = _parse_solver(get(dict, "solver", "cg+amg")),
         parallelize = _parse_bool(dict, "parallelize"),
-        max_parallel = parse(Int, get(dict, "max_parallel", "0")),
         precision = _parse_precision(get(dict, "precision", "Double")),
         use_64bit_indexing = _parse_bool(dict, "use_64bit_indexing", "true"),
         cholmod_batch_size = parse(Int, get(dict, "cholmod_batch_size", "1000")),
@@ -164,12 +157,8 @@ end
 
 _precision_str(v::Precision) = v == pr_single ? "single" : "double"
 
-function _log_level_str(v::LogLevel)
-    v == ll_none ? "NONE" :
-    v == ll_info ? "INFO" :
-    v == ll_debug ? "DEBUG" :
-    v == ll_warning ? "WARNING" :
-    v == ll_critical ? "CRITICAL" : "INFO"
+function _log_level_str(v::Logging.LogLevel)
+    v == Logging.Debug ? "DEBUG" : "INFO"
 end
 
 function _remove_policy_str(v::RemovePolicy)
@@ -207,7 +196,6 @@ function Base.Dict{String,String}(cfg::CSConfig)
     a["mask_file"] = cfg.mask_file
     a["solver"] = _solver_str(cfg.solver)
     a["parallelize"] = _bool_str(cfg.parallelize)
-    a["max_parallel"] = string(cfg.max_parallel)
     a["precision"] = _precision_str(cfg.precision)
     a["use_64bit_indexing"] = _bool_str(cfg.use_64bit_indexing)
     a["cholmod_batch_size"] = string(cfg.cholmod_batch_size)
@@ -273,7 +261,6 @@ function init_config()
     a["preemptive_memory_release"] = "False"
     a["low_memory_mode"] = "False"
     a["parallelize"] =  "False"
-    a["max_parallel"] =  "0"
     a["print_timings"] = "False"
     a["print_rusages"] = "False"
     a["solver"] =  "cg+amg"

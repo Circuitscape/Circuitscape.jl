@@ -11,6 +11,9 @@ using DelimitedFiles
 using Logging
 using Dates
 using SuiteSparse
+using TimerOutputs
+
+const CSTIMER = TimerOutput()
 
 function __init__()
     LinearAlgebra.BLAS.set_num_threads(1)

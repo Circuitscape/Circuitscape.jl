@@ -6,11 +6,11 @@ struct CSLogger <: AbstractLogger
     suppress_messages::Bool
 end
 
-function CSLogger(; suppress_messages::Bool = false, file_logger::Union{SimpleLogger, Nothing} = nothing)
-    CSLogger(ConsoleLogger(stderr, Logging.Info), file_logger, suppress_messages)
+function CSLogger(; level::Logging.LogLevel = Logging.Info, suppress_messages::Bool = false, file_logger::Union{SimpleLogger, Nothing} = nothing)
+    CSLogger(ConsoleLogger(stderr, level), file_logger, suppress_messages)
 end
 
-Logging.min_enabled_level(logger::CSLogger) = Logging.Info
+Logging.min_enabled_level(logger::CSLogger) = Logging.min_enabled_level(logger.console_logger)
 Logging.shouldlog(logger::CSLogger, level, _module, group, id) = true
 Logging.catch_exceptions(logger::CSLogger) = false
 
@@ -48,6 +48,7 @@ function update_logging!(cfg::CSConfig)
     end
 
     logger = CSLogger(
+        level = cfg.log_level,
         suppress_messages = cfg.suppress_messages,
         file_logger = file_logger
     )

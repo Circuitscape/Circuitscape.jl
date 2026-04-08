@@ -46,8 +46,7 @@ function compute_graph_data(data::NetworkData{T,V}, cfg)::GraphProblem{T,V} wher
 	c = size(A,1)
 	@info("Graph has $c nodes and $(length(cc)) connected components")
 
-    t = @elapsed G = laplacian!(A)
-    @info("Time taken to construct graph laplacian = $t")
+    G = @timeit CSTIMER "construct graph laplacian" laplacian!(A)
 
     # T = eltype(i)
     exclude_pairs = Tuple{V,V}[]

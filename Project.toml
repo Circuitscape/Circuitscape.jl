@@ -15,6 +15,7 @@ Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
 REPL = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 SuiteSparse = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
+TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 
 [weakdeps]
 AppleAccelerate = "13e28ba4-7ad8-5781-acae-3021b1ed3924"
@@ -33,6 +34,7 @@ GZip = "0.6"
 Graphs = "1"
 Krylov = "0.10"
 Pardiso = "1.1"
+TimerOutputs = "0.5"
 julia = "1.11"
 
 [extras]
