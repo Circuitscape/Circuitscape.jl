@@ -14,7 +14,7 @@ end
 function raster_pairwise(T, V, cfg)::Matrix{T}
 
     # Get input
-    rasterdata = load_raster_data(T, V, cfg)
+    rasterdata = @timeit CSTIMER "load raster data" load_raster_data(T, V, cfg)
 
     # Get compute flags
     flags = get_raster_flags(cfg)
@@ -56,11 +56,11 @@ function _pt_file_no_polygons_path(rasterdata::RasterData{T,V},
 
                     flags, cfg)::Matrix{T} where {T,V}
 
-    graphdata = compute_graph_data_no_polygons(rasterdata, flags, cfg)
-    r = single_ground_all_pairs(graphdata, flags, cfg)
+    graphdata = @timeit CSTIMER "construct graph" compute_graph_data_no_polygons(rasterdata, flags, cfg)
+    r = @timeit CSTIMER "solve pairwise resistances" single_ground_all_pairs(graphdata, flags, cfg)
 
     if flags.outputflags.write_cur_maps || flags.outputflags.write_cum_cur_map_only
-        write_cum_maps(graphdata.cum, rasterdata.cellmap, cfg, rasterdata.hbmeta,
+        @timeit CSTIMER "write cumulative current maps" write_cum_maps(graphdata.cum, rasterdata.cellmap, cfg, rasterdata.hbmeta,
                         flags.outputflags.write_max_cur_maps,
                         flags.outputflags.write_cum_cur_map_only)
     end

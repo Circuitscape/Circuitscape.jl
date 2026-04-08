@@ -305,35 +305,30 @@ function multiple_solver(cfg, solver, a::SparseMatrixCSC{T,V}, sources, grounds,
 end
 
 function multiple_solve(s::AMGSolver, matrix::SparseMatrixCSC{T,V}, sources::Vector{T}) where {T,V}
-    t1 = @elapsed M = aspreconditioner(smoothed_aggregation(matrix))
-    @info("Time taken to construct preconditioner = $t1 seconds")
-    t1 = @elapsed volt = solve_linear_system(matrix, sources, M)
+    M = aspreconditioner(smoothed_aggregation(matrix))
+    volt = solve_linear_system(matrix, sources, M)
     @assert (norm(matrix*volt .- sources) / norm(sources)) < 1e-4
-    @info("Time taken to solve linear system = $t1 seconds")
     volt
 end
 
 function multiple_solve(s::CholmodSolver, matrix::SparseMatrixCSC{T,V}, sources::Vector{T}) where {T,V}
     factor = construct_cholesky_factor(matrix, s)
-    t1 = @elapsed volt = solve_linear_system(factor, matrix, sources)
+    volt = solve_linear_system(factor, matrix, sources)
     @assert (norm(matrix*volt .- sources) / norm(sources)) < 1e-4
-    @info("Time taken to solve linear system = $t1 seconds")
     volt
 end
 
 function multiple_solve(s::PardisoSolver, matrix::SparseMatrixCSC{T,V}, sources::Vector{T}) where {T,V}
     factor = construct_cholesky_factor(matrix, s)
-    t1 = @elapsed volt = solve_linear_system(factor, matrix, sources)
+    volt = solve_linear_system(factor, matrix, sources)
     @assert (norm(matrix*volt .- sources) / norm(sources)) < 1e-4
-    @info("Time taken to solve linear system = $t1 seconds")
     volt
 end
 
 function multiple_solve(s::AccelerateSolver, matrix::SparseMatrixCSC{T,V}, sources::Vector{T}) where {T,V}
     factor = construct_cholesky_factor(matrix, s)
-    t1 = @elapsed volt = solve_linear_system(factor, matrix, sources)
+    volt = solve_linear_system(factor, matrix, sources)
     @assert (norm(matrix*volt .- sources) / norm(sources)) < 1e-4
-    @info("Time taken to solve linear system = $t1 seconds")
     volt
 end
 
