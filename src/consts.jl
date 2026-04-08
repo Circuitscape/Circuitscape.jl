@@ -35,11 +35,7 @@ const FILE_HDR_INCL_PAIRS_AAGRID = "min"
 const FILE_HDR_INCL_PAIRS = "mode"
 
 # Constants for logging
-const NONE = ["NONE", "None", "none"]
-const INFO = ["INFO", "info", "Info"]
 const DEBUG = ["DEBUG", "debug", "Debug"]
-const WARNING = ["WARNING", "WARN", "warning", "warn", "Warning", "Warn"]
-const CRITICAL = ["CRITICAL", "critical", "Critical"]
 
 # Constants for tolerance when checking matrix norms
 const TOL_SINGLE = 1e-3

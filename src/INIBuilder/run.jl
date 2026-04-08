@@ -94,7 +94,6 @@ function step6()
     opt = collect(1:Sys.CPU_THREADS) |> x -> string.(x)
     n = request(RadioMenu(opt))
     n > 1 && (cfg["parallelize"] = "true")
-    cfg["max_parallel"] = string(n)
     step7()
 end
 

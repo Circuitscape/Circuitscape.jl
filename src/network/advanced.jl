@@ -34,8 +34,7 @@ function compute_advanced_data(data::NetworkData{T,V},
 	c = size(A,1)
 	@info("Graph has $c nodes and $(length(cc)) connected components")
 
-    t = @elapsed G = laplacian!(A)
-    @info("Time taken to construct graph laplacian = $t")
+    G = @timeit CSTIMER "construct graph laplacian" laplacian!(A)
 
     nodemap, polymap = Matrix{V}(undef,0,0), Matrix{V}(undef,0,0)
     cellmap = Matrix{T}(undef,0,0)

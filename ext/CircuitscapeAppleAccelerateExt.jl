@@ -8,8 +8,7 @@ import Circuitscape: AccelerateSolver, construct_cholesky_factor, solve_linear_s
 function construct_cholesky_factor(matrix, ::AccelerateSolver)
     T = eltype(matrix)
     regularized = matrix + sparse(T(10) * eps(T) * I, size(matrix)...)
-    t = @elapsed factor = AppleAccelerate.AAFactorization(regularized)
-    @info("Time taken to construct Apple Accelerate factorization = $t")
+    factor = AppleAccelerate.AAFactorization(regularized)
     factor
 end
 

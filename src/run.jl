@@ -34,10 +34,13 @@ function _run(cfg)
     V = cfg.use_64bit_indexing ? Int64 : Int32
     @info("Precision used: $(_precision_str(cfg.precision))")
     if cfg.parallelize
-        @info("Starting up Circuitscape to use $(cfg.max_parallel) threads in parallel")
+        @info("Starting up Circuitscape to use $(Threads.nthreads()) threads in parallel")
     end
-    t = @elapsed r = _compute(T, V, cfg)
-    @info("Time taken to complete job = $t")
+    reset_timer!(CSTIMER)
+    r = @timeit CSTIMER "complete job" _compute(T, V, cfg)
+    if cfg.log_level == Logging.Debug
+        @info("\n", CSTIMER)
+    end
     r
 end
 

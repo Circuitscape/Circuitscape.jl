@@ -161,16 +161,15 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
         matrix.nzval .+= eps(eltype(matrix)) * norm(matrix.nzval)
 
         # Construct preconditioner *once* for every CC
-        t1 = @elapsed P = aspreconditioner(smoothed_aggregation(matrix))
-        @info("Time taken to construct preconditioner = $t1 seconds")
+        P = @timeit CSTIMER "construct preconditioner" aspreconditioner(smoothed_aggregation(matrix))
 
         # Get local nodemap for CC - useful for output writing
-        t2 = @elapsed local_nodemap = construct_local_node_map(nodemap, comp, polymap)
-        @info("Time taken to construct local nodemap = $t2 seconds")
+        local_nodemap = @timeit CSTIMER "construct local nodemap" construct_local_node_map(nodemap, comp, polymap)
 
         component_data = ComponentData(comp, matrix, local_nodemap, hbmeta, cellmap)
 
-        function solve_pairs_for_point(point_idx)
+        function solve_pairs_for_point(point_idx, local_timer)
+            @timeit local_timer "task $point_idx" begin
             # Each task needs its own workspace (scratch vectors are mutable)
             ml = P.ml
             local_P = aspreconditioner(AlgebraicMultigrid.MultiLevel(
@@ -224,8 +223,7 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
                 current[comp_j] = 1
 
                 log && haskey(pair_numbers, (src_node, dst_node)) && @debug("Solving pair $(pair_numbers[(src_node, dst_node)]) of $num_pairs")
-                solve_time = @elapsed voltages = solve_linear_system(matrix, current, local_P)
-                @debug("Time taken to solve linear system = $solve_time seconds")
+                voltages = @timeit local_timer "solve linear system" solve_linear_system(matrix, current, local_P)
 
                 voltages .= voltages .- voltages[comp_i]
                 resistance = voltages[comp_j] - voltages[comp_i]
@@ -243,25 +241,36 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
                         end
                         output = Output(points, voltages, (orig_pts[c_i], orig_pts[c_j]),
                                         (comp_i, comp_j), resistance, V(c_j), cum)
-                        postprocess(output, component_data, flags, shortcut, cfg)
+                        @timeit local_timer "postprocess" postprocess(output, component_data, flags, shortcut, cfg)
                     end
                 end
             end
 
+            end # @timeit task
         results
         end
 
         if get_shortcut_resistances
             idx = findfirst(isequal(csub[1]), points)
             idx === nothing && error("Focal point $(csub[1]) not found in points list")
-            solve_pairs_for_point(1)
+            solve_pairs_for_point(1, TimerOutput())
             update_shortcut_resistances!(idx, shortcut, resistances, points, comp)
         else
             is_parallel = cfg.parallelize
-            if is_parallel
-                all_results = fetch.(map(pt -> Threads.@spawn(solve_pairs_for_point(pt)), 1:size(csub,1)))
-            else
-                all_results = map(solve_pairs_for_point, 1:size(csub,1))
+            n_points = size(csub, 1)
+            local_timers = [TimerOutput() for _ in 1:n_points]
+            # NOTE: Work is distributed by source point, giving a triangular load:
+            # task 1 solves n-1 pairs, task 2 solves n-2, ..., task n solves 0.
+            # This causes significant load imbalance with many threads.
+            all_results = @timeit CSTIMER "solve and accumulate pairs" if is_parallel
+                    fetch.(map(pt -> Threads.@spawn(solve_pairs_for_point(pt, local_timers[pt])), 1:n_points))
+                else
+                    map(pt -> solve_pairs_for_point(pt, local_timers[pt]), 1:n_points)
+                end
+
+            # Merge per-task timers
+            for lt in local_timers
+                merge!(CSTIMER, lt)
             end
 
             # Set all resistances
@@ -364,11 +373,10 @@ function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, PardisoSolv
         # Conductance matrix corresponding to CC
         matrix = comps[cid]
 
-        t = @elapsed factor = construct_cholesky_factor(matrix, solver)
+        factor = @timeit CSTIMER "construct cholesky factor" construct_cholesky_factor(matrix, solver)
 
         # Get local nodemap for CC - useful for output writing
-        t2 = @elapsed local_nodemap = construct_local_node_map(nodemap, comp, polymap)
-        @info("Time taken to construct local nodemap = $t2 seconds")
+        local_nodemap = @timeit CSTIMER "construct local nodemap" construct_local_node_map(nodemap, comp, polymap)
 
         component_data = ComponentData(comp, matrix, local_nodemap, hbmeta, cellmap)
 
@@ -413,6 +421,7 @@ function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, PardisoSolv
         end
 
         function postprocess_pair(batch_idx, batch_range, lhs)
+            CSTIMER_THREAD = TimerOutput()
             batch_pos = batch_range[batch_idx]
             output = Output(points, lhs[:,batch_idx],
                 (orig_pts[cholmod_batch[batch_pos].points_idx[1]],
@@ -420,7 +429,8 @@ function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, PardisoSolv
                 cholmod_batch[batch_pos].cc_idx,
                 lhs[cholmod_batch[batch_pos].cc_idx[2], batch_idx] - lhs[cholmod_batch[batch_pos].cc_idx[1], batch_idx],
                 V(cholmod_batch[batch_pos].points_idx[2]), cum)
-            postprocess(output, component_data, flags, shortcut, cfg)
+            @timeit CSTIMER_THREAD "postprocess" postprocess(output, component_data, flags, shortcut, cfg)
+            CSTIMER_THREAD
         end
         if get_shortcut_resistances
             idx = findfirst(isequal(csub[1]), points)
@@ -459,10 +469,15 @@ function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, PardisoSolv
             end
 
             is_parallel = cfg.parallelize
-            if is_parallel
-                fetch.(map(bi -> Threads.@spawn(postprocess_pair(bi, batch_range, lhs)), 1:length(batch_range)))
-            else
-                map(bi -> postprocess_pair(bi, batch_range, lhs), 1:length(batch_range))
+            CSTIMER_THREADs = @timeit CSTIMER "postprocess pairs" begin
+                if is_parallel
+                    fetch.(map(bi -> Threads.@spawn(postprocess_pair(bi, batch_range, lhs)), 1:length(batch_range)))
+                else
+                    map(bi -> postprocess_pair(bi, batch_range, lhs), 1:length(batch_range))
+                end
+            end
+            for lt in CSTIMER_THREADs
+                merge!(CSTIMER, lt)
             end
 
             for (col, batch_pos) in enumerate(batch_range)
@@ -500,8 +515,7 @@ end
 # So can we make this consistent?
 function construct_cholesky_factor(matrix, ::CholmodSolver)
     T = eltype(matrix)
-    t = @elapsed factor = cholesky(matrix + sparse(T(10)*eps(T)*I,size(matrix)...))
-    @info("Time taken to construct cholesky factor = $t")
+    factor = cholesky(matrix + sparse(T(10)*eps(T)*I,size(matrix)...))
     factor
 end
 
@@ -656,15 +670,12 @@ function postprocess(output, component_data, flags, shortcut, cfg)
     name = "_$(orig_pts[1])_$(orig_pts[2])"
 
     if flags.outputflags.write_volt_maps
-        t = @elapsed write_volt_maps(name, output, component_data, flags, cfg)
-        @debug("Time taken to write voltage maps = $t seconds")
+        write_volt_maps(name, output, component_data, flags, cfg)
     end
 
     # TODO: Even though this function is called write_cur_maps
     # actually writing the calculated maps depends on some flags.
-    t = @elapsed write_cur_maps(name, output, component_data,
-                                [-9999.], flags, cfg)
-    @debug("Time taken to calculate current maps = $t seconds")
+    write_cur_maps(name, output, component_data, [-9999.], flags, cfg)
     nothing
 end
 

@@ -90,7 +90,7 @@ All Circuitscape configuration is done through an `.ini` file. Below is a comple
 | `use_64bit_indexing` | Boolean | `True` | If `True`, use 64-bit integer indexing. Required for very large grids. |
 | `cholmod_batch_size` | Integer | `1000` | Number of pairs to solve simultaneously when using CHOLMOD in pairwise mode. |
 | `parallelize` | Boolean | `False` | If `True`, run iterations in parallel using Julia threads. Start Julia with `julia -t N` for N threads. |
-| `max_parallel` | Integer | `0` | Number of parallel workers (legacy setting, threads are now controlled by Julia's `-t` flag). |
+
 | `low_memory_mode` | Boolean | `False` | If `True`, reduce memory usage at the cost of computation time. |
 | `preemptive_memory_release` | Boolean | `False` | If `True`, release memory more aggressively during computation. |
 
@@ -106,10 +106,7 @@ All Circuitscape configuration is done through an `.ini` file. Below is a comple
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|
 | `log_file` | Path | `None` | Path to log file. If `None`, no file logging. |
-| `log_level` | String | `INFO` | Logging level. Values: `DEBUG`, `INFO`, `WARNING`, `CRITICAL`. |
-| `screenprint_log` | Boolean | `False` | If `True`, print log messages to the screen. |
-| `print_timings` | Boolean | `False` | If `True`, print timing information for each solve. |
-| `print_rusages` | Boolean | `False` | If `True`, print resource usage statistics. |
+| `log_level` | String | `INFO` | Logging level. Values: `DEBUG`, `INFO`. When set to `DEBUG`, prints detailed timing summary and per-pair solve progress. |
 | `suppress_messages` | Boolean | `False` | If `True`, suppress all informational messages. |
 | `profiler_log_file` | Path | `None` | Path to profiler log file. |
 
@@ -139,7 +136,13 @@ For raster analyses, focal nodes may occur at points (single cells on the resist
 
 ### Parallelism
 
-Circuitscape uses Julia's native threading for parallel computation. Set `parallelize = True` and start Julia with `julia -t N` for N threads. Parallelism benefits pairwise, one-to-all, and all-to-one modes.
+Circuitscape uses Julia's native threading for parallel computation. Set `parallelize = True` and start Julia with `julia -t N` for N threads.
+
+Parallelism is supported in raster **pairwise**, **one-to-all**, and **all-to-one** modes. It is most effective in one-to-all and all-to-one, where each focal point is an independent solve that can be distributed evenly across threads.
+
+In **pairwise** mode, work is distributed by source focal point: the first task solves N-1 pairs, the second solves N-2, and so on. This triangular load distribution means early tasks do significantly more work than later ones, reducing parallel efficiency when the number of threads is large relative to the number of focal points. Use `log_level = DEBUG` to see per-task timing breakdowns.
+
+Network modes and raster advanced mode do not currently support parallelism.
 
 ## Advanced Mode Options
 
