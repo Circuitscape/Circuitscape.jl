@@ -161,10 +161,10 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
         matrix.nzval .+= eps(eltype(matrix)) * norm(matrix.nzval)
 
         # Construct preconditioner *once* for every CC
-        P = @timeit CSTIMER "construct preconditioner" aspreconditioner(smoothed_aggregation(matrix); 
+        P = @timeit CSTIMER "construct preconditioner" aspreconditioner(smoothed_aggregation(matrix; 
 																	    coarse_solver = AlgebraicMultigrid.Pinv, 
 																		presmoother = AlgebraicMultigrid.GaussSeidel(), 
-																		postsmoother = AlgebraicMultigrid.GaussSeidel())
+																		postsmoother = AlgebraicMultigrid.GaussSeidel()))
 
         # Get local nodemap for CC - useful for output writing
         local_nodemap = @timeit CSTIMER "construct local nodemap" construct_local_node_map(nodemap, comp, polymap)
