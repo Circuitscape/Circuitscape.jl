@@ -161,7 +161,10 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
         matrix.nzval .+= eps(eltype(matrix)) * norm(matrix.nzval)
 
         # Construct preconditioner *once* for every CC
-        P = @timeit CSTIMER "construct preconditioner" aspreconditioner(smoothed_aggregation(matrix); coarse_solver = AMG.Pinv)
+        P = @timeit CSTIMER "construct preconditioner" aspreconditioner(smoothed_aggregation(matrix); 
+																	    coarse_solver = AMG.Pinv, 
+																		presmoother = GaussSeidel(), 
+																		postsmoother = GaussSeidel())
 
         # Get local nodemap for CC - useful for output writing
         local_nodemap = @timeit CSTIMER "construct local nodemap" construct_local_node_map(nodemap, comp, polymap)
@@ -173,7 +176,7 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
             # Each task needs its own workspace (scratch vectors are mutable)
             ml = P.ml
             local_P = aspreconditioner(AlgebraicMultigrid.MultiLevel(
-                ml.levels, ml.final_A, ml.coarse_solver = Pinv,
+                ml.levels, ml.final_A, ml.coarse_solver,
                 ml.presmoother, ml.postsmoother, deepcopy(ml.workspace)))
 
             results = Vector{Tuple{V,V,T}}()
