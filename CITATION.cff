@@ -39,7 +39,7 @@ preferred-citation:
   doi: "10.3390/land10030301"
 references:
   - type: article
-    title: "Using circuit theory to model connectivity in ecology and conservation"
+    title: "Using circuit theory to model connectivity in ecology, evolution, and conservation"
     authors:
       - family-names: McRae
         given-names: Brad H
@@ -50,7 +50,9 @@ references:
       - family-names: Shah
         given-names: Viral B
     journal: Ecology
-    volume: 10
+    volume: 89
+    issue: 10
     start: 2712
     end: 2724
     year: 2008
+    doi: "10.1890/07-1861.1"
