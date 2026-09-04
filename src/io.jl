@@ -341,7 +341,7 @@ function _txt_list_reader(filename, T, habitatmeta)
     pts_remapped
 end
 
-function read_included_pairs(V, filename)
+function read_included_pairs(V, filename; starts_from_zero = false)
 
     f = _open(filename)
     filetype = _guess_file_type(filename, f)
@@ -358,6 +358,10 @@ function read_included_pairs(V, filename)
         included_pairs = readdlm(filename, skipstart=2)
         point_ids = V.(included_pairs[:,1])
         deleteat!(point_ids, 1)
+        # Network graphs numbered from 0 are shifted to 1-based on load, so the
+        # IDs named here move with them. Never infer this from the data: in a
+        # raster include file 0 means "no matching focal node" (issue #341).
+        starts_from_zero && (point_ids = point_ids .+ V(1))
         included_pairs = included_pairs[2:end, 2:end]
         map!(x -> x > maxval ? 0 : x, included_pairs, included_pairs)
         idx = findall(x -> x >= minval, included_pairs)
@@ -374,6 +378,8 @@ function read_included_pairs(V, filename)
             pl[1,:] = included_pairs
             included_pairs = pl
         end
+        starts_from_zero && (included_pairs = included_pairs .+ 1)
+
         point_ids = V.(sort!(unique(included_pairs)))
         idx = findall(x -> x == 0 , point_ids)
         if length(idx) > 0
@@ -431,7 +437,8 @@ function get_network_data(T, V, cfg)::NetworkData{T,V}
     end
 
     if cfg.use_included_pairs && is_pairwise
-        included_pairs = read_included_pairs(V, cfg.included_pairs_file)
+        included_pairs = read_included_pairs(V, cfg.included_pairs_file;
+                                             starts_from_zero = starts_from_zero)
     else
         included_pairs = IncludeExcludePairs(V)
     end

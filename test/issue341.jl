@@ -584,3 +584,35 @@ let
     @test !((1, 3) in ex2) && !((2, 3) in ex2)
 end
 
+# Test 12: network graphs numbered from 0 are shifted to 1-based on load, so the
+# IDs in the include file must shift with them. Previously the unshifted file IDs
+# were matched against shifted focal points, selecting the neighbouring pair.
+let
+    dir = mktempdir()
+    # 0-based path graph with distinct resistances, so picking the wrong pair
+    # gives a different number: 0-1 = 1, 1-2 = 5, 2-3 = 1.
+    write(joinpath(dir, "graph.txt"), "0\t1\t1.0\n1\t2\t5.0\n2\t3\t1.0\n")
+    write(joinpath(dir, "fp.txt"), "0\n1\n2\n3\n")
+    write(joinpath(dir, "include.txt"), "mode\tinclude\n1\t2\n")
+    ini = joinpath(dir, "job.ini")
+    write(ini, """[Circuitscape mode]
+data_type = network
+scenario = pairwise
+[Habitat raster or graph]
+habitat_file = $(joinpath(dir, "graph.txt"))
+habitat_map_is_resistances = True
+[Options for pairwise and one-to-all and all-to-one modes]
+point_file = $(joinpath(dir, "fp.txt"))
+use_included_pairs = True
+included_pairs_file = $(joinpath(dir, "include.txt"))
+output_file = $(joinpath(dir, "out.out"))
+""" * _INI_TAIL_341)
+    r = compute(ini)
+    @test size(r) == (3, 3)
+    # Node IDs come back shifted to 1-based, as load_graph reports for 0-based input.
+    @test r[1, 2] == 2.0
+    @test r[1, 3] == 3.0
+    # The requested pair is the 5.0 resistor, not the adjacent 1.0 one.
+    @test r[2, 3] ≈ 5.0
+end
+
