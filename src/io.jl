@@ -12,11 +12,27 @@ function IncludeExcludePairs(V)
 end
 Base.isempty(t::IncludeExcludePairs) = t.mode == :undef
 
+"""
+    exclude_pairs_from(included_pairs)
+
+Node ID pairs to exclude, derived from an include/exclude matrix. In `:include`
+mode every pair *not* marked is excluded; in `:exclude` mode only the marked
+pairs are. Shared by the raster and network paths.
+"""
+function exclude_pairs_from(included_pairs::IncludeExcludePairs{V}) where V
+    mat = included_pairs.include_pairs
+    point_ids = included_pairs.point_ids
+    target = included_pairs.mode == :include ? V(0) : V(1)
+    [(point_ids[i], point_ids[j]) for j in axes(mat, 2) for i in axes(mat, 1)
+        if mat[i,j] == target && mat[j,i] == target]
+end
+
 struct NetworkData{T,V} <: Data
     coords::Tuple{Vector{V},Vector{V},Vector{T}}
     fp::Vector{V}
     source_map::Matrix{T}
     ground_map::Matrix{T}
+    included_pairs::IncludeExcludePairs{V}
 end
 
 struct RasterMeta
@@ -414,7 +430,13 @@ function get_network_data(T, V, cfg)::NetworkData{T,V}
         ground_list = Matrix{T}(undef,0,0)
     end
 
-    NetworkData((i,j,v), fp, source_list, ground_list)
+    if cfg.use_included_pairs && is_pairwise
+        included_pairs = read_included_pairs(V, cfg.included_pairs_file)
+    else
+        included_pairs = IncludeExcludePairs(V)
+    end
+
+    NetworkData((i,j,v), fp, source_list, ground_list, included_pairs)
 end
 
 function load_raster_data(T, V, cfg)::RasterData{T,V}

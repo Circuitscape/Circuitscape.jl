@@ -30,7 +30,6 @@ function onetoall_kernel(data::RasterData{T,V}, flags, cfg)::Matrix{T} where {T,
     four_neighbors = flags.four_neighbors
 
     if use_included_pairs
-        points_unique = included_pairs.point_ids
         prune_points!(points_rc, included_pairs.point_ids)
         if use_variable_strengths
             strengths = prune_strengths(strengths, included_pairs.point_ids)
@@ -80,8 +79,13 @@ function onetoall_kernel(data::RasterData{T,V}, flags, cfg)::Matrix{T} where {T,
         @info("Solving point $i of $num_points_to_solve")
         n = points_unique[i]
         if use_included_pairs
+            # `i` indexes the focal points present in the raster, but the
+            # include matrix is indexed by position in `point_ids`. These differ
+            # whenever the file names an ID the point raster does not contain,
+            # so look the row up by node ID rather than reusing `i` (issue #341).
+            row = findfirst(isequal(n), point_ids)
             for j = 1:size(point_ids,1)
-                if i != j && included_pairs.include_pairs[i,j] == mode
+                if j != row && included_pairs.include_pairs[row,j] == mode
                     exclude = point_ids[j]
                     map!(x -> x == exclude ? 0 : x, point_map, point_map)
                 end
