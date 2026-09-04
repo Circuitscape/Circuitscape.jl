@@ -305,7 +305,12 @@ function multiple_solver(cfg, solver, a::SparseMatrixCSC{T,V}, sources, grounds,
 end
 
 function multiple_solve(s::AMGSolver, matrix::SparseMatrixCSC{T,V}, sources::Vector{T}) where {T,V}
-    M = aspreconditioner(smoothed_aggregation(matrix))
+    # Pin the coarse solver and smoothers for the same reason as in core.jl:
+    # CG needs a symmetric positive definite preconditioner.
+    M = aspreconditioner(smoothed_aggregation(matrix;
+                                              coarse_solver = AlgebraicMultigrid.Pinv,
+                                              presmoother = AlgebraicMultigrid.GaussSeidel(),
+                                              postsmoother = AlgebraicMultigrid.GaussSeidel()))
     volt = solve_linear_system(matrix, sources, M)
     @assert (norm(matrix*volt .- sources) / norm(sources)) < 1e-4
     volt
