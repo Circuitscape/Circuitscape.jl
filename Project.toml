@@ -1,6 +1,6 @@
 name = "Circuitscape"
 uuid = "2b7a1792-8151-5239-925d-e2b8fdfa3201"
-version = "5.17.1"
+version = "5.18.0"
 
 [deps]
 AlgebraicMultigrid = "2169fc97-5a83-5252-b627-83903c6c433c"
@@ -26,15 +26,15 @@ CircuitscapeAppleAccelerateExt = "AppleAccelerate"
 CircuitscapePardisoExt = "Pardiso"
 
 [compat]
-AlgebraicMultigrid = "1.2"
-AppleAccelerate = "0.6"
+AlgebraicMultigrid = "2"
+AppleAccelerate = "0.7"
 ArchGDAL = "0.10"
 DelimitedFiles = "1.9"
-GZip = "0.6, 0.7"
+GZip = "0.7"
 Graphs = "1"
 Krylov = "0.10"
 Pardiso = "1.1"
-TimerOutputs = "0.5"
+TimerOutputs = "1"
 julia = "1.11"
 
 [extras]
