@@ -440,3 +440,22 @@ version = unknown
     # Excluded pair
     @test r[2, 4] == -1  # pair (1,3)
 end
+
+# Test 8: The polygon path must count only the pairs it will solve, so the
+# "Total number of pair solves" log reflects the include/exclude file rather
+# than every combination of the nodes it mentions.
+let
+    pts = [1, 2, 3, 4]
+    # Include only (1,2) and (1,3): everything else is excluded, both orders,
+    # which is what generate_exclude_pairs produces in include mode.
+    excluded = [(1,4), (4,1), (2,3), (3,2), (2,4), (4,2), (3,4), (4,3)]
+    @test Circuitscape.pairs_to_solve(pts, excluded) == [(1,2), (1,3)]
+    # No exclusions: all C(4,2) pairs, in row-major order
+    @test Circuitscape.pairs_to_solve(pts, Tuple{Int,Int}[]) ==
+        [(1,2), (1,3), (1,4), (2,3), (2,4), (3,4)]
+    # A pair listed in only one order is still excluded
+    @test Circuitscape.pairs_to_solve(pts, [(3,1)]) ==
+        [(1,2), (1,4), (2,3), (2,4), (3,4)]
+    # Node IDs need not be contiguous or sorted; indices are into `pts`
+    @test Circuitscape.pairs_to_solve([10, 6, 1], [(6,10)]) == [(1,3), (2,3)]
+end
