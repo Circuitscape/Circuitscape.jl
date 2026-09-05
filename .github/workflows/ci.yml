@@ -51,6 +51,9 @@ jobs:
         os:
           - windows-latest
           - ubuntu-latest
+        include:
+          - version: 'min'
+            os: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: julia-actions/setup-julia@v3
