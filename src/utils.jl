@@ -241,7 +241,7 @@ function compute_omniscape_current(
                    compress_grids = false,
                    log_transform_maps = false)
 
-    data = compute_advanced_data(rasterdata, cfg)
+    data = advanced_problem(rasterdata, cfg)
 
     G = data.G
     geometry = data.geometry

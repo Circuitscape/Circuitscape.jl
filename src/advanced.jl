@@ -11,78 +11,16 @@ struct AdvancedProblem{T,V,W,Geom<:Geometry}
     solver::W
 end
 
-function raster_advanced(T, V, cfg)::Matrix{T}
-
-    # Load raster data
-    rasterdata = load_raster_data(T, V, cfg)
-
-    # Generate advanced
-    advanced_data = compute_advanced_data(rasterdata, cfg)
-
-    # Send to main kernel
-    v, _ = advanced_kernel(advanced_data, cfg)
-
-    v
-end
-
-
-function compute_advanced_data(data::RasterData{T,V}, cfg)::AdvancedProblem{T,V} where {T,V}
-
-    # Data
-    cellmap = data.cellmap
-    polymap = data.polymap
-    points_rc = data.points_rc
-    included_pairs = data.included_pairs
-    hbmeta = data.hbmeta
-    source_map = data.source_map
-
-
-    # Options
-    avg_res = cfg.connect_using_avg_resistances
-    four_neighbors = cfg.connect_four_neighbors_only
-
-    # Nodemap and graph construction
-    nodemap = construct_node_map(cellmap, polymap)
-    A = construct_graph(cellmap, nodemap, avg_res, four_neighbors)
-    G = laplacian!(A)
-
-    # Connected Components
-    cc = connected_components(G)
-
-    geometry = RasterGeometry(nodemap, polymap, hbmeta, cellmap)
-
-    # Advanced mode specific stuff
-    sources, grounds, finitegrounds =
-            get_sources_and_grounds(data, cfg, G, geometry)
-
-    solver = get_solver(cfg)
-
-    AdvancedProblem(G, cc, geometry,
-                sources, grounds, source_map,
-                finitegrounds, V(-1), V(0), solver)
-
-end
-
-function get_sources_and_grounds(data, cfg, G, geometry)
-
-    # Data
-    source_map = data.source_map
-    ground_map = data.ground_map
-
-    _get_sources_and_grounds(source_map, ground_map, cfg, G, geometry)
-end
-
 """
-    _get_sources_and_grounds(source_map, ground_map, cfg, G, geometry, override_policy = :none)
+    sources_and_grounds(geometry, source_map, ground_map, G, cfg, conflict_policy = policy(cfg))
 
 Source and ground vectors over the graph nodes from the user's source and
-ground inputs, with conflicts between the two resolved by `policy(cfg)` (or
-`override_policy`). For a raster the inputs are grids read through the
-nodemap; for a network they are `(node, value)` lists.
+ground inputs, with conflicts between the two resolved by `conflict_policy`.
+For a raster the inputs are grids read through the nodemap; for a network
+they are `(node, value)` lists.
 """
-function _get_sources_and_grounds(source_map, ground_map,
-                                  cfg, G, geometry::Geometry, override_policy = :none)
-    conflict_policy = override_policy == :none ? policy(cfg) : override_policy
+function sources_and_grounds(geometry::Geometry, source_map, ground_map, G, cfg,
+                             conflict_policy = policy(cfg))
 
     # Initialize sources and grounds
     sources = zeros(eltype(G), size(G, 1))

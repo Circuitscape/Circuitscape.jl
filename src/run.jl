@@ -48,23 +48,14 @@ function _run(cfg)
 end
 
 function _compute(T, V, cfg)
-    is_raster = cfg.data_type == dt_raster
-    scenario = cfg.scenario
-    if is_raster
-        if scenario == sc_pairwise
-            raster_pairwise(T, V, cfg)
-        elseif scenario == sc_advanced
-            raster_advanced(T, V, cfg)
-        elseif scenario == sc_onetoall
-            raster_one_to_all(T, V, cfg)
-        else
-            raster_one_to_all(T, V, cfg)
-        end
+    data = @timeit CSTIMER[] "load data" load_data(T, V, cfg)
+    if is_pairwise(cfg)
+        run_pairwise(data, cfg)
+    elseif is_advanced(cfg) || is_network(cfg)
+        # A network has no one-to-all / all-to-one; any other scenario runs as
+        # advanced, as it always has.
+        run_advanced(build_problem(data, cfg), cfg)
     else
-        if scenario == sc_pairwise
-            network_pairwise(T, V, cfg)
-        else
-            network_advanced(T, V, cfg)
-        end
+        onetoall_kernel(data, cfg)
     end
 end

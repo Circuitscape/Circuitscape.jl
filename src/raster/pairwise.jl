@@ -1,30 +1,50 @@
-function raster_pairwise(T, V, cfg)::Matrix{T}
+# Graph construction for a raster landscape: one node per habitat cell, the
+# cells of one short-circuit polygon merged into a node, edges to the 4 or 8
+# neighbours. The output geometry is the nodemap this produces.
 
-    # Get input
-    rasterdata = @timeit CSTIMER[] "load raster data" load_raster_data(T, V, cfg)
+"""
+    build_graph(data::RasterData, cfg, polymap = data.polymap) -> (G, cc, geometry)
 
-    pt_file_contains_polygons = length(rasterdata.points_rc[1]) !=
-                                length(unique(rasterdata.points_rc[3]))
-
-    if pt_file_contains_polygons
-        _pt_file_polygons_path(rasterdata, cfg)
-    else
-        _pt_file_no_polygons_path(rasterdata, cfg)
-    end
+Laplacian, connected components and geometry of the landscape graph. A
+`polymap` other than the loaded one lets callers merge extra cells into
+nodes, as the focal-region paths do.
+"""
+function build_graph(data::RasterData{T,V}, cfg, polymap = data.polymap) where {T,V}
+    cellmap = data.cellmap
+    nodemap = construct_node_map(cellmap, polymap)
+    A = construct_graph(cellmap, nodemap, cfg.connect_using_avg_resistances,
+                        cfg.connect_four_neighbors_only)
+    cc = connected_components(A)
+    G = laplacian!(A)
+    G, cc, RasterGeometry(nodemap, polymap, data.hbmeta, cellmap)
 end
 
-function _pt_file_no_polygons_path(rasterdata::RasterData{T,V}, cfg)::Matrix{T} where {T,V}
-
-    graphdata = @timeit CSTIMER[] "construct graph" compute_graph_data_no_polygons(rasterdata, cfg)
-    r = @timeit CSTIMER[] "solve pairwise resistances" single_ground_all_pairs(graphdata, cfg)
-
-    @timeit CSTIMER[] "write cumulative current maps" write_cum_maps(graphdata.cum, graphdata.geometry, cfg)
-
-    r
+# Focal nodes are the nodes under the focal cells, paired with their ids.
+function focal_nodes(data::RasterData{T,V}, geometry::RasterGeometry) where {T,V}
+    points_rc = data.points_rc
+    included_pairs = data.included_pairs
+    exclude_pairs = isempty(included_pairs) ? Tuple{V,V}[] :
+                        generate_exclude_pairs(points_rc, included_pairs)
+    nodemap = geometry.nodemap
+    points = V[nodemap[i, j] for (i, j) in zip(points_rc[1], points_rc[2])]
+    points, points_rc[3], exclude_pairs
 end
 
+initialize_cum(data::RasterData, cfg, num_nodes) =
+    initialize_cum_maps(data.cellmap, cfg.write_max_cur_maps)
 
-function _pt_file_polygons_path(rasterdata::RasterData{T,V}, cfg)::Matrix{T} where {T,V}
+# A point file that names one id in several cells describes focal regions.
+has_focal_regions(data::RasterData) =
+    length(data.points_rc[1]) != length(unique(data.points_rc[3]))
+
+"""
+    pairwise_regions(rasterdata, cfg)
+
+Pairwise mode over focal regions: every pair gets its own graph, with the
+two regions being solved collapsed into nodes and the others left as
+ordinary habitat.
+"""
+function pairwise_regions(rasterdata::RasterData{T,V}, cfg)::Matrix{T} where {T,V}
 
     # get unique list of points
     # for every point pair do
@@ -56,7 +76,7 @@ function _pt_file_polygons_path(rasterdata::RasterData{T,V}, cfg)::Matrix{T} whe
     for (k, (i, j)) in enumerate(pairs)
         pt1, pt2 = pts[i], pts[j]
         @info("Solving pair $k of $n")
-        graphdata = compute_graph_data_polygons(rasterdata, pt1, pt2, cum, cfg)
+        graphdata = region_pair_problem(rasterdata, pt1, pt2, cum, cfg)
         pairwise_resistance = single_ground_all_pairs(graphdata, cfg, false)
         resistances[i,j] = resistances[j,i] = pairwise_resistance[2,3]
     end
@@ -91,35 +111,17 @@ function pairs_to_solve(pts, exclude_pairs)
 end
 
 
-function compute_graph_data_polygons(rasterdata::RasterData{T,V},
+function region_pair_problem(rasterdata::RasterData{T,V},
                             pt1, pt2, cum, cfg)::GraphProblem{T,V} where {T,V}
 
-
-    # Data
-    gmap = rasterdata.cellmap
-    polymap = rasterdata.polymap
     points_rc = rasterdata.points_rc
-    hbmeta = rasterdata.hbmeta
 
-    # Options
-    avg_res = cfg.connect_using_avg_resistances
-    four_neighbors = cfg.connect_four_neighbors_only
-
-    # Construct new polymap
-    newpoly = create_new_polymap(gmap, polymap, points_rc, pt1, pt2)
-    nodemap = construct_node_map(gmap, newpoly)
-
-    # Construct graph
-    a = construct_graph(gmap, nodemap, avg_res, four_neighbors)
-    G = laplacian!(a)
-
-    # Find connected components
-    cc = connected_components(a)
+    # Construct new polymap and the graph over it
+    newpoly = create_new_polymap(rasterdata.cellmap, rasterdata.polymap, points_rc, pt1, pt2)
+    G, cc, geometry = build_graph(rasterdata, cfg, newpoly)
 
     # Construct points vector
-    x,y = 0,0
-    # x = find(x -> x == pt1, points_rc[3])[1]
-    # y = find(x -> x == pt2, points_rc[3])[1]
+    nodemap = geometry.nodemap
     x = something(findfirst(isequal(pt1), points_rc[3]), 0)
     y = something(findfirst(isequal(pt2), points_rc[3]), 0)
     c1 = nodemap[points_rc[1][x], points_rc[2][x]]
@@ -129,56 +131,7 @@ function compute_graph_data_polygons(rasterdata::RasterData{T,V},
     # Exclude pairs array
     exclude_pairs = Tuple{V,V}[]
 
-    solver = get_solver(cfg)
-    
-    GraphProblem(G, cc, points, [pt1, pt2], exclude_pairs,
-            RasterGeometry(nodemap, newpoly, hbmeta, gmap), cum, solver)
-end
-
-function compute_graph_data_no_polygons(data::RasterData{T,V}, cfg)::GraphProblem{T,V} where {T,V}
-
-
-    # Data
-    cellmap = data.cellmap
-    polymap = data.polymap
-    points_rc = data.points_rc
-    included_pairs = data.included_pairs
-    hbmeta = data.hbmeta
-
-    # Options
-    avg_res = cfg.connect_using_avg_resistances
-    four_neighbors = cfg.connect_four_neighbors_only
-    write_max_cur_maps = cfg.write_max_cur_maps
-
-    # Nodemap and graph construction
-    nodemap = construct_node_map(cellmap, polymap)
-    G = construct_graph(cellmap, nodemap, avg_res, four_neighbors)
-    G = laplacian!(G)
-
-    # Connected Components
-    cc = connected_components(G)
-
-    # Generate exclude pairs array
-    if !isempty(included_pairs)
-        exclude_pairs = generate_exclude_pairs(points_rc, included_pairs)
-    else
-        exclude_pairs = Tuple{V,V}[]
-    end
-
-    points = zeros(V, length(points_rc[3]))
-    for (i,v) in enumerate(zip(points_rc[1], points_rc[2]))
-        points[i] = nodemap[v...]
-    end
-
-    # Cumulative current maps
-    cum = initialize_cum_maps(cellmap, write_max_cur_maps)
-
-
-    solver = get_solver(cfg)
-
-    GraphProblem(G, cc, points, points_rc[3], exclude_pairs,
-                RasterGeometry(nodemap, polymap, hbmeta, cellmap), cum, solver)
-
+    GraphProblem(G, cc, points, [pt1, pt2], exclude_pairs, geometry, cum, get_solver(cfg))
 end
 
 function generate_exclude_pairs(points_rc, included_pairs::IncludeExcludePairs{V}) where V

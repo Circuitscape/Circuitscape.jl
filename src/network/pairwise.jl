@@ -1,25 +1,7 @@
-"""
-Primary driver for network pairwise.
-"""
-function network_pairwise(T, V, cfg)::Matrix{T}
+# Graph construction for a network: the edge list becomes a symmetric
+# adjacency matrix, and the output geometry is the identity on node ids.
 
-    # Get input
-    networkdata = get_network_data(T, V, cfg)
-
-    # Compute graph data
-    graphdata = compute_graph_data(networkdata, cfg)
-
-    # Send to main kernel
-    ret = single_ground_all_pairs(graphdata, cfg)
-
-	# Write cum maps
-	write_cum_maps(graphdata.cum, graphdata.geometry, cfg)
-
-	ret
-end
-
-function compute_graph_data(data::NetworkData{T,V}, cfg)::GraphProblem{T,V} where {T,V}
-
+function build_graph(data::NetworkData{T,V}, cfg) where {T,V}
 
     i,j,v = data.coords
 
@@ -33,13 +15,18 @@ function compute_graph_data(data::NetworkData{T,V}, cfg)::GraphProblem{T,V} wher
     A = A + A'
 
     cc = connected_components(A)
-	c = size(A,1)
-	@info("Graph has $c nodes and $(length(cc)) connected components")
+    c = size(A,1)
+    @info("Graph has $c nodes and $(length(cc)) connected components")
 
     G = @timeit CSTIMER[] "construct graph laplacian" laplacian!(A)
 
-    # Include/exclude pairs. In include mode focal points absent from the file
-    # are dropped, mirroring the raster path (issue #341).
+    G, cc, NetworkGeometry(collect(V, 1:m))
+end
+
+# Focal nodes are the user's node ids themselves. In include mode focal
+# points absent from the file are dropped, mirroring the raster path
+# (issue #341).
+function focal_nodes(data::NetworkData{T,V}, ::NetworkGeometry) where {T,V}
     included_pairs = data.included_pairs
     fp = data.fp
     if isempty(included_pairs)
@@ -49,12 +36,9 @@ function compute_graph_data(data::NetworkData{T,V}, cfg)::GraphProblem{T,V} wher
             (fp = filter(x -> x in included_pairs.point_ids, fp))
         exclude_pairs = exclude_pairs_from(included_pairs)
     end
-    solver = get_solver(cfg)
-
-	cum = initialize_cum_vectors(data.coords, size(G,1))
-
-    GraphProblem(G, cc, fp, fp, exclude_pairs,
-                NetworkGeometry(collect(V, 1:size(G,1))), cum, solver)
-
+    fp, fp, exclude_pairs
 end
 
+initialize_cum(data::NetworkData, cfg, num_nodes) = initialize_cum_vectors(data.coords, num_nodes)
+
+has_focal_regions(::NetworkData) = false

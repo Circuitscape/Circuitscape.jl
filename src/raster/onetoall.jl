@@ -1,12 +1,3 @@
-function raster_one_to_all(T, V, cfg)::Matrix{T}
-
-    # Load the data
-    rasterdata = load_raster_data(T, V, cfg)
-
-    # Send to main kernel
-    onetoall_kernel(rasterdata, cfg)
-end
-
 function onetoall_kernel(data::RasterData{T,V}, cfg)::Matrix{T} where {T,V}
 
     # Data
@@ -148,8 +139,7 @@ function onetoall_kernel(data::RasterData{T,V}, cfg)::Matrix{T} where {T,V}
         geometry = RasterGeometry(nodemap, newpoly, hbmeta, gmap)
         policy = one_to_all ? :rmvgnd : :rmvsrc
         sources, grounds, finite_grounds =
-                    _get_sources_and_grounds(source_map, ground_map,
-                            cfg, G, geometry, policy)
+                    sources_and_grounds(geometry, source_map, ground_map, G, cfg, policy)
 
 
         solver = get_solver(cfg)
