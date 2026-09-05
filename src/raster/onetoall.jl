@@ -72,9 +72,20 @@ function onetoall_kernel(data::RasterData{T,V}, flags, cfg)::Matrix{T} where {T,
         unique_point_map[f(1,ind), f(2,ind)] = f(3,ind)
     end
 
+    # With an include/exclude file the set of focal points that act as
+    # sources/grounds changes from one focal point to the next. When every focal
+    # point is a single cell that never changes the graph: an inactive point is
+    # still an ordinary node, so the nodemap, graph and Laplacian built above are
+    # valid for every solve and only the source/ground vectors differ. Only when
+    # a focal point spans several cells (a focal region) does the topology
+    # depend on which points are active, because a region collapses into one
+    # node only while it is active. That is the one case that needs a rebuild
+    # per focal point. (Same test as `raster_pairwise`.)
+    point_file_no_polygons = length(points_rc[1]) == length(points_unique)
+
     # @distributed for i = 1:num_points_to_solve
     function f(i)
-        let point_map = copy(original_point_map), s = copy(z), strength_map = copy(strength_map), source_map = source_map, newpoly = newpoly, nodemap = nodemap, a = a
+        let point_map = copy(original_point_map), s = copy(z), strength_map = copy(strength_map), source_map = source_map, newpoly = newpoly, nodemap = nodemap, G = G, cc = cc
         str = use_variable_strengths ? strengths[i,2] : 1
         @info("Solving point $i of $num_points_to_solve")
         n = points_unique[i]
@@ -90,9 +101,19 @@ function onetoall_kernel(data::RasterData{T,V}, flags, cfg)::Matrix{T} where {T,
                     map!(x -> x == exclude ? 0 : x, point_map, point_map)
                 end
             end
-            newpoly = create_new_polymap(gmap, polymap, points_rc, 0, 0, point_map)
-            nodemap = construct_node_map(gmap, polymap)
-            a = construct_graph(gmap, nodemap, avg_res, four_neighbors)
+            if !point_file_no_polygons
+                # Focal regions: excluded regions must not be merged into a
+                # single node for this solve, so rebuild the polymap, nodemap,
+                # graph and Laplacian from the pruned point map. The nodemap
+                # has to come from `newpoly` (not `polymap`) and G/cc have to be
+                # rebuilt with it, otherwise node numbering and the Laplacian
+                # disagree and the wrong cells are grounded.
+                newpoly = create_new_polymap(gmap, polymap, points_rc, 0, 0, point_map)
+                nodemap = construct_node_map(gmap, newpoly)
+                a_i = construct_graph(gmap, nodemap, avg_res, four_neighbors)
+                cc = connected_components(a_i)
+                G = laplacian!(a_i)
+            end
         end
         if use_variable_strengths
             _tmp = [point_map[points_rc[1][x], points_rc[2][x]] for x = 1:size(points_rc[1], 1)]
@@ -121,7 +142,11 @@ function onetoall_kernel(data::RasterData{T,V}, flags, cfg)::Matrix{T} where {T,
             ground_map = map(x -> x == n ? Inf : T(0), point_map)
         end
 
-        check_node = nodemap[points_rc[1][i], points_rc[2][i]]
+        # `i` indexes `points_unique`, not the rows of `points_rc`; the two only
+        # coincide when every focal point is a single cell. Look the cell up by
+        # node ID so focal regions get the right node.
+        ind = findfirst(isequal(n), points_rc[3])
+        check_node = nodemap[points_rc[1][ind], points_rc[2][ind]]
 
         policy = one_to_all ? :rmvgnd : :rmvsrc
         sources, grounds, finite_grounds =
