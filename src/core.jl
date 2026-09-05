@@ -1,9 +1,12 @@
 struct Cumulative{T,V}
     cum_curr::Matrix{T}
     max_curr::Matrix{T}
-	cum_branch_curr::Vector{T}
-	cum_node_curr::Vector{T}
-	coords::Vector{Tuple{V,V}}
+    cum_branch_curr::Vector{T}
+    cum_node_curr::Vector{T}
+    coords::Vector{Tuple{V,V}}
+    # Edge (in either orientation) -> position in coords / cum_branch_curr,
+    # so accumulating a pair's branch currents is O(E), not O(E^2).
+    branch_index::Dict{Tuple{V,V},Int}
     lock::ReentrantLock
 end
 

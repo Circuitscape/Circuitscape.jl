@@ -166,8 +166,8 @@ function initialize_cum_maps(cellmap::Matrix{T}, max = false) where T
     cum_branch_curr = Vector{T}()
     cum_node_curr = Vector{T}()
 
-    Cumulative(cum_curr, max_curr,
-			   cum_branch_curr, cum_node_curr, Vector{Tuple{Int,Int}}(), ReentrantLock())
+    Cumulative(cum_curr, max_curr, cum_branch_curr, cum_node_curr,
+               Vector{Tuple{Int,Int}}(), Dict{Tuple{Int,Int},Int}(), ReentrantLock())
 end
 
 function initialize_cum_vectors(coords::Tuple{Vector{V},Vector{V},Vector{T}}, num_nodes::Int64) where {T,V}
@@ -177,9 +177,17 @@ function initialize_cum_vectors(coords::Tuple{Vector{V},Vector{V},Vector{T}}, nu
 	cum_branch_curr = zeros(T, length(_v))
 	cum_node_curr = zeros(T, num_nodes)
 
-	pair_coords = map((x,y) -> (x,y), _i, _j)
-    Cumulative(cum_curr, max_curr,
-			   cum_branch_curr, cum_node_curr, pair_coords, ReentrantLock())
+    pair_coords = map((x,y) -> (x,y), _i, _j)
+    # First occurrence wins for a duplicated edge, as the linear scan it
+    # replaces did; both orientations map to the same slot.
+    branch_index = Dict{Tuple{V,V},Int}()
+    sizehint!(branch_index, 2 * length(pair_coords))
+    for (idx, (a, b)) in enumerate(pair_coords)
+        get!(branch_index, (a, b), idx)
+        get!(branch_index, (b, a), idx)
+    end
+    Cumulative(cum_curr, max_curr, cum_branch_curr, cum_node_curr,
+               pair_coords, branch_index, ReentrantLock())
 end
 
 # Function to calculate current for Omniscape moving window solves
