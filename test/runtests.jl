@@ -12,9 +12,9 @@ clean_output()
     include("internal.jl")
 end
 
-runtests(solver="cg+amg", parallel=true)
+runtests(solver="cg+amg", parallel=true, precision="double")
 runtests(solver="cg+amg", parallel=true, precision="single")
-runtests(solver="cholmod", parallel=true)
+runtests(solver="cholmod", parallel=true, precision="double")
 runtests(solver="cholmod", parallel=true, precision="single")
 
 accelerate_available = try
@@ -24,7 +24,7 @@ catch
     false
 end
 if accelerate_available
-    runtests(solver="accelerate", parallel=true)
+    runtests(solver="accelerate", parallel=true, precision="double")
     runtests(solver="accelerate", parallel=true, precision="single")
 else
     println("Skipping Apple Accelerate tests (not available)")
@@ -38,7 +38,7 @@ catch
     false
 end
 if pardiso_available
-    runtests(solver="pardiso", parallel=true)
+    runtests(solver="pardiso", parallel=true, precision="double")
 else
     println("Skipping Pardiso tests (MKL not available)")
 end
