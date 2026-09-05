@@ -42,7 +42,7 @@ function compute_graph_data(data::NetworkData{T,V}, cfg)::GraphProblem{T,V} wher
     A = sparse(i,j,v,m,m)
     A = A + A'
 
-    cc = connected_components(SimpleGraph(A))
+    cc = connected_components(A)
 	c = size(A,1)
 	@info("Graph has $c nodes and $(length(cc)) connected components")
 

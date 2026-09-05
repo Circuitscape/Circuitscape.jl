@@ -1,6 +1,7 @@
 import Circuitscape: construct_node_map, compute_omniscape_current
 using Circuitscape
 import LinearAlgebra
+import Graphs, SparseArrays, Random
 
 # Omniscape moving window solve test 
 # just checking syntax, other tests should be sufficient to ensure correctness.
@@ -471,4 +472,34 @@ end
         err = try Circuitscape.validate(Circuitscape.CSConfig(d)); nothing catch e; e end
         @test err isa ArgumentError && occursin("write_as_tif", err.msg)
     end
+end
+
+# Connected components on the CSC structure must match what Graphs returned:
+# same components, same order (by smallest vertex, ascending within).
+@testset "connected_components" begin
+    ref(A) = Graphs.connected_components(Graphs.SimpleGraph(A))
+    same(A) = map(c -> Int.(c), Circuitscape.connected_components(A)) == ref(A)
+
+    # Grid Laplacians (what the solvers pass), including a disconnected one
+    @test same(model_problem(4))
+    G = model_problem(5); G[13, :] .= 0; G[:, 13] .= 0; SparseArrays.dropzeros!(G)
+    @test same(G)   # isolated vertex is its own component
+    @test length(Circuitscape.connected_components(G)) == 2
+
+    # Random symmetric graphs: many components, isolated vertices, Int32 indices
+    Random.seed!(7)
+    for trial in 1:200
+        n = rand(1:60)
+        B = SparseArrays.sprand(n, n, rand() * 0.15)
+        A = B + B'
+        @test same(A)
+        @test same(convert(SparseArrays.SparseMatrixCSC{Float64,Int32}, A))
+    end
+
+    # Stored zeros are not edges, exactly as SimpleGraph treats them
+    A = SparseArrays.sparse([1, 2, 2, 3], [2, 1, 3, 2], [0.0, 0.0, 1.0, 1.0], 3, 3)
+    @test SparseArrays.nnz(A) == 4
+    @test same(A) && length(Circuitscape.connected_components(A)) == 2
+
+    @test_throws ArgumentError Circuitscape.connected_components(SparseArrays.sprand(3, 4, 0.5))
 end
