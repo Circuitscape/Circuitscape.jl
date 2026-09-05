@@ -178,52 +178,87 @@ function _create_current_maps(G, voltages, finitegrounds, cfg; nodemap = Matrix{
             end
         end
 
-        return current_map, spzeros(0,0)
+        return current_map, nothing
     end
 end
 
-function get_node_currents(G, voltages, finitegrounds)
+"""
+    get_node_currents(G, voltages, finitegrounds)
 
-    node_currents_pos = _get_node_currents_posneg(G, voltages, finitegrounds, true)
-    node_currents_neg = _get_node_currents_posneg(G, voltages, finitegrounds, false)
-    node_currents = map((x,y) -> x > y ? x : y, node_currents_pos, node_currents_neg)
+Per-node current `max(total inflow, total outflow)`, in one sweep over the
+CSC structure of `G` with no sparse temporaries.
 
-end
+For every off-diagonal entry `(row, col)` of the symmetric Laplacian `G` the
+branch current `b = |G[row,col]| * (v[row] - v[col])` is the current arriving
+at `col` from `row`; `b > 0` is inflow at `col`, `b < 0` is outflow. Every
+undirected edge is therefore seen from both ends, once in each column, which
+is exactly the column sum of the old `B - B'` construction and keeps the
+same (row-sorted) summation order. A finite ground at node `i` carries
+`finitegrounds[i] * v[i]`: negative is inflow, positive is outflow.
 
-function _get_node_currents_posneg(G::SparseMatrixCSC{T,V},
-                            voltages, finitegrounds, pos) where {T,V}
+The historical implementation zeroed branch currents smaller than `1e-8`
+relative to the largest *signed* branch current of each direction before
+summing; that reference differs between the two directions, so it is
+recovered first (a pass that touches only `nzval`/`voltages`) and applied
+in the accumulation pass to reproduce the previous results exactly.
+`finitegrounds[1] != -9999` is the sentinel meaning "no finite grounds".
+"""
+function get_node_currents(G::SparseMatrixCSC{T}, voltages::AbstractVector,
+                           finitegrounds) where {T}
+    n = size(G, 1)
+    v = voltages
+    rowval = rowvals(G)
+    nzval = nonzeros(G)
 
-    branch_currents = _get_branch_currents(G, voltages, pos)
-    branch_currents = branch_currents - branch_currents'
-    dropnonzeros!(branch_currents)
-
-	if finitegrounds[1]!= -9999
-        finiteground_currents = finitegrounds .* voltages
-        if pos
-            map!(x -> x < 0 ? -x : 0, finiteground_currents, finiteground_currents)
-        else
-            map!(x -> x > 0 ? x : 0, finiteground_currents, finiteground_currents)
-        end
-        n = size(G, 1)
-        branch_currents = branch_currents + spdiagm(0 => finiteground_currents)
-    end
-
-    s = vec(sum(branch_currents, dims=1))
-
-    s
-end
-
-function dropnonzeros!(G)
-    for i = 1:size(G, 1)
-        for j in nzrange(G, i)
-            row = G.rowval[j]
-            val = G.nzval[j]
-            if val < 0
-                G.nzval[j] = 0
+    # Pass 1: maxima of the signed branch currents over the upper triangle
+    # (`maxin`: rows above the diagonal, the old "pos" reference) and the
+    # lower triangle (`maxout`, the old "neg" reference). They are -Inf when
+    # the graph has no edges, in which case nothing is thresholded.
+    maxin = typemin(T)
+    maxout = typemin(T)
+    @inbounds for col = 1:n
+        vc = v[col]
+        for k in nzrange(G, col)
+            row = rowval[k]
+            row == col && continue
+            b = abs(nzval[k]) * (v[row] - vc)
+            if row < col
+                b > maxin && (maxin = b)
+            else
+                b > maxout && (maxout = b)
             end
         end
     end
-    dropzeros!(G)
+
+    # Pass 2: accumulate inflow and outflow per node and keep the larger.
+    node_currents = Vector{T}(undef, n)
+    has_finitegrounds = finitegrounds[1] != -9999
+    @inbounds for col = 1:n
+        vc = v[col]
+        inflow = zero(T)
+        outflow = zero(T)
+        for k in nzrange(G, col)
+            row = rowval[k]
+            row == col && continue
+            b = abs(nzval[k]) * (v[row] - vc)
+            if b > 0
+                abs(b / maxin) < 1e-8 || (inflow += b)
+            elseif b < 0
+                abs(b / maxout) < 1e-8 || (outflow -= b)
+            end
+        end
+        if has_finitegrounds
+            fg = finitegrounds[col] * vc
+            if fg < 0
+                inflow -= fg
+            elseif fg > 0
+                outflow += fg
+            end
+        end
+        node_currents[col] = inflow > outflow ? inflow : outflow
+    end
+
+    node_currents
 end
 
 function _get_branch_currents(G::SparseMatrixCSC{T,V}, voltages, pos) where {T,V}
