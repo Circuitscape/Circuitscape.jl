@@ -37,12 +37,14 @@ function _run(cfg)
     if cfg.parallelize
         @info("Starting up Circuitscape to use $(Threads.nthreads()) threads in parallel")
     end
-    reset_timer!(CSTIMER)
-    r = @timeit CSTIMER "complete job" _compute(T, V, cfg)
-    if cfg.log_level == Logging.Debug
-        @info("\n", CSTIMER)
+    with(CSTIMER => TimerOutput()) do
+        r = @timeit CSTIMER[] "complete job" _compute(T, V, cfg)
+        if cfg.log_level == Logging.Debug
+            timings = CSTIMER[]
+            @info("\n", timings)
+        end
+        r
     end
-    r
 end
 
 function _compute(T, V, cfg)
