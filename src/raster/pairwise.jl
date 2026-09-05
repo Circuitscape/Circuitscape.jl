@@ -165,7 +165,7 @@ function compute_graph_data_polygons(rasterdata::RasterData{T,V},
     G = laplacian!(a)
 
     # Find connected components
-    cc = connected_components(SimpleGraph(a))
+    cc = connected_components(a)
 
     # Construct points vector
     x,y = 0,0
@@ -208,7 +208,7 @@ function compute_graph_data_no_polygons(data::RasterData{T,V},
     G = laplacian!(G)
 
     # Connected Components
-    cc = connected_components(SimpleGraph(G))
+    cc = connected_components(G)
 
     # Generate exclude pairs array
     if !isempty(included_pairs)

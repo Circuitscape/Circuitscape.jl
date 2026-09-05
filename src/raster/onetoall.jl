@@ -50,7 +50,7 @@ function onetoall_kernel(data::RasterData{T,V}, flags, cfg)::Matrix{T} where {T,
     nodemap = construct_node_map(gmap, newpoly)
 
     a = construct_graph(gmap, nodemap, avg_res, four_neighbors)
-    cc = connected_components(SimpleGraph(a))
+    cc = connected_components(a)
     G = laplacian!(a)
     @info("There are $(size(a, 1)) points and $(length(cc)) connected components")
 

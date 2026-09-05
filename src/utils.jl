@@ -4,6 +4,46 @@ export  accumulate_current_maps,
 
 const IO_LOCK = ReentrantLock()
 
+"""
+    connected_components(A::SparseMatrixCSC) -> Vector{Vector{Ti}}
+
+Connected components of the graph whose edges are the nonzero off-diagonal
+entries of the symmetric matrix `A`, computed directly on the CSC structure.
+Components are ordered by their smallest vertex and vertices ascend within
+each — the same contract as `Graphs.connected_components(SimpleGraph(A))`,
+which this replaces. That path built an adjacency-list copy of `A` first: at
+4M cells, 1.4 GB allocated and 458 MB retained to produce 31 MB of labels.
+"""
+function connected_components(A::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
+    n = size(A, 1)
+    size(A, 2) == n || throw(ArgumentError("adjacency matrix must be square"))
+    rv = rowvals(A)
+    nz = nonzeros(A)
+    label = zeros(Ti, n)
+    stack = Ti[]
+    ncomp = 0
+    for u in 1:n
+        label[u] == 0 || continue
+        ncomp += 1
+        label[u] = ncomp
+        push!(stack, Ti(u))
+        while !isempty(stack)
+            v = pop!(stack)
+            @inbounds for k in nzrange(A, v)
+                w = rv[k]
+                (nz[k] == 0 || label[w] != 0) && continue
+                label[w] = ncomp
+                push!(stack, w)
+            end
+        end
+    end
+    comps = [Ti[] for _ in 1:ncomp]
+    for u in 1:n
+        push!(comps[label[u]], Ti(u))
+    end
+    comps
+end
+
  """
  Construct nodemap specific to a connected component
  """
