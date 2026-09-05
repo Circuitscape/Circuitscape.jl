@@ -498,31 +498,62 @@ function write_cum_maps(cum, cellmap::Matrix{T}, cfg, hbmeta, write_max, write_c
 
 end
 
-# Write a single band raster, either in .tif or .asc format,
-# inspired by GeoArrays.write()
+"""
+    write_raster(fn_prefix, array, wkt, transform, file_format)
+
+Write a single-band raster. `.asc` is written natively with `writedlm` —
+several times faster than the GDAL AAIGrid driver, and thread-safe, so it
+takes no lock; `.tif` goes through GDAL under `IO_LOCK`.
+"""
 function write_raster(fn_prefix::String,
                       array::Matrix{T} where T <: Number,
                       wkt::String,
                       transform,
                       file_format::String)
+    if file_format == "tif"
+        write_raster_gdal(fn_prefix, array, wkt, transform)
+    else
+        write_asc(fn_prefix, array, wkt, transform)
+    end
+end
+
+function write_asc(fn_prefix::String, array::AbstractMatrix, wkt::String, transform)
+    nrows, ncols = size(array)
+    if length(transform) >= 6
+        xll, dx, dy = transform[1], transform[2], -transform[6]
+        yll = transform[4] - nrows * dy
+    else
+        xll, yll, dx, dy = 0.0, 0.0, 1.0, 1.0
+    end
+    open(fn_prefix * ".asc", "w") do io
+        println(io, "ncols         ", ncols)
+        println(io, "nrows         ", nrows)
+        println(io, "xllcorner     ", xll)
+        println(io, "yllcorner     ", yll)
+        if dx ≈ dy
+            println(io, "cellsize      ", dx)
+        else
+            println(io, "dx            ", dx)
+            println(io, "dy            ", dy)
+        end
+        println(io, "NODATA_value  -9999")
+        writedlm(io, array, ' ')
+    end
+    # Projection travels in a sidecar, as with the GDAL AAIGrid driver
+    isempty(wkt) || write(fn_prefix * ".prj", wkt)
+    nothing
+end
+
+# Inspired by GeoArrays.write()
+function write_raster_gdal(fn_prefix::String, array::AbstractMatrix, wkt::String, transform)
     # Prepare data outside the lock
     array_t = permutedims(array, [2, 1])
-
     width, height = size(array_t)
-
-    # Define extension and driver based in file_format
-    file_format == "tif" ? (ext = ".tif"; driver = "GTiff") :
-            (ext = ".asc"; driver = "AAIGrid")
-
-    file_format == "tif" ? (options = ["COMPRESS=LZW"]) :
-                           (options = [])
-
-    # Append file extention to filename
-    fn = string(fn_prefix, ext)
+    fn = fn_prefix * ".tif"
+    options = ["COMPRESS=LZW"]
 
     # Lock only the ArchGDAL calls (GDAL is not thread safe)
     lock(IO_LOCK) do
-        # Create raster in memory *NEEDED* because no create driver for .asc
         ArchGDAL.create(fn_prefix,
                         driver = ArchGDAL.getdriver("MEM"),
                         width = width,
@@ -531,19 +562,14 @@ function write_raster(fn_prefix::String,
                         dtype = eltype(array_t),
                         options = options) do dataset
             band = ArchGDAL.getband(dataset, 1)
-            # Write data to band
             ArchGDAL.write!(band, array_t)
-
-            # Write nodata and projection info
             ArchGDAL.setnodatavalue!(band, -9999.0)
             ArchGDAL.setgeotransform!(dataset, transform)
             ArchGDAL.setproj!(dataset, wkt)
-
-            # Copy memory object to disk (necessary because ArchGDAL.create
-            # does not support creation of ASCII rasters)
             ArchGDAL.write(dataset, fn,
-                           driver = ArchGDAL.getdriver(driver),
+                           driver = ArchGDAL.getdriver("GTiff"),
                            options = options)
         end
     end
+    nothing
 end
