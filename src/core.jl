@@ -93,36 +93,84 @@ function get_solver(cfg)
     end
 end
 
-function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T} where {T,V}
+const DirectSolver = Union{CholmodSolver, PardisoSolver, AccelerateSolver}
+
+# One pair of focal nodes to solve within a connected component. `src_indices`
+# and `dst_indices` are the positions in `points` that map to each node; a
+# focal region contributes several, all sharing one solve.
+struct PairJob{V}
+    src_node::V
+    dst_node::V
+    comp_i::V
+    comp_j::V
+    src_indices::Vector{Int}
+    dst_indices::Vector{Int}
+end
+
+"""
+    pair_jobs(csub, comp, points, orig_pts, exclude, first_source_only)
+
+The node pairs to solve in one component, grouped by source node, in the
+order the log numbers them. A pair is skipped when every combination of its
+focal indices is excluded. With `first_source_only` (the resistance shortcut)
+only pairs anchored at `csub[1]` are produced. A group is returned for every
+source considered, even when it has no pairs, so callers can iterate sources.
+"""
+function pair_jobs(csub::Vector{V}, comp, points, orig_pts, exclude, first_source_only) where V
+    groups = Vector{Vector{PairJob{V}}}()
+    nsrc = first_source_only ? min(1, length(csub)) : length(csub)
+    for si in 1:nsrc
+        src_node = csub[si]
+        comp_i = findfirst(isequal(src_node), comp)
+        comp_i === nothing && error("Node $src_node not found in component")
+        src_indices = findall(isequal(src_node), points)
+        jobs = PairJob{V}[]
+        for di in si+1:length(csub)
+            dst_node = csub[di]
+            dst_node == src_node && continue
+            comp_j = findfirst(isequal(dst_node), comp)
+            comp_j === nothing && error("Node $dst_node not found in component")
+            dst_indices = findall(isequal(dst_node), points)
+            any(((orig_pts[c_i], orig_pts[c_j]) ∉ exclude
+                 for c_i in src_indices, c_j in dst_indices)) || continue
+            push!(jobs, PairJob{V}(src_node, dst_node, V(comp_i), V(comp_j),
+                                   src_indices, dst_indices))
+        end
+        push!(groups, jobs)
+    end
+    groups
+end
+
+"""
+    solve(prob, solver, flags, cfg, log)
+
+Pairwise driver shared by every solver. Enumerates the pairs per connected
+component, hands them to `solve_pairs!` for the solver-specific linear
+algebra, and stores resistances / postprocesses maps in `handle_pair`. Only
+`prepare!` and `solve_pairs!` differ between the iterative and direct paths.
+"""
+function solve(prob::GraphProblem{T,V}, solver::Solver, flags, cfg, log)::Matrix{T} where {T,V}
 
     # Data
     a = prob.G
     cc = prob.cc
     points = prob.points
-    # Membership is tested once per candidate pair below and again in
-    # get_num_pairs; in include mode the list holds nearly every combination
-    # in both orders, so a Vector scan is O(pairs x exclusions).
-    exclude = Set(prob.exclude_pairs)
+    exclude = prob.exclude_pairs
     nodemap = prob.nodemap
     polymap = prob.polymap
     orig_pts = prob.user_points
     hbmeta = prob.hbmeta
     cellmap = prob.cellmap
+    cum = prob.cum
 
     # Flags
     outputflags = flags.outputflags
-    is_raster = flags.is_raster
     write_volt_maps = outputflags.write_volt_maps
     write_cur_maps = outputflags.write_cur_maps
     write_cum_cur_map_only = outputflags.write_cum_cur_map_only
     write_max_cur_maps = outputflags.write_max_cur_maps
 
-    # Get number of focal points
     numpoints = size(points, 1)
-
-    # Cumulative currents
-
-    cum = prob.cum
 
     @info("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
 
@@ -130,15 +178,15 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
     log && @info("Total number of pair solves = $num_pairs")
 
     # Initialize pairwise resistance
-    resistances = -1 * ones(T, numpoints, numpoints)::Matrix{T}
-    voltmatrix = zeros(T, size(resistances))::Matrix{T}
-    shortcut_res = deepcopy(resistances)::Matrix{T}
+    resistances = -1 * ones(T, numpoints, numpoints)
+    voltmatrix = zeros(T, size(resistances))
+    shortcut_res = -1 * ones(T, size(resistances))
 
     # Get a vector of connected components
     comps = getindex.([a], cc, cc)
 
     get_shortcut_resistances = false
-    if is_raster && !write_volt_maps && !write_cur_maps &&
+    if flags.is_raster && !write_volt_maps && !write_cur_maps &&
             !write_cum_cur_map_only && !write_max_cur_maps &&
             isempty(exclude)
         get_shortcut_resistances = true
@@ -148,362 +196,53 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
     end
     shortcut = Shortcut(get_shortcut_resistances, voltmatrix, shortcut_res)
 
+    pair_label(job) = haskey(pair_numbers, (job.src_node, job.dst_node)) ?
+        "Solving pair $(pair_numbers[(job.src_node, job.dst_node)]) of $num_pairs" :
+        "Solving pair $(job.src_node)-$(job.dst_node)"
+
     for (cid, comp) in enumerate(cc)
 
         # Subset of points relevant to CC
         csub = filter(x -> x in comp, points) |> unique
+        isempty(csub) && continue
 
-        if isempty(csub)
-            continue
-        end
-
-        # Conductance matrix corresponding to CC
+        # Conductance matrix corresponding to CC; the solver may regularize
+        # it in place before it is captured for output writing.
         matrix = comps[cid]
-
-        # Regularization step
-        matrix.nzval .+= eps(eltype(matrix)) * norm(matrix.nzval)
-
-        # Construct preconditioner *once* for every CC.
-        # CG requires a symmetric positive definite preconditioner, so the coarse
-        # solve must be a symmetric operator. AlgebraicMultigrid's default coarse
-        # solver (QR) is not, and its factorization is also not safe to share
-        # across the threaded pair solves below; the pseudo-inverse is both.
-        P = @timeit CSTIMER[] "construct preconditioner" aspreconditioner(
-                smoothed_aggregation(matrix;
-                                     coarse_solver = AlgebraicMultigrid.Pinv,
-                                     presmoother = AlgebraicMultigrid.GaussSeidel(),
-                                     postsmoother = AlgebraicMultigrid.GaussSeidel()))
+        handle = prepare!(solver, matrix)
 
         # Get local nodemap for CC - useful for output writing
         local_nodemap = @timeit CSTIMER[] "construct local nodemap" construct_local_node_map(nodemap, comp, polymap)
 
         component_data = ComponentData(comp, matrix, local_nodemap, hbmeta, cellmap)
 
-        function solve_pairs_for_point(point_idx, local_timer)
-            @timeit local_timer "task $point_idx" begin
-            # Each task needs its own workspace (scratch vectors are mutable)
-            ml = P.ml
-            local_P = aspreconditioner(AlgebraicMultigrid.MultiLevel(
-                ml.levels, ml.final_A, ml.coarse_solver,
-                ml.presmoother, ml.postsmoother, deepcopy(ml.workspace)))
+        groups = pair_jobs(csub, comp, points, orig_pts, exclude, get_shortcut_resistances)
 
-            results = Vector{Tuple{V,V,T}}()
-
-            src_node = csub[point_idx]
-            comp_i = findfirst(isequal(src_node), comp)
-            comp_i === nothing && error("Node $src_node not found in component")
-            comp_i = V(comp_i)
-            src_indices = findall(x -> x == src_node, points)
-            smash_repeats!(results, src_indices)
-
-            # Iteration space through all possible pairs
-            pair_range = point_idx+1:size(csub, 1)
-            if Threads.nthreads() > 1
-                for pair_idx in pair_range
-                    dst_node = csub[pair_idx]
-                    haskey(pair_numbers, (src_node, dst_node)) && @debug("Scheduling pair $(pair_numbers[(src_node, dst_node)]) of $num_pairs to be solved")
-                end
-            end
-
-            # Loop through all possible pairs
-            for pair_idx in pair_range
-
-                dst_node = csub[pair_idx]
-                comp_j = findfirst(isequal(dst_node), comp)
-                comp_j === nothing && error("Node $dst_node not found in component")
-                comp_j = V(comp_j)
-                dst_indices = findall(x -> x == dst_node, points)
-
-                if src_node == dst_node
-                    continue
-                end
-
-                # Check if all index combinations are excluded
-                any_included = false
-                for c_i in src_indices, c_j in dst_indices
-                    if (orig_pts[c_i], orig_pts[c_j]) ∉ exclude
-                        any_included = true
-                        break
-                    end
-                end
-                !any_included && continue
-
-                # Solve once per (src_node, dst_node) pair
-                current = zeros(T, size(matrix, 1))
-                current[comp_i] = -1
-                current[comp_j] = 1
-
-                log && haskey(pair_numbers, (src_node, dst_node)) && @debug("Solving pair $(pair_numbers[(src_node, dst_node)]) of $num_pairs")
-                voltages = @timeit local_timer "solve linear system" solve_linear_system(matrix, current, local_P; tol = residual_tolerance(cfg, T))
-
-                voltages .= voltages .- voltages[comp_i]
-                resistance = voltages[comp_j] - voltages[comp_i]
-
-                # Store result for all non-excluded index combinations
-                for c_i in src_indices
-                    for c_j in dst_indices
-                        if (orig_pts[c_i], orig_pts[c_j]) in exclude
-                            continue
-                        end
-                        push!(results, (c_i, c_j, resistance))
-                        if get_shortcut_resistances
-                            resistances[c_i, c_j] = resistance
-                            resistances[c_j, c_i] = resistance
-                        end
-                        output = Output(points, voltages, (orig_pts[c_i], orig_pts[c_j]),
-                                        (comp_i, comp_j), resistance, V(c_j), cum)
-                        @timeit local_timer "postprocess" postprocess(output, component_data, flags, shortcut, cfg)
-                    end
-                end
-            end
-
-            end # @timeit task
-        results
+        # Focal indices that share a node have zero resistance between them
+        for si in eachindex(groups)
+            smash_repeats!(resistances, findall(isequal(csub[si]), points))
         end
+
+        # Store one solve's result for every non-excluded index combination
+        # and postprocess its maps. Runs on worker threads; each (c_i, c_j)
+        # is owned by exactly one job, so the writes never overlap.
+        function handle_pair(job, voltages)
+            resistance = voltages[job.comp_j] - voltages[job.comp_i]
+            for c_i in job.src_indices, c_j in job.dst_indices
+                (orig_pts[c_i], orig_pts[c_j]) in exclude && continue
+                resistances[c_i, c_j] = resistance
+                resistances[c_j, c_i] = resistance
+                output = Output(points, voltages, (orig_pts[c_i], orig_pts[c_j]),
+                                (job.comp_i, job.comp_j), resistance, V(c_j), cum)
+                postprocess(output, component_data, flags, shortcut, cfg)
+            end
+        end
+
+        solve_pairs!(handle_pair, handle, solver, matrix, groups, cfg, log, pair_label)
 
         if get_shortcut_resistances
             idx = findfirst(isequal(csub[1]), points)
             idx === nothing && error("Focal point $(csub[1]) not found in points list")
-            solve_pairs_for_point(1, TimerOutput())
-            update_shortcut_resistances!(idx, shortcut, resistances, points, comp)
-        else
-            is_parallel = cfg.parallelize
-            n_points = size(csub, 1)
-            local_timers = [TimerOutput() for _ in 1:n_points]
-            # NOTE: Work is distributed by source point, giving a triangular load:
-            # task 1 solves n-1 pairs, task 2 solves n-2, ..., task n solves 0.
-            # This causes significant load imbalance with many threads.
-            all_results = @timeit CSTIMER[] "solve and accumulate pairs" if is_parallel
-                    fetch.(map(pt -> Threads.@spawn(solve_pairs_for_point(pt, local_timers[pt])), 1:n_points))
-                else
-                    map(pt -> solve_pairs_for_point(pt, local_timers[pt]), 1:n_points)
-                end
-
-            # Merge per-task timers
-            for lt in local_timers
-                merge!(CSTIMER[], lt)
-            end
-
-            # Set all resistances
-            for task_result in all_results
-                for (ci, cj, rv) in task_result
-                    resistances[ci, cj] = rv
-                    resistances[cj, ci] = rv
-                end
-            end
-        end
-
-    end
-
-    if get_shortcut_resistances
-        resistances = shortcut.shortcut_res
-    end
-
-    for i = 1:size(resistances,1)
-        resistances[i,i] = 0
-    end
-
-    # Pad it with the user points
-    r = vcat(vcat(0,orig_pts)', hcat(orig_pts, resistances))
-
-    # Save resistances
-    save_resistances(r, cfg)
-
-    r
-end
-
-struct CholmodNode{T}
-    cc_idx::Tuple{T,T}
-    points_idx::Tuple{T,T}
-end
-
-function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, PardisoSolver, AccelerateSolver}, flags,
-                                  cfg, log) where {T,V}
-
-    # Data
-    a = prob.G
-    cc = prob.cc
-    points = prob.points
-    # Membership is tested once per candidate pair below and again in
-    # get_num_pairs; in include mode the list holds nearly every combination
-    # in both orders, so a Vector scan is O(pairs x exclusions).
-    exclude = Set(prob.exclude_pairs)
-    nodemap = prob.nodemap
-    polymap = prob.polymap
-    orig_pts = prob.user_points
-    hbmeta = prob.hbmeta
-    cellmap = prob.cellmap
-
-    # Flags
-    outputflags = flags.outputflags
-    is_raster = flags.is_raster
-    write_volt_maps = outputflags.write_volt_maps
-    write_cur_maps = outputflags.write_cur_maps
-    write_cum_cur_map_only = outputflags.write_cum_cur_map_only
-    write_max_cur_maps = outputflags.write_max_cur_maps
-
-    # Cumulative current map
-    cum = prob.cum
-
-    # Batchsize
-    batch_size = solver.bs
-
-    # Get number of focal points
-    numpoints = size(points, 1)
-
-    @info("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
-
-    num_pairs, _ = get_num_pairs(cc, points, exclude, orig_pts)
-    log && @info("Total number of pair solves = $num_pairs")
-
-    # Initialize pairwise resistance
-    resistances = -1 * ones(eltype(a), numpoints, numpoints)
-    voltmatrix = zeros(eltype(a), size(resistances))
-    shortcut_res = -1 * ones(eltype(a), size(resistances))
-
-    # Get a vector of connected components
-    comps = getindex.([a], cc, cc)
-
-    get_shortcut_resistances = false
-    if is_raster && !write_volt_maps && !write_cur_maps &&
-            !write_cum_cur_map_only  && !write_max_cur_maps &&
-            isempty(exclude)
-        get_shortcut_resistances = true
-        log && @info("Triggering resistance calculation shortcut")
-        num_pairs, _ = get_num_pairs_shortcut(cc, points, exclude, orig_pts)
-        log && @info("Total number of pair solves has been reduced to $num_pairs")
-    end
-    shortcut = Shortcut(get_shortcut_resistances, voltmatrix, shortcut_res)
-
-    for (cid, comp) in enumerate(cc)
-
-        # Subset of points relevant to CC
-        csub = filter(x -> x in comp, points) |> unique
-
-        if isempty(csub)
-            continue
-        end
-
-        # Conductance matrix corresponding to CC
-        matrix = comps[cid]
-
-        factor = @timeit CSTIMER[] "construct cholesky factor" construct_cholesky_factor(matrix, solver)
-
-        # Get local nodemap for CC - useful for output writing
-        local_nodemap = @timeit CSTIMER[] "construct local nodemap" construct_local_node_map(nodemap, comp, polymap)
-
-        component_data = ComponentData(comp, matrix, local_nodemap, hbmeta, cellmap)
-
-        cholmod_batch = CholmodNode[]
-
-        # Build batch of pairs to solve
-        function build_cholmod_batch(point_idx)
-
-            src_node = csub[point_idx]
-            comp_i_raw = findfirst(isequal(src_node), comp)
-            comp_i_raw === nothing && error("Node $src_node not found in component")
-            comp_i = V(comp_i_raw)
-            src_indices = findall(x -> x == src_node, points)
-            smash_repeats!(resistances, src_indices)
-
-            # Iteration space through all possible pairs
-            pair_range = point_idx+1:size(csub, 1)
-
-            # Loop through all possible pairs
-            for pair_idx in pair_range
-
-                dst_node = csub[pair_idx]
-                comp_j_raw = findfirst(isequal(dst_node), comp)
-                comp_j_raw === nothing && error("Node $dst_node not found in component")
-                comp_j = V(comp_j_raw)
-                dst_indices = findall(x -> x == dst_node, points)
-
-                if src_node == dst_node
-                    continue
-                end
-
-                # Forget excluded pairs
-                for c_i in src_indices, c_j in dst_indices
-                    if (orig_pts[c_i], orig_pts[c_j]) in exclude
-                        continue
-                    else
-                        push!(cholmod_batch,
-                          CholmodNode((comp_i, comp_j), (V(c_i), V(c_j))))
-                    end
-                end
-            end
-        end
-
-        function postprocess_pair(batch_idx, batch_range, lhs)
-            CSTIMER_THREAD = TimerOutput()
-            batch_pos = batch_range[batch_idx]
-            output = Output(points, lhs[:,batch_idx],
-                (orig_pts[cholmod_batch[batch_pos].points_idx[1]],
-                orig_pts[cholmod_batch[batch_pos].points_idx[2]]),
-                cholmod_batch[batch_pos].cc_idx,
-                lhs[cholmod_batch[batch_pos].cc_idx[2], batch_idx] - lhs[cholmod_batch[batch_pos].cc_idx[1], batch_idx],
-                V(cholmod_batch[batch_pos].points_idx[2]), cum)
-            @timeit CSTIMER_THREAD "postprocess" postprocess(output, component_data, flags, shortcut, cfg)
-            CSTIMER_THREAD
-        end
-        if get_shortcut_resistances
-            idx = findfirst(isequal(csub[1]), points)
-            idx === nothing && error("Focal point $(csub[1]) not found in points list")
-            build_cholmod_batch(1)
-        else
-            build_cholmod_batch.(1:size(csub, 1))
-        end
-
-        num_batched_pairs = length(cholmod_batch)
-
-        for st in 1:batch_size:num_batched_pairs
-
-            batch_range = st + batch_size <= num_batched_pairs ?
-                            (st:(st+batch_size-1)) : (st:num_batched_pairs)
-
-            @debug("Solving points $(batch_range.start) to $(batch_range.stop)")
-
-            rhs = zeros(eltype(matrix), size(matrix, 1), length(batch_range))
-
-            for (col, batch_pos) in enumerate(batch_range)
-                node = cholmod_batch[batch_pos]
-                rhs[node.cc_idx[1], col] = -1
-                rhs[node.cc_idx[2], col] = 1
-            end
-
-            lhs = solve_linear_system(factor, matrix, rhs; tol = residual_tolerance(cfg, T))
-
-            # Normalisation step
-            for (col, batch_pos) in enumerate(batch_range)
-                ref_node = cholmod_batch[batch_pos].cc_idx[1]
-                ref_volt = lhs[ref_node, col]
-                for row = 1:size(matrix, 1)
-                    lhs[row, col] = lhs[row, col] - ref_volt
-                end
-            end
-
-            is_parallel = cfg.parallelize
-            CSTIMER_THREADs = @timeit CSTIMER[] "postprocess pairs" begin
-                if is_parallel
-                    fetch.(map(bi -> Threads.@spawn(postprocess_pair(bi, batch_range, lhs)), 1:length(batch_range)))
-                else
-                    map(bi -> postprocess_pair(bi, batch_range, lhs), 1:length(batch_range))
-                end
-            end
-            for lt in CSTIMER_THREADs
-                merge!(CSTIMER[], lt)
-            end
-
-            for (col, batch_pos) in enumerate(batch_range)
-                coords = cholmod_batch[batch_pos].points_idx
-                resistance = lhs[cholmod_batch[batch_pos].cc_idx[2], col] -
-                            lhs[cholmod_batch[batch_pos].cc_idx[1], col]
-                resistances[coords...] = resistance
-                resistances[reverse(coords)...] = resistance
-            end
-        end
-
-        if get_shortcut_resistances
             update_shortcut_resistances!(idx, shortcut, resistances, points, comp)
         end
     end
@@ -523,6 +262,110 @@ function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, PardisoSolv
     save_resistances(r, cfg)
 
     r
+end
+
+# Per-component setup. Returns whatever solve_pairs! needs: an AMG
+# preconditioner or a factorization.
+function prepare!(::AMGSolver, matrix)
+    # Regularization step
+    matrix.nzval .+= eps(eltype(matrix)) * norm(matrix.nzval)
+
+    # Construct preconditioner *once* for every CC.
+    # CG requires a symmetric positive definite preconditioner, so the coarse
+    # solve must be a symmetric operator. AlgebraicMultigrid's default coarse
+    # solver (QR) is not, and its factorization is also not safe to share
+    # across the threaded pair solves below; the pseudo-inverse is both.
+    @timeit CSTIMER[] "construct preconditioner" aspreconditioner(
+        smoothed_aggregation(matrix;
+                             coarse_solver = AlgebraicMultigrid.Pinv,
+                             presmoother = AlgebraicMultigrid.GaussSeidel(),
+                             postsmoother = AlgebraicMultigrid.GaussSeidel()))
+end
+
+prepare!(solver::DirectSolver, matrix) =
+    @timeit CSTIMER[] "construct cholesky factor" construct_cholesky_factor(matrix, solver)
+
+"""
+    solve_pairs!(handle_pair, handle, solver, matrix, groups, cfg, log, pair_label)
+
+Solve every job in `groups` and call `handle_pair(job, voltages)` with the
+voltages referenced to the source node. The iterative path solves one pair at
+a time and parallelizes over source nodes, each task with its own
+preconditioner workspace; the direct path factorizes once and solves batches
+of right-hand sides, parallelizing the postprocessing of each batch.
+"""
+function solve_pairs!(handle_pair, P, ::AMGSolver, matrix::SparseMatrixCSC{T},
+                      groups, cfg, log, pair_label) where T
+
+    function task(jobs, timer)
+        @timeit timer "task" begin
+        # Each task needs its own workspace (scratch vectors are mutable)
+        ml = P.ml
+        local_P = aspreconditioner(AlgebraicMultigrid.MultiLevel(
+            ml.levels, ml.final_A, ml.coarse_solver,
+            ml.presmoother, ml.postsmoother, deepcopy(ml.workspace)))
+
+        for job in jobs
+            current = zeros(T, size(matrix, 1))
+            current[job.comp_i] = -1
+            current[job.comp_j] = 1
+
+            log && @debug(pair_label(job))
+            voltages = @timeit timer "solve linear system" solve_linear_system(matrix, current, local_P; tol = residual_tolerance(cfg, T))
+            voltages .-= voltages[job.comp_i]
+            @timeit timer "postprocess" handle_pair(job, voltages)
+        end
+        end # @timeit task
+        timer
+    end
+
+    # NOTE: Work is distributed by source point, giving a triangular load:
+    # task 1 solves n-1 pairs, task 2 solves n-2, ..., task n solves 0.
+    # This causes significant load imbalance with many threads.
+    timers = [TimerOutput() for _ in groups]
+    @timeit CSTIMER[] "solve and accumulate pairs" if cfg.parallelize
+        fetch.(map(i -> Threads.@spawn(task(groups[i], timers[i])), eachindex(groups)))
+    else
+        foreach(i -> task(groups[i], timers[i]), eachindex(groups))
+    end
+    foreach(t -> merge!(CSTIMER[], t), timers)
+    nothing
+end
+
+function solve_pairs!(handle_pair, factor, solver::DirectSolver, matrix::SparseMatrixCSC{T},
+                      groups, cfg, log, pair_label) where T
+
+    jobs = collect(Iterators.flatten(groups))
+    n = size(matrix, 1)
+
+    for batch in Iterators.partition(jobs, solver.bs)
+        rhs = zeros(T, n, length(batch))
+        for (col, job) in enumerate(batch)
+            rhs[job.comp_i, col] = -1
+            rhs[job.comp_j, col] = 1
+        end
+
+        log && @debug("Solving a batch of $(length(batch)) pairs: " * pair_label(first(batch)) *
+                      " to " * pair_label(last(batch)))
+        lhs = solve_linear_system(factor, matrix, rhs; tol = residual_tolerance(cfg, T))
+
+        function post(col)
+            timer = TimerOutput()
+            job = batch[col]
+            voltages = lhs[:, col]
+            voltages .-= voltages[job.comp_i]
+            @timeit timer "postprocess" handle_pair(job, voltages)
+            timer
+        end
+
+        timers = @timeit CSTIMER[] "postprocess pairs" if cfg.parallelize
+            fetch.(map(col -> Threads.@spawn(post(col)), 1:length(batch)))
+        else
+            map(post, 1:length(batch))
+        end
+        foreach(t -> merge!(CSTIMER[], t), timers)
+    end
+    nothing
 end
 
 # TODO: In the pardiso case, we're not really constructing the factor
