@@ -48,8 +48,17 @@ function compute_graph_data(data::NetworkData{T,V}, cfg)::GraphProblem{T,V} wher
 
     G = @timeit CSTIMER "construct graph laplacian" laplacian!(A)
 
-    # T = eltype(i)
-    exclude_pairs = Tuple{V,V}[]
+    # Include/exclude pairs. In include mode focal points absent from the file
+    # are dropped, mirroring the raster path (issue #341).
+    included_pairs = data.included_pairs
+    fp = data.fp
+    if isempty(included_pairs)
+        exclude_pairs = Tuple{V,V}[]
+    else
+        included_pairs.mode == :include &&
+            (fp = filter(x -> x in included_pairs.point_ids, fp))
+        exclude_pairs = exclude_pairs_from(included_pairs)
+    end
     solver = get_solver(cfg)
 
     nodemap = Matrix{V}(undef,0,0)
@@ -59,7 +68,7 @@ function compute_graph_data(data::NetworkData{T,V}, cfg)::GraphProblem{T,V} wher
 
 	cum = initialize_cum_vectors(data.coords, size(G,1))
 
-    GraphProblem(G, cc, data.fp, data.fp, 
+    GraphProblem(G, cc, fp, fp, 
                 exclude_pairs, nodemap, polymap, hbmeta, cellmap, cum, solver)
 
 end

@@ -236,33 +236,13 @@ end
 
 function generate_exclude_pairs(points_rc, included_pairs::IncludeExcludePairs{V}) where V
 
-    exclude_pairs_array = Tuple{V,V}[]
-    mat = included_pairs.include_pairs
-    point_ids = included_pairs.point_ids
-
+    # Include mode prunes focal nodes not mentioned in the include file;
+    # exclude mode keeps every node and only drops the listed pairs.
     if included_pairs.mode == :include
-        # Include mode: prune focal nodes not mentioned in the include file,
-        # and exclude pairs among remaining nodes that aren't explicitly included
-        prune_points!(points_rc, point_ids)
-        for j = 1:size(mat, 2)
-            for i = 1:size(mat, 1)
-                if mat[i,j] == 0 && mat[j,i] == 0
-                    push!(exclude_pairs_array, (point_ids[i], point_ids[j]))
-                end
-            end
-        end
-    else
-        # Exclude mode: don't prune any nodes, just exclude the listed pairs
-        for j = 1:size(mat, 2)
-            for i = 1:size(mat, 1)
-                if mat[i,j] == 1 && mat[j,i] == 1
-                    push!(exclude_pairs_array, (point_ids[i], point_ids[j]))
-                end
-            end
-        end
+        prune_points!(points_rc, included_pairs.point_ids)
     end
 
-    exclude_pairs_array
+    exclude_pairs_from(included_pairs)
 end
 
 function construct_node_map(gmap, polymap::Matrix{V}) where V

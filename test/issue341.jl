@@ -459,3 +459,160 @@ let
     # Node IDs need not be contiguous or sorted; indices are into `pts`
     @test Circuitscape.pairs_to_solve([10, 6, 1], [(6,10)]) == [(1,3), (2,3)]
 end
+
+# Shared tail for the raster ini files below.
+const _INI_TAIL_341 = """
+[Connection scheme for raster habitat data]
+connect_four_neighbors_only = True
+connect_using_avg_resistances = True
+[Output options]
+write_cur_maps = False
+write_volt_maps = False
+write_cum_cur_map_only = False
+write_max_cur_maps = False
+compress_grids = False
+log_transform_maps = False
+set_null_currents_to_nodata = False
+set_null_voltages_to_nodata = False
+[Calculation options]
+solver = cg+amg
+[Short circuit regions (aka polygons)]
+use_polygons = False
+polygon_file = None
+[Options for advanced mode]
+ground_file_is_resistances = False
+source_file = None
+remove_src_or_gnd = keepall
+ground_file = None
+use_unit_currents = False
+use_direct_grounds = False
+[Options for one-to-all and all-to-one modes]
+use_variable_source_strengths = False
+variable_source_file = None
+[Mask file]
+use_mask = False
+mask_file = None
+[Version]
+version = unknown
+"""
+
+_asc_hdr_341(n) = "ncols $n\nnrows $n\nxllcorner 0\nyllcorner 0\ncellsize 1\nNODATA_value -9999\n"
+
+# Test 9: one-to-all must index the include matrix by node ID, not by position
+# among the focal points present in the raster. The two differ as soon as the
+# include file names an ID the point raster does not contain, which silently
+# grounded the wrong nodes.
+let
+    dir = mktempdir()
+    write(joinpath(dir, "cell.asc"),
+          _asc_hdr_341(5) * join(fill(join(fill("1", 5), " "), 5), "\n") * "\n")
+    # Raster contains nodes 2, 3, 4 only.
+    write(joinpath(dir, "pts.asc"), _asc_hdr_341(5) *
+          "2 0 0 0 3\n0 0 0 0 0\n0 0 0 0 0\n0 0 0 0 0\n4 0 0 0 0\n")
+    # Node 1 is named in the file but absent from the raster, shifting every
+    # include-matrix row by one relative to the surviving focal points.
+    write(joinpath(dir, "include.txt"), "mode\tinclude\n1\t2\n3\t4\n")
+    ini = joinpath(dir, "job.ini")
+    write(ini, """[Circuitscape mode]
+data_type = raster
+scenario = one-to-all
+[Habitat raster or graph]
+habitat_file = $(joinpath(dir, "cell.asc"))
+habitat_map_is_resistances = True
+[Options for pairwise and one-to-all and all-to-one modes]
+point_file = $(joinpath(dir, "pts.asc"))
+use_included_pairs = True
+included_pairs_file = $(joinpath(dir, "include.txt"))
+output_file = $(joinpath(dir, "out.out"))
+""" * _INI_TAIL_341)
+    r = compute(ini)
+    @test size(r) == (3, 2)
+    @test r[:, 1] == [2.0, 3.0, 4.0]
+    # Node 2's only listed partner (1) is absent, so it has nothing to ground to.
+    @test r[1, 2] == -1
+    # Nodes 3 and 4 are each other's only partner, so both see the same
+    # single-source/single-ground resistance.
+    @test r[2, 2] > 0
+    @test r[2, 2] ≈ r[3, 2]
+end
+
+# Test 10: network mode must honour the include file too — it used to be read
+# and then discarded, so every pair was solved.
+let
+    dir = mktempdir()
+    # Path graph 1-2-3-4 with unit conductances.
+    write(joinpath(dir, "graph.txt"), "1\t2\t1.0\n2\t3\t1.0\n3\t4\t1.0\n")
+    write(joinpath(dir, "fp.txt"), "1\n2\n3\n4\n")
+    write(joinpath(dir, "include.txt"), "mode\tinclude\n1\t2\n")
+    ini = joinpath(dir, "job.ini")
+    write(ini, """[Circuitscape mode]
+data_type = network
+scenario = pairwise
+[Habitat raster or graph]
+habitat_file = $(joinpath(dir, "graph.txt"))
+habitat_map_is_resistances = False
+[Options for pairwise and one-to-all and all-to-one modes]
+point_file = $(joinpath(dir, "fp.txt"))
+use_included_pairs = True
+included_pairs_file = $(joinpath(dir, "include.txt"))
+output_file = $(joinpath(dir, "out.out"))
+""" * _INI_TAIL_341)
+    r = compute(ini)
+    # Nodes 3 and 4 are not named in the include file, so they are dropped.
+    @test size(r) == (3, 3)
+    @test r[1, 2] == 1.0
+    @test r[1, 3] == 2.0
+    # Adjacent nodes on a unit-conductance path graph.
+    @test r[2, 3] ≈ 1.0
+end
+
+# Test 11: exclude_pairs_from derives the excluded node ID pairs from the matrix
+let
+    inc = Circuitscape.IncludeExcludePairs(:include, [1, 2, 3],
+                                           [0 1 0; 1 0 0; 0 0 0])
+    ex = Circuitscape.exclude_pairs_from(inc)
+    # (1,2) is the only included pair, so every other combination is excluded.
+    @test (1, 3) in ex && (3, 1) in ex
+    @test (2, 3) in ex && (3, 2) in ex
+    @test !((1, 2) in ex) && !((2, 1) in ex)
+
+    exc = Circuitscape.IncludeExcludePairs(:exclude, [1, 2, 3],
+                                           [0 1 0; 1 0 0; 0 0 0])
+    ex2 = Circuitscape.exclude_pairs_from(exc)
+    # Only the listed pair is excluded.
+    @test (1, 2) in ex2 && (2, 1) in ex2
+    @test !((1, 3) in ex2) && !((2, 3) in ex2)
+end
+
+# Test 12: network graphs numbered from 0 are shifted to 1-based on load, so the
+# IDs in the include file must shift with them. Previously the unshifted file IDs
+# were matched against shifted focal points, selecting the neighbouring pair.
+let
+    dir = mktempdir()
+    # 0-based path graph with distinct resistances, so picking the wrong pair
+    # gives a different number: 0-1 = 1, 1-2 = 5, 2-3 = 1.
+    write(joinpath(dir, "graph.txt"), "0\t1\t1.0\n1\t2\t5.0\n2\t3\t1.0\n")
+    write(joinpath(dir, "fp.txt"), "0\n1\n2\n3\n")
+    write(joinpath(dir, "include.txt"), "mode\tinclude\n1\t2\n")
+    ini = joinpath(dir, "job.ini")
+    write(ini, """[Circuitscape mode]
+data_type = network
+scenario = pairwise
+[Habitat raster or graph]
+habitat_file = $(joinpath(dir, "graph.txt"))
+habitat_map_is_resistances = True
+[Options for pairwise and one-to-all and all-to-one modes]
+point_file = $(joinpath(dir, "fp.txt"))
+use_included_pairs = True
+included_pairs_file = $(joinpath(dir, "include.txt"))
+output_file = $(joinpath(dir, "out.out"))
+""" * _INI_TAIL_341)
+    r = compute(ini)
+    @test size(r) == (3, 3)
+    # Node IDs come back shifted to 1-based, as load_graph reports for 0-based input.
+    @test r[1, 2] == 2.0
+    @test r[1, 3] == 3.0
+    # The requested pair is the 5.0 resistor, not the adjacent 1.0 one.
+    @test r[2, 3] ≈ 5.0
+end
+
