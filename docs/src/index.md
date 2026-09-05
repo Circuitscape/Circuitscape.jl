@@ -48,7 +48,7 @@ ahead to Building a Circuitscape Job.
 If you do have your INI file handy, you can run the job by:
 ```julia
 using Circuitscape
-compute("myjob.ini")
+Circuitscape.compute("myjob.ini")
 ```
 
 You can also run Circuitscape programmatically by passing a configuration dictionary:
@@ -59,7 +59,7 @@ cfg["habitat_file"] = "resistance_map.asc"
 cfg["point_file"] = "focal_nodes.asc"
 cfg["scenario"] = "pairwise"
 cfg["output_file"] = "output/results.out"
-compute(cfg)
+Circuitscape.compute(cfg)
 ```
 
 ## Building a Circuitscape Job
@@ -109,9 +109,13 @@ performance advantages over the previous Python version (v4.0.5).
 
 ### Faster and More Scalable
 
-We benchmarked `Circuitscape.jl` with the Python version (v4.0.5) using
-16 parallel processes and benchmark problems from the standard Circuitscape
-[benchmark suite.](https://github.com/Circuitscape/BigTests)
+The benchmark below dates from 2021 and compares Circuitscape.jl 5.x with the
+Python version (v4.0.5), both using 16 parallel processes, on problems from
+the standard Circuitscape [benchmark suite](https://github.com/Circuitscape/BigTests).
+It predates the 6.0 performance work (chunked thread scheduling, native raster
+I/O, the removal of several graph copies), which is described with
+measurements under *What Makes a Run Fast* in
+[On Solvers and Computation Time](compute.md).
 
 ```@raw html
 <img src="benchmark/benchmark.png" width=650 height=450>
@@ -127,93 +131,21 @@ From the benchmark, Circuitscape.jl is up to *4x faster*
 on 16 processes. However, the best performing bar in the chart is
 _Julia-CHOLMOD_, which uses a direct solver.
 
-### CHOLMOD Solver
+### Solvers, Threads and Precision
 
-The CHOLMOD solver performs a [Cholesky
-decomposition](https://en.wikipedia.org/wiki/Cholesky_decomposition) on the graph
-constructed, and performs a batched back substitution
-to compute the voltages. It plugs into the
-[CHOLMOD](http://faculty.cse.tamu.edu/davis/suitesparse.html) library,
-which is part of the SuiteSparse collection of high performance sparse
-matrix algorithms.
+Circuitscape ships with the iterative `cg+amg` solver (the default) and the
+direct CHOLMOD solver, and can use Apple Accelerate (macOS) or Intel MKL
+Pardiso through optional package extensions. Runs are parallelized with Julia
+threads (`julia -t N` together with `parallelize = True`). Single precision
+(`precision = single`) is supported: it is tested in CI for `cg+amg`, CHOLMOD
+and Accelerate with a precision-aware residual check, and trades memory for
+some accuracy. GeoTIFF input and output needs the optional ArchGDAL package;
+ESRI ASCII grids need nothing extra.
 
-To use this mode, include a line in your Circuitscape
-INI file:
-```
-solver = cholmod
-```
-
-The Cholesky decomposition is a direct solver method, unlike the algebraic
-multigrid method used by default.
-The advantage is that it can be much faster than
-the iterative solution for smaller problem sizes.
-
-*Word of caution*: The Cholesky decomposition is not practical
-to use beyond a certain problem size because of a phenomenon called
-[fill-in](https://algowiki-project.org/en/Cholesky_method#Reordering_to_reduce_the_number_of_fill-in_elements), which results in loss of sparsity and large memory consumption.
-
-### Pardiso Solver
-
-Circuitscape also supports the [Pardiso](https://github.com/JuliaSparse/Pardiso.jl)
-direct solver as a package extension. Pardiso requires Intel MKL, so it is
-only available on systems where MKL is installed. To use it, first install
-Pardiso.jl, then load it before Circuitscape:
-
-```julia
-using Pkg
-Pkg.add("Pardiso")
-```
-
-```julia
-using Pardiso         # must be loaded before or alongside Circuitscape
-using Circuitscape
-compute("myjob.ini")  # with solver = pardiso in the INI file
-```
-
-And set the solver in your INI file:
-```
-solver = pardiso
-```
-
-Pardiso requires double precision and will automatically switch if single
-precision is requested. Like CHOLMOD, it is a direct solver best suited
-for small to medium problem sizes.
-
-### Parallel Computing
-
-Circuitscape.jl supports multi-threaded computation on Linux, macOS, and Windows
-using Julia's native threading. To run with multiple threads, start Julia with the
-`-t` flag:
-
-```bash
-julia -t 4    # use 4 threads
-```
-
-Or set the `JULIA_NUM_THREADS` environment variable before starting Julia.
-
-You can also enable parallelism from the INI file:
-```
-parallelize = True
-```
-
-The AMG solver (default) parallelizes individual pair solves across threads,
-which can provide significant speedups for pairwise and one-to-all/all-to-one
-modes with many focal points. The CHOLMOD and Pardiso solvers perform batched
-direct solves; threading is used for postprocessing (current map accumulation
-and output writing) in these modes.
-
-### Single Precision (Experimental)
-
-Circuitscape.jl supports running problems in
-single precision as opposed to the standard double precision.
-
-Single precision usually takes much less memory, but trades off
-against solution accuracy.
-
-Use this new feature by including a line in your config file:
-```
-precision = single
-```
+All of this, including guidance on choosing a solver and the accuracy note on
+single precision, is in [On Solvers and Computation Time](compute.md). The
+INI options are listed in [Inputs, Outputs and Options](options.md), and
+users of Circuitscape 5.x should read [Upgrading to 6.0](migration.md).
 
 # Related Projects
 

@@ -74,10 +74,10 @@ All Circuitscape configuration is done through an `.ini` file. Below is a comple
 | `write_volt_maps` | Boolean | `False` | If `True`, write voltage maps for each iteration. |
 | `write_cum_cur_map_only` | Boolean | `False` | If `True`, calculate current maps for each iteration but only write the cumulative (summed) map to disk. |
 | `write_max_cur_maps` | Boolean | `False` | If `True`, write a map showing the maximum current value at each cell across all iterations. |
-| `set_null_currents_to_nodata` | Boolean | `False` | If `True`, set cells with zero current to NODATA in output current maps. |
-| `set_null_voltages_to_nodata` | Boolean | `False` | If `True`, set cells with zero voltage to NODATA in output voltage maps. |
-| `set_focal_node_currents_to_zero` | Boolean | `False` | If `True`, set current at focal nodes to zero in output maps. *Note: not yet implemented in Circuitscape 5.* |
-| `compress_grids` | Boolean | `False` | If `True`, compress output ASCII grids using gzip. |
+| `set_null_currents_to_nodata` | Boolean | `False` | If `True`, cells that are NODATA in the resistance map (and so have no graph node) are written as NODATA in current maps instead of 0. |
+| `set_null_voltages_to_nodata` | Boolean | `False` | If `True`, cells that are NODATA in the resistance map are written as NODATA in voltage maps instead of 0. |
+| `set_focal_node_currents_to_zero` | Boolean | `False` | If `True`, the cells of the *active* focal nodes carry zero current in each raster current map: the two focal nodes of the pair in pairwise mode, every focal node in one-to-all and all-to-one. Cumulative and maximum maps then show only current that flows *through* a focal region while other pairs are active. Raster current maps only; network node currents and resistances are unaffected. |
+| `compress_grids` | Boolean | `False` | Accepted for compatibility with Circuitscape 4. Output grids are currently written uncompressed; gzipped *input* grids (`.asc.gz`) are read. |
 | `log_transform_maps` | Boolean | `False` | If `True`, log10-transform values in output current maps. Cells with zero current are set to NODATA. |
 | `write_as_tif` | Boolean | `False` | If `True`, write current and voltage maps as GeoTIFF (LZW-compressed) instead of ESRI ASCII grids. Requires the optional GDAL support: `Pkg.add("ArchGDAL")`, then `using ArchGDAL` before running. |
 
@@ -85,13 +85,12 @@ All Circuitscape configuration is done through an `.ini` file. Below is a comple
 
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|
-| `solver` | String | `cg+amg` | Linear solver to use. Values: `cg+amg` (iterative, recommended for large grids), `cholmod` (direct, uses more memory), `accelerate` (direct, macOS only, requires [AppleAccelerate.jl](https://github.com/JuliaLinearAlgebra/AppleAccelerate.jl)), `pardiso` (direct, requires [Pardiso.jl](https://github.com/JuliaSparse/Pardiso.jl)). |
-| `precision` | String | `Double` | Floating-point precision. Values: `Double`, `Single`. CHOLMOD and Pardiso require double precision. |
+| `solver` | String | `cg+amg` | Linear solver to use. Values: `cg+amg` (iterative, recommended for large grids), `cholmod` (direct, uses more memory), `accelerate` (direct, macOS only, requires [AppleAccelerate.jl](https://github.com/JuliaLinearAlgebra/AppleAccelerate.jl)), `pardiso` (direct, requires [Pardiso.jl](https://github.com/JuliaSparse/Pardiso.jl)). Also accepted: `amg+cg`, `cholesky`, `cholfact`, `mklpardiso`, `apple_accelerate`. Any other value is an error. |
+| `precision` | String | `double` | Floating-point precision. Values: `double`, `single` (either case). Single precision is supported and tested for `cg+amg`, `cholmod` and `accelerate`; `pardiso` is double-only and switches to double with a warning. See the accuracy note under *Convergence Checks* in [On Solvers and Computation Time](compute.md). |
 | `use_64bit_indexing` | Boolean | `True` | If `True`, use 64-bit integer indexing. Required for very large grids. |
-| `cholmod_batch_size` | Integer | `1000` | Number of pairs to solve simultaneously when using CHOLMOD in pairwise mode. |
+| `cholmod_batch_size` | Integer | `1000` | Number of right-hand sides the direct solvers (`cholmod`, `pardiso`, `accelerate`) solve at once in pairwise mode. Postprocessing of each batch runs across threads. Ignored by `cg+amg`. |
 | `residual_tolerance` | Float | `auto` | Every linear solve is accepted only if its true relative residual `‖Gv − b‖ / ‖b‖` is below this. `auto` means `1e-4` in double precision and `1e-3` in single. With `cg+amg`, a solve that stops short is retried with tighter Krylov tolerances before the run is aborted. |
-| `parallelize` | Boolean | `False` | If `True`, run iterations in parallel using Julia threads. Start Julia with `julia -t N` for N threads. |
-
+| `parallelize` | Boolean | `False` | If `True`, run pair solves (or per-focal-node solves) in parallel using Julia threads. Start Julia with `julia -t N` for N threads; see *Parallelism* below. |
 | `low_memory_mode` | Boolean | `False` | Circuitscape 4 option, not implemented in Circuitscape.jl. Setting it to `True` is an error so that it cannot be relied on silently. |
 | `preemptive_memory_release` | Boolean | `False` | Circuitscape 4 option, not implemented in Circuitscape.jl. Setting it to `True` is an error. |
 
@@ -107,11 +106,43 @@ All Circuitscape configuration is done through an `.ini` file. Below is a comple
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|
 | `log_file` | Path | `None` | Path to log file. If `None`, no file logging. |
-| `log_level` | String | `INFO` | Logging level. Values: `DEBUG`, `INFO`, `WARNING`, `ERROR` (`CRITICAL` is accepted as `ERROR`). When set to `DEBUG`, prints detailed timing summary and per-pair solve progress. |
-| `suppress_messages` | Boolean | `False` | If `True`, suppress all informational messages. |
-| `profiler_log_file` | Path | `None` | Path to profiler log file. |
+| `log_level` | String | `INFO` | Logging level. Values: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` (case-insensitive; `WARN` is also accepted; `CRITICAL` is treated as `ERROR`). Any other value is an error. `DEBUG` logs every pair solve and prints a timing table at the end of the run. |
+| `suppress_messages` | Boolean | `False` | If `True`, suppress informational messages on the console. Warnings and errors are still shown, and a `log_file` still receives everything. |
+
+The Circuitscape 4 keys `profiler_log_file`, `print_timings`, `print_rusages` and `screenprint_log` are accepted without a warning and have no effect.
 
 ---
+
+## Configuration Validation
+
+Since 6.0 a configuration is checked in full before any data is read, and a problem is reported as an error rather than silently turning into a different run.
+
+**Values.** `solver`, `scenario`, `data_type`, `precision`, `log_level`, `remove_src_or_gnd` and every boolean option accept only the values listed in the tables above. Anything else is an error naming the key and the valid values. In earlier versions `solver = cholmodd` ran `cg+amg`, `scenario = pairwsie` ran pairwise and `write_cur_maps = Ture` wrote nothing; each of these is now refused:
+
+```
+ArgumentError: solver = "cholmodd" is not recognised; expected one of: cg+amg, cholmod, pardiso, accelerate
+ArgumentError: write_cur_maps = "Ture" is not recognised; expected one of: True, False
+```
+
+A missing `scenario` is an error (`scenario is not set; expected one of: pairwise, advanced, one-to-all, all-to-one`) rather than an implicit pairwise run.
+
+**Files.** Every input file the run will actually use must exist: `habitat_file` always; `point_file` in pairwise, one-to-all and all-to-one; `source_file` and `ground_file` in advanced mode; `polygon_file`, `mask_file`, `included_pairs_file`, `variable_source_file` and `reclass_file` only when the matching `use_*` option is `True`. The directory of `output_file` must exist. An INI Builder placeholder such as `(Browse for a resistance file)` counts as unset. All problems are collected and reported in one message, so a configuration is fixed in one round trip:
+
+```
+ArgumentError: Invalid configuration:
+  - habitat_file = "resistance.asc" does not exist
+  - point_file = "nodes.asc" does not exist
+  - output directory "output" (from output_file) does not exist
+  - low_memory_mode is not implemented in Circuitscape.jl; remove it or set it to False
+```
+
+**Never-implemented options.** `low_memory_mode` and `preemptive_memory_release` are Circuitscape 4 options that Circuitscape.jl parses but has never implemented. Setting either to `True` is an error, so that a large run cannot rely on them by mistake.
+
+**GeoTIFF without GDAL.** If ArchGDAL is not loaded, a configuration that names a GeoTIFF input (detected by file content, not extension) or sets `write_as_tif = True` is refused up front with the installation hint (`Pkg.add("ArchGDAL")`, then `using ArchGDAL`). See *GeoTIFF Support* in [On Solvers and Computation Time](compute.md).
+
+**Unknown keys** produce a warning (`Ignoring unrecognised configuration keys: ...`) and are otherwise ignored, so a misspelt key is visible without breaking old INI files.
+
+**Circuitscape 4 spellings** still work: `remove_src_or_gnd = not entered` means `keepall`, Python log level names (`WARNING`, `CRITICAL`, any case) are read, and `residual_tolerance = None` means automatic.
 
 ## Data Type
 
@@ -137,13 +168,18 @@ For raster analyses, focal nodes may occur at points (single cells on the resist
 
 ### Parallelism
 
-Circuitscape uses Julia's native threading for parallel computation. Set `parallelize = True` and start Julia with `julia -t N` for N threads.
+Circuitscape uses Julia's native threads. Two things are needed: start Julia with threads (`julia -t N`, or set the `JULIA_NUM_THREADS` environment variable before starting Julia) **and** set `parallelize = True` in the INI file. With `parallelize = False`, the default, the run is serial however many threads Julia has. The log line `Starting up Circuitscape to use N threads in parallel` confirms both are in effect.
 
-Parallelism is supported in raster **pairwise**, **one-to-all**, and **all-to-one** modes. It is most effective in one-to-all and all-to-one, where each focal point is an independent solve that can be distributed evenly across threads.
+What runs in parallel depends on the mode and solver:
 
-In **pairwise** mode, work is distributed by source focal point: the first task solves N-1 pairs, the second solves N-2, and so on. This triangular load distribution means early tasks do significantly more work than later ones, reducing parallel efficiency when the number of threads is large relative to the number of focal points. Use `log_level = DEBUG` to see per-task timing breakdowns.
+- **Pairwise with `cg+amg`** (raster and network): the pair solves. All pairs of a connected component are collected and split into equal-sized chunks, about four per thread, each solved on its own task with its own preconditioner workspace. Every pair costs about the same, so equal counts are equal work. This includes the default configuration with no maps requested, where the resistance shortcut solves one system per focal node rather than one per pair: those solves used to run on a single task and are now spread across the threads too.
+- **Pairwise with a direct solver** (`cholmod`, `pardiso`, `accelerate`): the factorization is computed once per connected component and `cholmod_batch_size` right-hand sides are solved at a time inside the solver library; the postprocessing of each batch (node currents, map accumulation and writing) runs across threads.
+- **One-to-all and all-to-one**: one task per focal node. Each is an independent solve; the per-node current maps are accumulated on the main thread afterwards.
+- **Advanced mode** is a single solve per connected component and is not parallelized.
 
-Network modes and raster advanced mode do not currently support parallelism.
+Julia 1.12 starts an interactive thread in addition to the default worker threads. Circuitscape schedules its tasks on the default thread pool only, so `Threads.nthreads()`, the number given by `-t`, is what matters and the interactive thread changes nothing. BLAS is set to a single thread at startup because the workload is sparse.
+
+Set `log_level = DEBUG` to get a timing table at the end of the run with the `solve linear system` and `postprocess` time per task.
 
 ## Advanced Mode Options
 
@@ -233,7 +269,7 @@ Set `use_included_pairs = True` and provide `included_pairs_file` to restrict ca
 
 ## Input Raster Format
 
-Raster input maps should be stored in Arc/Info ASCII grid or GeoTIFF format, as exported by standard GIS packages. Set `write_as_tif = True` to produce GeoTIFF output instead of ASCII grids. For focal nodes, the value stored in each grid location refers to the focal node ID, and a single ID can occupy more than one cell (IDs must be positive integers). For current sources, the grid value specifies the source strength in amps. For grounds, the grid value specifies either the resistance or conductance of the resistor tying each ground node to ground.
+Raster input maps should be stored in Arc/Info ASCII grid or GeoTIFF format, as exported by standard GIS packages. ASCII grids (optionally gzipped, with `xllcorner`/`yllcorner` or `xllcenter`/`yllcenter`, `cellsize` or `dx`/`dy`) are read natively; GeoTIFF needs the optional ArchGDAL package (see *GeoTIFF Support* in [On Solvers and Computation Time](compute.md)). Set `write_as_tif = True` to produce GeoTIFF output instead of ASCII grids. For focal nodes, the value stored in each grid location refers to the focal node ID, and a single ID can occupy more than one cell (IDs must be positive integers). For current sources, the grid value specifies the source strength in amps. For grounds, the grid value specifies either the resistance or conductance of the resistor tying each ground node to ground.
 
 The ASCII raster format is as follows:
 
@@ -386,6 +422,40 @@ Make sure to include a zero in the upper-left corner of the matrix.
 Files should be in tab-delimited text with a .txt extension.
 
 ## Output Files
+
+Every output name starts with `output_file` with its `.out` extension removed; below this prefix is written `<out>`. The configuration as run is written, in INI form, to `output_file` itself, so the options are recorded next to the results. Focal node IDs in file names are the IDs from the focal node file.
+
+### Which files are written
+
+Raster modes write ESRI ASCII grids (`.asc`), or GeoTIFF (`.tif`) when `write_as_tif = True`. When the input raster carries a projection it is written alongside each `.asc` as a `.prj` sidecar.
+
+| File | Mode | Written when |
+|------|------|--------------|
+| `<out>_resistances.out`, `<out>_resistances_3columns.out` | pairwise | always |
+| `<out>_curmap_<i>_<j>.asc` | pairwise | `write_cur_maps = True` and `write_cum_cur_map_only = False` |
+| `<out>_cum_curmap.asc` | pairwise | `write_cur_maps = True` or `write_cum_cur_map_only = True` |
+| `<out>_max_curmap.asc` | pairwise | `write_max_cur_maps = True`, together with `write_cur_maps` or `write_cum_cur_map_only` |
+| `<out>_voltmap_<i>_<j>.asc` | pairwise | `write_volt_maps = True` |
+| `<out>_curmap_<id>.asc` (one per focal node) | one-to-all, all-to-one | `write_cur_maps = True` or `write_cum_cur_map_only = True` (`write_cum_cur_map_only` does not suppress the per-node maps in these modes) |
+| `<out>_cum_curmap.asc`, `<out>_max_curmap.asc` | one-to-all, all-to-one | as in pairwise |
+| `<out>_voltmap_<id>.asc` | one-to-all, all-to-one | `write_volt_maps = True` |
+| `<out>_curmap.asc` | advanced | `write_cur_maps = True` or `write_cum_cur_map_only = True` |
+| `<out>_voltmap.asc` | advanced | `write_volt_maps = True` |
+
+One-to-all and all-to-one do not write a resistances file; their result (one value per focal node) is the return value of `compute`. `set_focal_node_currents_to_zero`, `log_transform_maps` and `set_null_currents_to_nodata` are applied to each per-pair or per-node map before it is accumulated, so they affect the cumulative and maximum maps as well.
+
+Network modes write tab-separated text. Branch current files omit branches carrying less than `1e-6` A.
+
+| File | Mode | Written when |
+|------|------|--------------|
+| `<out>_resistances.out`, `<out>_resistances_3columns.out` | pairwise | always |
+| `<out>_node_currents_<i>_<j>.txt`, `<out>_branch_currents_<i>_<j>.txt` | pairwise | `write_cur_maps = True`. Since 6.0 these honour the flag as the raster path always did; before, they were written on every run. (They are also produced when any other map option is on, since every map option enables the per-pair postprocessing; `write_cum_cur_map_only` does not suppress them.) |
+| `<out>_node_currents_cum.txt`, `<out>_branch_currents_cum.txt` | pairwise | `write_cur_maps = True` |
+| `<out>_voltages_<i>_<j>.txt` | pairwise | `write_volt_maps = True` |
+| `<out>_node_currents.txt`, `<out>_branch_currents.txt` | advanced | `write_cur_maps = True` or `write_cum_cur_map_only = True` |
+| `<out>_voltages.txt` | advanced | `write_volt_maps = True` |
+
+`write_max_cur_maps` has no effect in network mode. Node current files have two columns (node ID, current); branch current files three (node, node, current); voltage files two (node ID, voltage).
 
 ### Current and Voltage Data
 

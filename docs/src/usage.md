@@ -7,7 +7,7 @@ See the [Gnarly Landscape Utilities website](http://www.circuitscape.org/gnarly-
 Lastly, users interested in mapping important connectivity areas may wish to consider [Linkage Mapper](https://code.google.com/p/linkage-mapper/), which maps least-cost corridors. Linkage Mapper now also hybridizes least-cost corridor modeling with Circuitscape (see the Pinchpoint Mapper tool within the Linkage Mapper toolkit). Links to other connectivity tools can be found on the [Corridor Design](http://www.corridordesign.org/) and [Connecting Landscapes](http://connectinglandscapes.org/) websites.
 
 
-Circuitscape may be called through its own graphical user interface, from the Circuitscape for ArcGIS Toolbox, or from the command line. Users supply Circuitscape with resistance data and the program calculates effective resistances and/or creates maps of current flow and voltages across landscapes and networks.
+Circuitscape is run from Julia: `Circuitscape.compute("job.ini")` runs a job described by an INI file, `Circuitscape.compute(dict)` runs one built in code, and the interactive INI builder `Circuitscape.start()` writes an INI file step by step and can run it. It can also be called from R or Python; see [Calling Circuitscape from Other Programs](otherprog.md). There is no graphical user interface or ArcGIS toolbox. Users supply Circuitscape with resistance data and the program calculates effective resistances and/or creates maps of current flow and voltages across landscapes and networks.
 
 ### Two data types: network and raster
 

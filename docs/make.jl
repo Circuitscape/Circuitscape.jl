@@ -6,7 +6,9 @@ makedocs(
              "User Guide" => "usage.md",
              "Inputs, Outputs and Options" => "options.md", 
              "On Solvers and Computation Time" => "compute.md", 
-             "Calling Circuitscape from other Programs" => "otherprog.md", 
+             "Calling Circuitscape from other Programs" => "otherprog.md",
+             "Upgrading to 6.0" => "migration.md",
+             "API Reference" => "api.md",
              "Logging Options" => "logging.md"
     ]
 )

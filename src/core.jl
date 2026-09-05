@@ -1,3 +1,13 @@
+"""
+    Cumulative
+
+Accumulators shared by every pair solve of a pairwise run, guarded by `lock`:
+the cumulative and maximum current grids of a raster (`cum_curr`,
+`max_curr`; `max_curr` is empty unless `write_max_cur_maps`), or the
+cumulative node and branch currents of a network (`cum_node_curr`,
+`cum_branch_curr`, with `coords` naming each branch and `branch_index`
+mapping an edge in either orientation to its slot).
+"""
 struct Cumulative{T,V}
     cum_curr::Matrix{T}
     max_curr::Matrix{T}
@@ -10,9 +20,17 @@ struct Cumulative{T,V}
     lock::ReentrantLock
 end
 
-# A pairwise problem: the graph Laplacian, its connected components, the focal
-# nodes (graph indices, with the user's ids alongside) and where each node
-# lands in the output. Raster and network differ only in `geometry`.
+"""
+    GraphProblem
+
+A pairwise problem: the graph Laplacian `G`, its connected components `cc`,
+the focal nodes as graph indices (`points`) with the user's ids alongside
+(`user_points`), the pairs of user ids not to solve (`exclude_pairs`), the
+[`Geometry`](@ref) that maps nodes back to output coordinates, the
+[`Cumulative`](@ref) accumulators and the solver. Raster and network runs
+differ only in `geometry`. Built by [`build_problem`](@ref) and consumed by
+[`solve`](@ref).
+"""
 struct GraphProblem{T,V,W,Geom<:Geometry}
     G::SparseMatrixCSC{T,V}
     cc::Vector{Vector{V}}
@@ -24,8 +42,12 @@ struct GraphProblem{T,V,W,Geom<:Geometry}
     solver::W
 end
 
-# One connected component as the output writers see it: its node list, its
-# matrix and its geometry restricted to the component's local numbering.
+"""
+    ComponentData
+
+One connected component as the output writers see it: its node list, its
+matrix and its geometry restricted to the component's local numbering.
+"""
 struct ComponentData{T,V,Geom<:Geometry}
     cc::Vector{V}
     matrix::SparseMatrixCSC{T,V}
@@ -53,19 +75,55 @@ struct Shortcut{T}
     shortcut_res::Matrix{T}
 end
 
+"""
+    Solver
+
+Abstract supertype of the solver backends. `prepare!` and `solve_pairs!`
+dispatch on it; everything else in the pairwise driver is shared.
+"""
 abstract type Solver end
 
+"""
+    CholmodSolver(bs)
+
+Direct solver: sparse Cholesky factorization through SuiteSparse CHOLMOD
+(`solver = cholmod`), solving `bs` right-hand sides per batch. Available
+without extra packages, in double and single precision.
+"""
 struct CholmodSolver <: Solver
     bs::Int
 end
 
+"""
+    AMGSolver()
+
+Iterative solver: conjugate gradient preconditioned by smoothed-aggregation
+algebraic multigrid (`solver = cg+amg`, the default). One preconditioner is
+built per connected component and shared, with a private workspace per task,
+by the parallel pair solves.
+"""
 struct AMGSolver <: Solver
 end
 
+"""
+    PardisoSolver(bs)
+
+Direct solver through Intel MKL Pardiso (`solver = pardiso`), `bs` right-hand
+sides per batch. Requires the Pardiso.jl package extension (`using Pardiso`)
+and double precision.
+"""
 struct PardisoSolver <: Solver
     bs::Int
 end
 
+"""
+    AccelerateSolver(bs)
+
+Direct solver through Apple's Accelerate sparse Cholesky
+(`solver = accelerate`), `bs` right-hand sides per batch. Requires the
+AppleAccelerate.jl package extension (`using AppleAccelerate`) on macOS;
+double and single precision.
+"""
 struct AccelerateSolver <: Solver
     bs::Int
 end
@@ -79,6 +137,12 @@ function single_ground_all_pairs(prob::GraphProblem{T,V,W}, cfg, log = true) whe
     solve(prob, prob.solver, cfg, log)
 end
 
+"""
+    get_solver(cfg) -> Solver
+
+The solver backend selected by `cfg.solver`, with `cfg.cholmod_batch_size`
+as the batch size of the direct solvers. Logs which solver is used.
+"""
 function get_solver(cfg)
     s = cfg.solver
     if s == st_cg_amg
@@ -103,9 +167,15 @@ end
 
 const DirectSolver = Union{CholmodSolver, PardisoSolver, AccelerateSolver}
 
-# One pair of focal nodes to solve within a connected component. `src_indices`
-# and `dst_indices` are the positions in `points` that map to each node; a
-# focal region contributes several, all sharing one solve.
+"""
+    PairJob
+
+One pair of focal nodes to solve within a connected component: the two graph
+nodes (`src_node`, `dst_node`), their local indices in the component
+(`comp_i`, `comp_j`), and `src_indices` / `dst_indices`, the positions in
+`points` that map to each node; a focal region contributes several positions,
+all sharing one solve. Produced by [`pair_jobs`](@ref).
+"""
 struct PairJob{V}
     src_node::V
     dst_node::V
@@ -299,8 +369,14 @@ function solve(prob::GraphProblem{T,V}, solver::Solver, cfg, log)::Matrix{T} whe
     r
 end
 
-# Per-component setup. Returns whatever solve_pairs! needs: an AMG
-# preconditioner or a factorization.
+"""
+    prepare!(solver, matrix)
+
+Per-component setup, run once before the pairs of a component are solved.
+Returns whatever `solve_pairs!` needs for that solver: the AMG preconditioner
+for [`AMGSolver`](@ref) (after regularizing `matrix` in place), or the
+factorization for a direct solver.
+"""
 function prepare!(::AMGSolver, matrix)
     # Regularization step
     matrix.nzval .+= eps(eltype(matrix)) * norm(matrix.nzval)
@@ -420,15 +496,13 @@ end
 
 
 """
-Returns all possible pairs to solve.
+    get_num_pairs(ccs, fp, exclude_pairs, user_points = fp) -> (n, numbering)
 
-Input:
-* ccs::Vector{Vector{Int}} - vector of connected components
-* fp::Vector{Int} - vector of focal points
-* exclude_pairs::Vector{Tuple{Int,Int}} - vector of point pairs (tuples) to exclude
-
-Output:
-* n - total number of pairs
+Number of pairs the pairwise driver will solve without the resistance
+shortcut: for every connected component, the pairs of distinct focal nodes in
+it whose user ids are not in `exclude_pairs`. `numbering` maps each
+`(node, node)` pair to its position in that count, which is how the log
+labels `Solving pair k of n`.
 """
 function get_num_pairs(ccs, fp::Vector{V}, exclude_pairs, user_points::Vector{V}=fp) where V
 
