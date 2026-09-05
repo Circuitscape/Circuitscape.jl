@@ -91,8 +91,8 @@ All Circuitscape configuration is done through an `.ini` file. Below is a comple
 | `cholmod_batch_size` | Integer | `1000` | Number of pairs to solve simultaneously when using CHOLMOD in pairwise mode. |
 | `parallelize` | Boolean | `False` | If `True`, run iterations in parallel using Julia threads. Start Julia with `julia -t N` for N threads. |
 
-| `low_memory_mode` | Boolean | `False` | If `True`, reduce memory usage at the cost of computation time. |
-| `preemptive_memory_release` | Boolean | `False` | If `True`, release memory more aggressively during computation. |
+| `low_memory_mode` | Boolean | `False` | Circuitscape 4 option, not implemented in Circuitscape.jl. Setting it to `True` is an error so that it cannot be relied on silently. |
+| `preemptive_memory_release` | Boolean | `False` | Circuitscape 4 option, not implemented in Circuitscape.jl. Setting it to `True` is an error. |
 
 ### Reclassification
 
@@ -106,7 +106,7 @@ All Circuitscape configuration is done through an `.ini` file. Below is a comple
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|
 | `log_file` | Path | `None` | Path to log file. If `None`, no file logging. |
-| `log_level` | String | `INFO` | Logging level. Values: `DEBUG`, `INFO`. When set to `DEBUG`, prints detailed timing summary and per-pair solve progress. |
+| `log_level` | String | `INFO` | Logging level. Values: `DEBUG`, `INFO`, `WARNING`, `ERROR` (`CRITICAL` is accepted as `ERROR`). When set to `DEBUG`, prints detailed timing summary and per-pair solve progress. |
 | `suppress_messages` | Boolean | `False` | If `True`, suppress all informational messages. |
 | `profiler_log_file` | Path | `None` | Path to profiler log file. |
 
