@@ -35,6 +35,11 @@ jobs:
         with:
           version: ${{ matrix.version }}
       - uses: julia-actions/cache@v3
+        with:
+          # A job that fails partway through can leave the depot with a
+          # package resolved but not installed; saving that depot poisons
+          # every later run on the same ref (seen on #508, Windows).
+          save-always: false
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
       - uses: julia-actions/julia-processcoverage@v1
@@ -64,6 +69,11 @@ jobs:
         with:
           version: '1'
       - uses: julia-actions/cache@v3
+        with:
+          # A job that fails partway through can leave the depot with a
+          # package resolved but not installed; saving that depot poisons
+          # every later run on the same ref (seen on #508, Windows).
+          save-always: false
       - run: |
           julia --project -e '
             using Pkg
@@ -84,6 +94,11 @@ jobs:
         with:
           version: '1'
       - uses: julia-actions/cache@v3
+        with:
+          # A job that fails partway through can leave the depot with a
+          # package resolved but not installed; saving that depot poisons
+          # every later run on the same ref (seen on #508, Windows).
+          save-always: false
       - run: |
           julia --project=docs -e '
             using Pkg
