@@ -104,9 +104,32 @@ function read_point_strengths(T, path::String, starts_from_zero)
 	str
 end
 
-function read_cellmap(habitat_file::String, is_res::Bool, ::Type{T}) where {T}
+"""
+    read_reclass_table(T, path)
+
+Two whitespace-separated columns, `old new`, one pair per line. Applied to the
+habitat raster's values as read from the file, i.e. before any conversion
+between resistance and conductance (issue #231).
+"""
+function read_reclass_table(::Type{T}, path::String) where {T}
+    table = readdlm(path, T)
+    size(table, 2) == 2 ||
+        throw(ArgumentError("reclass_file = \"$path\" must have exactly two columns (old value, new value); found $(size(table, 2))"))
+    table
+end
+
+function reclassify!(cell_map::Matrix{T}, table::Matrix{T}) where {T}
+    # A single lookup so that chained rows (1 -> 2, 2 -> 3) do not compound:
+    # applying them one after the other would send 1 to 3.
+    lookup = Dict{T,T}(table[i,1] => table[i,2] for i in axes(table, 1))
+    map!(x -> get(lookup, x, x), cell_map, cell_map)
+end
+
+function read_cellmap(habitat_file::String, is_res::Bool, ::Type{T};
+                      reclass_table::Union{Nothing,Matrix{T}} = nothing) where {T}
 
     cell_map, rastermeta = _grid_reader(T, habitat_file)
+    reclass_table === nothing || reclassify!(cell_map, reclass_table)
 
     gmap = similar(cell_map)
     ind = findall(x -> x == -9999, cell_map)
@@ -480,8 +503,9 @@ function load_raster_data(T, V, cfg)::RasterData{T,V}
 
     @info("Reading maps")
 
-    # Read cell map
-    cellmap, hbmeta = read_cellmap(hab_file, hab_is_res, T)
+    # Read cell map, reclassifying its values first if asked to
+    reclass_table = cfg.use_reclass_table ? read_reclass_table(T, cfg.reclass_file) : nothing
+    cellmap, hbmeta = read_cellmap(hab_file, hab_is_res, T; reclass_table)
     c = count(x -> x > 0, cellmap)
     ncells = length(cellmap)
     if ncells > 5_000_000 && cfg.solver == st_cholmod

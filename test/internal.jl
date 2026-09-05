@@ -358,3 +358,37 @@ end
     @test err isa ErrorException
     @test occursin("after 3 attempts", err.msg)
 end
+
+# Issue 231: reclassify habitat raster values through a lookup table
+@testset "Reclass table (#231)" begin
+    # One pass: chained rows must not compound (1 -> 2 -> 3)
+    m = [1.0 2.0; 2.0 3.0]
+    Circuitscape.reclassify!(m, [1.0 2.0; 2.0 3.0])
+    @test m == [2.0 3.0; 3.0 3.0]
+
+    # A table that is not two columns is rejected by name
+    dir = mktempdir()
+    write(joinpath(dir, "bad.txt"), "1 2 3\n")
+    @test_throws ArgumentError Circuitscape.read_reclass_table(Float64, joinpath(dir, "bad.txt"))
+
+    # End to end: doubling every resistance doubles every effective resistance
+    hdr = "ncols 5\nnrows 5\nxllcorner 0\nyllcorner 0\ncellsize 1\nNODATA_value -9999\n"
+    write(joinpath(dir, "cell.asc"), hdr * join(fill(join(fill("2", 5), " "), 5), "\n") * "\n")
+    write(joinpath(dir, "pts.asc"), hdr *
+          "1 0 0 0 2\n0 0 0 0 0\n0 0 0 0 0\n0 0 0 0 0\n3 0 0 0 0\n")
+    write(joinpath(dir, "reclass.txt"), "2\t4\n")
+    d = Circuitscape.init_config()
+    d["data_type"] = "raster"; d["scenario"] = "pairwise"
+    d["habitat_file"] = joinpath(dir, "cell.asc")
+    d["point_file"] = joinpath(dir, "pts.asc")
+    d["output_file"] = joinpath(dir, "out.out")
+    d["connect_four_neighbors_only"] = "True"
+    base = compute(d)
+    d["use_reclass_table"] = "True"
+    d["reclass_file"] = joinpath(dir, "reclass.txt")
+    reclassed = compute(d)
+    @test reclassed[2:end, 2:end] ≈ 2 .* base[2:end, 2:end]
+    # Cells the table does not mention are untouched: no-op table gives base back
+    write(joinpath(dir, "reclass.txt"), "7\t9\n")
+    @test compute(d) ≈ base
+end

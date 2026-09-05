@@ -99,8 +99,8 @@ All Circuitscape configuration is done through an `.ini` file. Below is a comple
 
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|
-| `use_reclass_table` | Boolean | `False` | If `True`, reclassify resistance values using a lookup table. *Note: not yet implemented in Circuitscape 5.* |
-| `reclass_file` | Path | — | Path to file with reclassification data. |
+| `use_reclass_table` | Boolean | `False` | If `True`, replace values in the habitat raster using the lookup table in `reclass_file` before the run. Raster mode only. |
+| `reclass_file` | Path | — | Text file with two whitespace-separated columns, `old new`, one pair per line. Every cell whose value equals `old` is set to `new`; other cells, including NODATA, are left alone. Values are replaced in a single pass, so `1 2` followed by `2 3` sends 1 to 2, not to 3. Lets one large raster be reused with many resistance assignments without exporting a new file each time. |
 
 ### Logging
 
