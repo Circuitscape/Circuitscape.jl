@@ -7,6 +7,7 @@ struct OutputFlags
     set_null_voltages_to_nodata::Bool
     compress_grids::Bool
     log_transform_maps::Bool
+    set_focal_node_currents_to_zero::Bool
 end
 
 function compute_3col(resistances::Matrix{T}) where {T}
@@ -92,6 +93,14 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
         cum_curr = output.cum.cum_curr
         max_curr = output.cum.max_curr
 
+        # Issue 342: with set_focal_node_currents_to_zero the two focal nodes
+        # being solved carry no current in this pair's map, so the cumulative
+        # map shows only current that flows *through* a focal region when
+        # other pairs are active (Dickson et al. 2013).
+        if flags.outputflags.set_focal_node_currents_to_zero
+            zero_focal_cells!(cmap, nodemap, output.comp_idx)
+        end
+
         # Process the current map
         process_grid!(cmap, cellmap, hbmeta, log_transform = log_transform,
                             set_null_to_nodata = set_null_currents_to_nodata)
@@ -112,6 +121,15 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
 
 		return nothing
    end
+end
+
+# Zero every cell of `cmap` whose local node index is one of `nodes`. Focal
+# regions collapse to a single node, so this clears the whole region.
+function zero_focal_cells!(cmap, nodemap, nodes)
+    @inbounds for k in eachindex(nodemap)
+        nodemap[k] in nodes && (cmap[k] = 0)
+    end
+    cmap
 end
 
 function write_currents(node_curr_arr, branch_curr_arr, name, cfg)

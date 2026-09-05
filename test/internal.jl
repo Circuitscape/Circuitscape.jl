@@ -280,3 +280,55 @@ end
     d = copy(good); d["max_parallel"] = "4"
     @test Circuitscape.CSConfig(d) isa Circuitscape.CSConfig
 end
+
+# Issue 342: set_focal_node_currents_to_zero
+@testset "set_focal_node_currents_to_zero (#342)" begin
+    dir = mktempdir()
+    hdr = "ncols 5\nnrows 5\nxllcorner 0\nyllcorner 0\ncellsize 1\nNODATA_value -9999\n"
+    write(joinpath(dir, "cell.asc"), hdr * join(fill(join(fill("1", 5), " "), 5), "\n") * "\n")
+    # Node 1 is a two-cell region; nodes 2 and 3 are single cells.
+    write(joinpath(dir, "pts.asc"), hdr *
+          "1 1 0 0 2\n0 0 0 0 0\n0 0 0 0 0\n0 0 0 0 0\n3 0 0 0 0\n")
+    focal = [(1,1), (1,2), (1,5), (5,1)]
+    d = Circuitscape.init_config()
+    d["data_type"] = "raster"; d["scenario"] = "pairwise"
+    d["habitat_file"] = joinpath(dir, "cell.asc")
+    d["point_file"] = joinpath(dir, "pts.asc")
+    d["connect_four_neighbors_only"] = "True"
+    d["write_cur_maps"] = "True"
+    read_map(name) = readdlm(joinpath(dir, name), skipstart = 6)
+
+    d["output_file"] = joinpath(dir, "plain.out")
+    r_plain = compute(d)
+    plain_pair = read_map("plain_curmap_1_2.asc")
+    plain_cum = read_map("plain_cum_curmap.asc")
+    @test all(plain_pair[i, j] > 0 for (i, j) in focal[1:3])
+
+    d["set_focal_node_currents_to_zero"] = "True"
+    d["output_file"] = joinpath(dir, "zeroed.out")
+    r_zero = compute(d)
+    zero_pair = read_map("zeroed_curmap_1_2.asc")
+    zero_cum = read_map("zeroed_cum_curmap.asc")
+
+    # Resistances are unaffected; only the maps change
+    @test r_zero ≈ r_plain
+    # The active pair (region 1, node 2) is zeroed; node 3 was not active
+    @test all(zero_pair[i, j] == 0 for (i, j) in focal[1:3])
+    @test zero_pair[5, 1] == plain_pair[5, 1]
+    # Everything else is identical
+    mask = trues(5, 5); for (i, j) in focal[1:3]; mask[i, j] = false; end
+    @test zero_pair[mask] ≈ plain_pair[mask]
+    # Every focal cell is active in some pair, so the cumulative map is
+    # strictly smaller there and identical elsewhere
+    @test all(zero_cum[i, j] < plain_cum[i, j] for (i, j) in focal)
+    mask = trues(5, 5); for (i, j) in focal; mask[i, j] = false; end
+    @test zero_cum[mask] ≈ plain_cum[mask]
+
+    # One-to-all: all focal cells are zeroed in the cumulative map
+    d["scenario"] = "one-to-all"
+    d["output_file"] = joinpath(dir, "ota.out")
+    compute(d)
+    ota_cum = read_map("ota_cum_curmap.asc")
+    @test all(ota_cum[i, j] == 0 for (i, j) in focal)
+    @test any(ota_cum .> 0)
+end

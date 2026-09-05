@@ -229,6 +229,14 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, flags, cfg)::Tuple{Matrix
         end
     end
 
+    # Issue 342: in one-to-all / all-to-one every focal node is active on each
+    # solve (one as source, the rest as grounds), so all of them are zeroed.
+    if is_raster && (is_onetoall || is_alltoone) &&
+            flags.outputflags.set_focal_node_currents_to_zero
+        active = V[n for n in eachindex(sources) if sources[n] != 0 || grounds[n] != 0]
+        zero_focal_cells!(outcurr, nodemap, Set(active))
+    end
+
     if write_c_maps || write_cum_cur_map_only
         if !is_raster
             write_cur_maps(name, voltages, FullGraph(G, cellmap), finitegrounds, flags, cfg)

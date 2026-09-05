@@ -210,7 +210,7 @@ Set `log_transform_maps = True` to apply a log10 transform to current densities 
 
 ### Set Focal Node Currents to Zero
 
-When `set_focal_node_currents_to_zero = True`, focal nodes will have zero current in output maps when they are activated. For pairwise mode, cumulative maps will still show currents flowing through focal regions from other pairs being activated. This helps show the importance of each focal region for connecting others (see Dickson et al. 2013). *Note: not yet implemented in Circuitscape 5.*
+When `set_focal_node_currents_to_zero = True`, focal nodes have zero current in raster current maps when they are activated. For pairwise mode, cumulative maps will still show currents flowing through focal regions from other pairs being activated. This helps show the importance of each focal region for connecting others (see Dickson et al. 2013). In one-to-all and all-to-one modes every focal node is active on each solve, so all focal cells are zeroed. Applies to raster current maps; network node currents are unaffected.
 
 ## Optional Input Files
 
