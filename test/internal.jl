@@ -813,3 +813,35 @@ end
     # of 3*1 = 3 flowing in, which beats the 0.5 flowing out to node 2.
     @test Circuitscape.get_node_currents(L, [1.0, 0.5, 0.0], [-3.0, 0.0, 2.0]) ≈ [3.0, 0.5, 0.5]
 end
+
+# With no map output requested, postprocessing is skipped entirely: no
+# per-pair files in either mode, and resistances identical to a run with maps.
+@testset "postprocess skipped without map outputs" begin
+    dir = mktempdir()
+    hdr = "ncols 5\nnrows 5\nxllcorner 0\nyllcorner 0\ncellsize 1\nNODATA_value -9999\n"
+    write(joinpath(dir, "cell.asc"), hdr * join(fill(join(fill("1", 5), " "), 5), "\n") * "\n")
+    write(joinpath(dir, "pts.asc"), hdr * "1 0 0 0 2\n0 0 0 0 0\n0 0 0 0 0\n0 0 0 0 0\n3 0 0 0 0\n")
+    write(joinpath(dir, "excl.txt"), "mode\texclude\n1\t2\n")   # defeat the resistance shortcut
+    d = Circuitscape.init_config()
+    d["data_type"] = "raster"; d["scenario"] = "pairwise"
+    d["habitat_file"] = joinpath(dir, "cell.asc"); d["point_file"] = joinpath(dir, "pts.asc")
+    d["use_included_pairs"] = "True"; d["included_pairs_file"] = joinpath(dir, "excl.txt")
+    d["output_file"] = joinpath(dir, "maps.out"); d["write_cur_maps"] = "True"
+    r_maps = compute(d)
+    @test any(f -> occursin("_curmap_", f), readdir(dir))
+    d["output_file"] = joinpath(dir, "nomaps.out"); d["write_cur_maps"] = "False"
+    r_none = compute(d)
+    @test r_none == r_maps
+    @test !any(f -> startswith(f, "nomaps") && (occursin("curmap", f) || occursin("voltmap", f)), readdir(dir))
+
+    # Network mode used to write per-pair current files regardless of the flag
+    write(joinpath(dir, "g.txt"), "1\t2\t1.0\n2\t3\t1.0\n3\t4\t1.0\n")
+    write(joinpath(dir, "fp.txt"), "1\n4\n")
+    n = Circuitscape.init_config()
+    n["data_type"] = "network"; n["scenario"] = "pairwise"
+    n["habitat_file"] = joinpath(dir, "g.txt"); n["point_file"] = joinpath(dir, "fp.txt")
+    n["output_file"] = joinpath(dir, "net.out"); n["write_cur_maps"] = "False"
+    rn = compute(n)
+    @test rn[2, 3] ≈ 3.0
+    @test !any(f -> startswith(f, "net") && occursin("currents", f), readdir(dir))
+end

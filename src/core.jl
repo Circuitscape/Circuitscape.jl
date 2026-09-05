@@ -626,6 +626,12 @@ function postprocess(output, component_data, shortcut, cfg)
         return nothing
     end
 
+    # Nothing below produces a result unless some map output was requested;
+    # without this, every pair still computed its node currents and a
+    # full-grid current map only to discard them (~1 GB allocated per pair
+    # at 1M cells, a fifth of the run time).
+    (cfg.write_volt_maps || cfg.write_cur_maps ||
+     cfg.write_cum_cur_map_only || cfg.write_max_cur_maps) || return nothing
 
     name = "_$(orig_pts[1])_$(orig_pts[2])"
 
