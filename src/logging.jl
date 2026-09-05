@@ -1,5 +1,3 @@
-const ui_interface = Ref{Function}((x,y) -> nothing)
-
 struct CSLogger <: AbstractLogger
     console_logger::ConsoleLogger
     file_logger::Union{SimpleLogger, Nothing}
@@ -17,10 +15,6 @@ Logging.catch_exceptions(logger::CSLogger) = false
 function Logging.handle_message(logger::CSLogger, level, message, _module, group, id, filepath, line; kwargs...)
     ts = Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS")
     msg = "$ts : $message"
-
-    # Forward to UI callback
-    ui_level = level >= Logging.Warn ? :warn : :info
-    ui_interface[](msg, ui_level)
 
     # Log to console unless suppressed
     if !logger.suppress_messages || level >= Logging.Warn
