@@ -56,6 +56,6 @@ function _compute(T, V, cfg)
         # advanced, as it always has.
         run_advanced(build_problem(data, cfg), cfg)
     else
-        onetoall_kernel(data, cfg)
+        run_onetoall(data, cfg)
     end
 end

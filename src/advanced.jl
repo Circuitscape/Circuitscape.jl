@@ -1,13 +1,13 @@
+# An advanced-mode problem: the graph Laplacian, its connected components,
+# the source and ground vectors over the nodes (finite grounds separated out
+# for the solver) and where each node lands in the output.
 struct AdvancedProblem{T,V,W,Geom<:Geometry}
     G::SparseMatrixCSC{T,V}
     cc::Vector{Vector{V}}
     geometry::Geom
     sources::Vector{T}
     grounds::Vector{T}
-    source_map::Matrix{T} # Needed for one to all mode
     finitegrounds::Vector{T}
-    check_node::V
-    src::V
     solver::W
 end
 
@@ -94,7 +94,21 @@ function resolve_conflicts(sources::Vector{T},
     sources, grounds, finitegrounds
 end
 
-function advanced_kernel(prob::AdvancedProblem{T,V,S}, cfg)::Tuple{Matrix{T},Matrix{T}} where {T,V,S}
+"""
+    advanced_kernel(prob, cfg; check_node, name, accumulate_currents)
+        -> (voltages, current_map, solver_called)
+
+Solve every connected component that has both a source and a ground, and
+write the voltage and current maps the options ask for, suffixed `name`.
+`voltages` is over all graph nodes (zero in components not solved); the
+current map is the per-cell sum over components for a raster (empty for a
+network), filled when `accumulate_currents`. One-to-all / all-to-one solve
+one focal node at a time and pass it as `check_node` to skip every other
+component.
+"""
+function advanced_kernel(prob::AdvancedProblem{T,V}, cfg;
+                         check_node = V(-1), name = "",
+                         accumulate_currents = cfg.write_cur_maps) where {T,V}
 
     # Data
     G = prob.G
@@ -103,21 +117,16 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, cfg)::Tuple{Matrix{T},Mat
     grounds = prob.grounds
     finitegrounds = prob.finitegrounds
     cc = prob.cc
-    src = prob.src
-    check_node = prob.check_node
-    source_map = prob.source_map # Need it for one to all mode
 
     # Options
-    alltoone = is_alltoone(cfg)
-    onetoall = is_onetoall(cfg)
     write_v_maps = cfg.write_volt_maps
     write_c_maps = cfg.write_cur_maps
     write_cum_cur_map_only = cfg.write_cum_cur_map_only
 
     f_local = Vector{eltype(G)}()
     solver_called = false
-	voltages = zeros(eltype(G), size(G, 1))
-    outvolt = alloc_map(geometry)
+    voltages = zeros(eltype(G), size(G, 1))
+    outvolt = write_v_maps ? alloc_map(geometry) : zeros(0, 0)
     outcurr = alloc_map(geometry)
 
     for c in cc
@@ -140,20 +149,19 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, cfg)::Tuple{Matrix{T},Mat
             f_local = finitegrounds
         end
 
-		voltages[c] .+= multiple_solver(cfg, prob.solver, a_local, s_local, g_local, f_local)
+        voltages[c] .+= multiple_solver(cfg, prob.solver, a_local, s_local, g_local, f_local)
         solver_called = true
 
         local_geometry = restrict(geometry, c)
         write_v_maps && accum_voltages!(outvolt, voltages[c], local_geometry)
-        write_c_maps && accum_currents!(outcurr, a_local, voltages[c], f_local, local_geometry)
+        accumulate_currents && accum_currents!(outcurr, a_local, voltages[c], f_local, local_geometry)
     end
 
-    name = src == 0 ? "" : "_$(V(src))"
     write_v_maps && write_advanced_volt_map(name, voltages, outvolt, geometry, cfg)
 
     # Issue 342: in one-to-all / all-to-one every focal node is active on each
     # solve (one as source, the rest as grounds), so all of them are zeroed.
-    if (onetoall || alltoone) && cfg.set_focal_node_currents_to_zero
+    if (is_onetoall(cfg) || is_alltoone(cfg)) && cfg.set_focal_node_currents_to_zero
         active = V[n for n in eachindex(sources) if sources[n] != 0 || grounds[n] != 0]
         zero_focal_nodes!(outcurr, geometry, Set(active))
     end
@@ -162,46 +170,17 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, cfg)::Tuple{Matrix{T},Mat
         write_advanced_cur_map(name, voltages, outcurr, G, finitegrounds, geometry, cfg)
     end
 
-    advanced_result(voltages, outcurr, solver_called, source_map, geometry, cfg)
+    voltages, outcurr, solver_called
 end
 
-# The value an advanced-mode run returns. A network run returns every node's
-# voltage; a raster run returns the voltage grid, or, in one-to-all /
-# all-to-one, the effective resistance of the focal node solved.
-function advanced_result(voltages::Vector{T}, outcurr, solver_called, source_map,
-                         geometry::NetworkGeometry, cfg) where T
-    v = [geometry.nodes voltages]
-    v, outcurr
-end
+# The value an advanced-mode run returns: every node's voltage for a network,
+# the voltage grid for a raster (`[-1]` when nothing could be solved).
+advanced_result(voltages, solver_called, geometry::NetworkGeometry) =
+    [geometry.nodes voltages]
 
-function advanced_result(voltages::Vector{T}, outcurr, solver_called, source_map,
-                         geometry::RasterGeometry, cfg) where T
-    if !solver_called
-        ret = Matrix{T}(undef,1,1)
-        ret[1] = -1
-        return ret, outcurr
-    end
-
-    if is_onetoall(cfg)
-        volt = _create_voltage_map(voltages, geometry.nodemap, geometry.hbmeta)
-        idx = findall(x->x!=0,source_map)
-        val = volt[idx] ./ source_map[idx]
-        if val[1] ≈ 0
-            ret = Matrix{T}(undef,1,1)
-            ret[1] = -1
-            return ret, outcurr
-        else
-            ret = Matrix{T}(undef,length(val),1)
-            ret[:,1] = val
-            return ret, outcurr
-        end
-    elseif is_alltoone(cfg)
-        ret = Matrix{T}(undef,1,1)
-        ret[1] = 0
-        return ret, outcurr
-    end
-
-    _create_voltage_map(voltages, geometry.nodemap, geometry.hbmeta), outcurr
+function advanced_result(voltages::Vector{T}, solver_called, geometry::RasterGeometry) where T
+    solver_called || return fill(T(-1), 1, 1)
+    _create_voltage_map(voltages, geometry.nodemap, geometry.hbmeta)
 end
 
 # Zero the current of every cell whose node is in `nodes`; a network has no

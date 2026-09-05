@@ -241,48 +241,10 @@ function compute_omniscape_current(
                    compress_grids = false,
                    log_transform_maps = false)
 
-    data = advanced_problem(rasterdata, cfg)
-
-    G = data.G
-    geometry = data.geometry
-    sources = data.sources
-    grounds = data.grounds
-    finitegrounds = data.finitegrounds
-    cc = data.cc
-    check_node = data.check_node
-
-    f_local = Vector{eltype(G)}()
-    voltages = Vector{eltype(G)}()
-    outcurr = alloc_map(geometry)
-
-    for c in cc
-        if check_node != -1 && !(check_node in c)
-            continue
-        end
-
-        a_local = G[c,c]
-        s_local = sources[c]
-        g_local = grounds[c]
-
-        if sum(s_local) == 0 || sum(g_local) == 0
-            continue
-        end
-
-        if finitegrounds != [-9999.]
-            f_local = finitegrounds[c]
-        else
-            f_local = finitegrounds
-        end
-
-        voltages = multiple_solver(cfg,
-                                   data.solver,
-                                   a_local,
-                                   s_local,
-                                   g_local,
-                                   f_local)
-
-        accum_currents!(outcurr, a_local, voltages, f_local, restrict(geometry, c))
-    end
+    # The kernel accumulates the current map for us even though no map is
+    # written; that map is Omniscape's result.
+    prob = advanced_problem(rasterdata, cfg)
+    _, outcurr, _ = advanced_kernel(prob, cfg; accumulate_currents = true)
 
     return outcurr
 end

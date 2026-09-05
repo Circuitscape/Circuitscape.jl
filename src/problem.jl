@@ -33,9 +33,7 @@ function advanced_problem(data::Data, cfg)
     G, cc, geometry = @timeit CSTIMER[] "construct graph" build_graph(data, cfg)
     sources, grounds, finitegrounds =
         sources_and_grounds(geometry, data.source_map, data.ground_map, G, cfg)
-    V = eltype(rowvals(G))
-    AdvancedProblem(G, cc, geometry, sources, grounds, data.source_map,
-                    finitegrounds, V(-1), V(0), get_solver(cfg))
+    AdvancedProblem(G, cc, geometry, sources, grounds, finitegrounds, get_solver(cfg))
 end
 
 """
@@ -62,6 +60,6 @@ end
 Advanced mode: one solve with the user's sources and grounds.
 """
 function run_advanced(prob::AdvancedProblem{T}, cfg)::Matrix{T} where T
-    v, _ = advanced_kernel(prob, cfg)
-    v
+    voltages, _, solver_called = advanced_kernel(prob, cfg)
+    advanced_result(voltages, solver_called, prob.geometry)
 end
