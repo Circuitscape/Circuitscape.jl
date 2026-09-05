@@ -3,14 +3,11 @@ function raster_one_to_all(T, V, cfg)::Matrix{T}
     # Load the data
     rasterdata = load_raster_data(T, V, cfg)
 
-    # Get flags
-    flags = get_raster_flags(cfg)
-
     # Send to main kernel
-    onetoall_kernel(rasterdata, flags, cfg)
+    onetoall_kernel(rasterdata, cfg)
 end
 
-function onetoall_kernel(data::RasterData{T,V}, flags, cfg)::Matrix{T} where {T,V}
+function onetoall_kernel(data::RasterData{T,V}, cfg)::Matrix{T} where {T,V}
 
     # Data
     strengths = data.strengths
@@ -21,13 +18,13 @@ function onetoall_kernel(data::RasterData{T,V}, flags, cfg)::Matrix{T} where {T,
     hbmeta = data.hbmeta
     source_map = data.source_map
 
-    # Flags
+    # Options
     use_variable_strengths = !isempty(strengths)
     use_included_pairs = !isempty(included_pairs)
     mode = included_pairs.mode == :include ? 0 : 1
-    one_to_all = flags.is_onetoall
-    avg_res = flags.avg_res
-    four_neighbors = flags.four_neighbors
+    one_to_all = is_onetoall(cfg)
+    avg_res = cfg.connect_using_avg_resistances
+    four_neighbors = cfg.connect_four_neighbors_only
 
     if use_included_pairs
         prune_points!(points_rc, included_pairs.point_ids)
@@ -58,7 +55,7 @@ function onetoall_kernel(data::RasterData{T,V}, flags, cfg)::Matrix{T} where {T,
     # ground_map = Matrix{eltype(a)}(0, 0)
     s = zeros(eltype(a), size(point_map))
     z = deepcopy(s)
-    cum = initialize_cum_maps(gmap, flags.outputflags.write_max_cur_maps)
+    cum = initialize_cum_maps(gmap, cfg.write_max_cur_maps)
 
     point_ids = included_pairs.point_ids
     res = zeros(eltype(a), size(points_unique, 1))
@@ -126,7 +123,7 @@ function onetoall_kernel(data::RasterData{T,V}, flags, cfg)::Matrix{T} where {T,
         policy = one_to_all ? :rmvgnd : :rmvsrc
         sources, grounds, finite_grounds =
                     _get_sources_and_grounds(source_map, ground_map,
-                            flags, G, nodemap, policy)
+                            cfg, G, nodemap, policy)
 
 
         solver = get_solver(cfg)
@@ -136,11 +133,7 @@ function onetoall_kernel(data::RasterData{T,V}, flags, cfg)::Matrix{T} where {T,
                         check_node, n, gmap, solver)
 
 
-        if one_to_all
-            v, curr = advanced_kernel(advanced_data, flags, cfg)
-        else
-            v, curr = advanced_kernel(advanced_data, flags, cfg)
-        end
+        v, curr = advanced_kernel(advanced_data, cfg)
         res[i] = v[1]
 
         return curr
@@ -158,13 +151,11 @@ function onetoall_kernel(data::RasterData{T,V}, flags, cfg)::Matrix{T} where {T,
     for curr in results
         curr === nothing && continue
         cum.cum_curr .+= curr
-        flags.outputflags.write_max_cur_maps && (cum.max_curr .= max.(cum.max_curr, curr))
+        cfg.write_max_cur_maps && (cum.max_curr .= max.(cum.max_curr, curr))
     end
 
-    if flags.outputflags.write_cur_maps || flags.outputflags.write_cum_cur_map_only
-        write_cum_maps(cum, gmap, cfg, hbmeta,
-                       flags.outputflags.write_max_cur_maps,
-                       flags.outputflags.write_cum_cur_map_only)
+    if cfg.write_cur_maps || cfg.write_cum_cur_map_only
+        write_cum_maps(cum, gmap, cfg, hbmeta)
     end
 
     hcat(points_unique, res)

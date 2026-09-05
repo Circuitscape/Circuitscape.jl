@@ -42,6 +42,11 @@ struct Output{T,V}
     cum::Cumulative{T}
 end
 
+# The pairwise kernel hands `write_cur_maps` / `write_volt_maps` an `Output`
+# per pair; the advanced kernel hands them the voltage vector itself.
+_voltages(output::Output) = output.voltages
+_voltages(voltages::AbstractVector) = voltages
+
 struct Shortcut{T}
     get_shortcut_resistances::Bool
     voltmatrix::Matrix{T}
@@ -70,8 +75,8 @@ Core kernel of Circuitscape - used to solve several pairs
 Input:
 * data::GraphProblem
 """
-function single_ground_all_pairs(prob::GraphProblem{T,V,W}, flags, cfg, log = true) where {T,V,W}
-    solve(prob, prob.solver, flags, cfg, log)
+function single_ground_all_pairs(prob::GraphProblem{T,V,W}, cfg, log = true) where {T,V,W}
+    solve(prob, prob.solver, cfg, log)
 end
 
 function get_solver(cfg)
@@ -145,14 +150,14 @@ function pair_jobs(csub::Vector{V}, comp, points, orig_pts, exclude, first_sourc
 end
 
 """
-    solve(prob, solver, flags, cfg, log)
+    solve(prob, solver, cfg, log)
 
 Pairwise driver shared by every solver. Enumerates the pairs per connected
 component, hands them to `solve_pairs!` for the solver-specific linear
 algebra, and stores resistances / postprocesses maps in `handle_pair`. Only
 `prepare!` and `solve_pairs!` differ between the iterative and direct paths.
 """
-function solve(prob::GraphProblem{T,V}, solver::Solver, flags, cfg, log)::Matrix{T} where {T,V}
+function solve(prob::GraphProblem{T,V}, solver::Solver, cfg, log)::Matrix{T} where {T,V}
 
     # Data
     a = prob.G
@@ -166,12 +171,11 @@ function solve(prob::GraphProblem{T,V}, solver::Solver, flags, cfg, log)::Matrix
     cellmap = prob.cellmap
     cum = prob.cum
 
-    # Flags
-    outputflags = flags.outputflags
-    write_volt_maps = outputflags.write_volt_maps
-    write_cur_maps = outputflags.write_cur_maps
-    write_cum_cur_map_only = outputflags.write_cum_cur_map_only
-    write_max_cur_maps = outputflags.write_max_cur_maps
+    # Output options
+    write_volt_maps = cfg.write_volt_maps
+    write_cur_maps = cfg.write_cur_maps
+    write_cum_cur_map_only = cfg.write_cum_cur_map_only
+    write_max_cur_maps = cfg.write_max_cur_maps
 
     numpoints = size(points, 1)
 
@@ -189,7 +193,7 @@ function solve(prob::GraphProblem{T,V}, solver::Solver, flags, cfg, log)::Matrix
     comps = getindex.([a], cc, cc)
 
     get_shortcut_resistances = false
-    if flags.is_raster && !write_volt_maps && !write_cur_maps &&
+    if is_raster(cfg) && !write_volt_maps && !write_cur_maps &&
             !write_cum_cur_map_only && !write_max_cur_maps &&
             isempty(exclude)
         get_shortcut_resistances = true
@@ -237,7 +241,7 @@ function solve(prob::GraphProblem{T,V}, solver::Solver, flags, cfg, log)::Matrix
                 resistances[c_j, c_i] = resistance
                 output = Output(points, voltages, (orig_pts[c_i], orig_pts[c_j]),
                                 (job.comp_i, job.comp_j), resistance, V(c_j), cum)
-                postprocess(output, component_data, flags, shortcut, cfg)
+                postprocess(output, component_data, shortcut, cfg)
             end
         end
 
@@ -574,7 +578,7 @@ function solve_linear_system(factor::SuiteSparse.CHOLMOD.Factor, matrix, rhs; to
     refine_columns!(factor \ rhs, factor, matrix, rhs, tol, "CHOLMOD")
 end
 
-function postprocess(output, component_data, flags, shortcut, cfg)
+function postprocess(output, component_data, shortcut, cfg)
 
 
     voltages = output.voltages
@@ -594,13 +598,13 @@ function postprocess(output, component_data, flags, shortcut, cfg)
 
     name = "_$(orig_pts[1])_$(orig_pts[2])"
 
-    if flags.outputflags.write_volt_maps
-        write_volt_maps(name, output, component_data, flags, cfg)
+    if cfg.write_volt_maps
+        write_volt_maps(name, output, component_data, cfg)
     end
 
     # TODO: Even though this function is called write_cur_maps
-    # actually writing the calculated maps depends on some flags.
-    write_cur_maps(name, output, component_data, [-9999.], flags, cfg)
+    # actually writing the calculated maps depends on some options.
+    write_cur_maps(name, output, component_data, [-9999.], cfg)
     nothing
 end
 
