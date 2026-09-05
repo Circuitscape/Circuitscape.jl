@@ -503,3 +503,14 @@ end
 
     @test_throws ArgumentError Circuitscape.connected_components(SparseArrays.sprand(3, 4, 0.5))
 end
+
+# The INI builder is an extension on the REPL stdlib
+@testset "INI builder extension" begin
+    # start() loads REPL itself, so a script need not; afterwards the
+    # extension is active and the zero-argument method exists
+    ext = Circuitscape.load_repl_extension()
+    @test ext !== nothing
+    @test Base.get_extension(Circuitscape, :CircuitscapeREPLExt) === ext
+    @test hasmethod(Circuitscape.start, Tuple{})
+    @test_throws MethodError Circuitscape.start(1)
+end
