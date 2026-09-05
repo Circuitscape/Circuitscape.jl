@@ -46,6 +46,15 @@ awkward component does not abort a long run. The retry is logged as a warning;
 if you see many of them, the grid probably has extreme resistance contrasts
 worth examining.
 
+Single precision (`precision = single`) halves memory at a cost in accuracy
+that depends on the problem: on the largest raster in the test suite,
+effective resistances differ from the double precision run by about 1%, and
+the gap will be larger on bigger grids or with stronger resistance contrasts.
+The difference does not change when `residual_tolerance` is tightened, so it
+is a property of the Float32 arithmetic rather than of solver convergence;
+verify against a double precision run before relying on single precision
+results.
+
 ## Default Solvers: CG+AMG and CHOLMOD
 
 Circuitscape ships with two solvers that work out of the box with no additional

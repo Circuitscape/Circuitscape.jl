@@ -3,7 +3,7 @@ module CircuitscapePardisoExt
 using Pardiso
 using SparseArrays
 using LinearAlgebra
-import Circuitscape: PardisoSolver, construct_cholesky_factor, solve_linear_system
+import Circuitscape: PardisoSolver, construct_cholesky_factor, solve_linear_system, refine_columns!
 
 mutable struct PardisoFactorize
     const ps::Pardiso.MKLPardisoSolver
@@ -31,17 +31,28 @@ end
 construct_cholesky_factor(matrix, ::PardisoSolver) =
     PardisoFactorize()
 
+# Lets refine_columns! use `\` on the Pardiso handle for a fixed matrix.
+struct PardisoOp
+    p::PardisoFactorize
+    A::SparseMatrixCSC
+end
+function Base.:\(o::PardisoOp, r::AbstractVector)
+    x = zeros(eltype(r), length(r))
+    o.p(x, o.A, Vector(r))
+    x
+end
+
 function solve_linear_system(factor::PardisoFactorize, matrix, rhs; tol = 1e-4)
-    lhs = similar(rhs)
     mat = sparse(10eps(eltype(matrix)) * I, size(matrix)...) + matrix
-    x = zeros(eltype(matrix), size(matrix, 1))
+    op = PardisoOp(factor, mat)
+    lhs = similar(rhs)
     for i = 1:size(lhs, 2)
-        factor(x, mat, rhs[:, i])
-        residual = norm(mat * x .- rhs[:, i]) / norm(rhs[:, i])
-        residual < tol || error("Pardiso solver residual $residual exceeds tolerance $tol for column $i")
-        lhs[:, i] .= x
+        lhs[:, i] .= op \ rhs[:, i]
     end
-    lhs
+    # Pardiso already runs SOLVE_ITERATIVE_REFINE; this is the same
+    # residual-driven refinement the CHOLMOD and Accelerate backends apply,
+    # so all three direct solvers are held to the same standard.
+    refine_columns!(lhs, op, mat, rhs, tol, "Pardiso")
 end
 
 end # module CircuitscapePardisoExt
