@@ -1,5 +1,6 @@
 import Circuitscape: construct_node_map, compute_omniscape_current
 using Circuitscape
+import LinearAlgebra
 
 # Omniscape moving window solve test 
 # just checking syntax, other tests should be sufficient to ensure correctness.
@@ -331,4 +332,29 @@ end
     ota_cum = read_map("ota_cum_curmap.asc")
     @test all(ota_cum[i, j] == 0 for (i, j) in focal)
     @test any(ota_cum .> 0)
+end
+
+# Issue 470: the residual gate is configurable, and an unreachable tolerance
+# fails with the retry history rather than a bare threshold.
+@testset "Residual tolerance (#470)" begin
+    d = Circuitscape.init_config(); d["scenario"] = "pairwise"
+    cfg = Circuitscape.CSConfig(d)
+    @test cfg.residual_tolerance == 0.0
+    @test Circuitscape.residual_tolerance(cfg, Float64) == 1e-4
+    @test Circuitscape.residual_tolerance(cfg, Float32) == 1e-3
+    d["residual_tolerance"] = "1e-6"
+    cfg = Circuitscape.CSConfig(d)
+    @test Circuitscape.residual_tolerance(cfg, Float64) == 1e-6
+    @test Circuitscape.residual_tolerance(cfg, Float32) == 1e-6
+    @test Dict{String,String}(cfg)["residual_tolerance"] == "1.0e-6"
+
+    G = model_problem(4)
+    G.nzval .+= eps(Float64) * LinearAlgebra.norm(G.nzval)
+    M = Circuitscape.aspreconditioner(Circuitscape.smoothed_aggregation(G))
+    b = zeros(16); b[1] = -1; b[16] = 1
+    v = Circuitscape.solve_linear_system(G, b, M)
+    @test LinearAlgebra.norm(G * v .- b) / LinearAlgebra.norm(b) < 1e-4
+    err = try Circuitscape.solve_linear_system(G, b, M; tol = 0.0); nothing catch e; e end
+    @test err isa ErrorException
+    @test occursin("after 3 attempts", err.msg)
 end

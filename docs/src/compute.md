@@ -33,6 +33,19 @@ The `cholmod`, `accelerate`, and `pardiso` solvers perform batched direct solves
 Threading in these modes parallelizes the postprocessing step (current map
 accumulation and output writing).
 
+## Convergence Checks
+
+Every linear solve, whichever solver produced it, is accepted only if its true
+relative residual `‖Gv − b‖ / ‖b‖` is below `residual_tolerance` (by default
+`1e-4` in double precision and `1e-3` in single). For `cg+amg` there is a subtlety: Krylov's stopping test is on the
+*preconditioned* residual, and when the multigrid preconditioner is a poor fit
+for a particular component the two norms can disagree — CG reports success
+while the true residual is still too large. Circuitscape then tightens the
+Krylov tolerance and retries (up to three attempts) before failing, so a single
+awkward component does not abort a long run. The retry is logged as a warning;
+if you see many of them, the grid probably has extreme resistance contrasts
+worth examining.
+
 ## Default Solvers: CG+AMG and CHOLMOD
 
 Circuitscape ships with two solvers that work out of the box with no additional

@@ -27,6 +27,7 @@ Base.@kwdef struct CSConfig
     precision::Precision = pr_double
     use_64bit_indexing::Bool = true
     cholmod_batch_size::Int = 1000
+    residual_tolerance::Float64 = 0.0   # 0 = automatic: 1e-4 double, 1e-3 single
     low_memory_mode::Bool = false
     preemptive_memory_release::Bool = false
     use_variable_source_strengths::Bool = false
@@ -93,6 +94,9 @@ function _parse_precision(s)
     s in DOUBLE ? pr_double : _bad_value("precision", s, ["single", "double"])
 end
 
+_parse_tolerance(s) = s in ("auto", "Auto", "AUTO", "None", "") ? 0.0 : parse(Float64, s)
+_tolerance_str(v) = v > 0 ? string(v) : "auto"
+
 function _parse_log_level(s)
     # Circuitscape 4 accepted Python's level names; keep reading them.
     l = lowercase(s)
@@ -139,6 +143,7 @@ function CSConfig(dict::Dict{String,String})
         precision = _parse_precision(get(dict, "precision", "Double")),
         use_64bit_indexing = _parse_bool(dict, "use_64bit_indexing", "true"),
         cholmod_batch_size = parse(Int, get(dict, "cholmod_batch_size", "1000")),
+        residual_tolerance = _parse_tolerance(get(dict, "residual_tolerance", "auto")),
         low_memory_mode = _parse_bool(dict, "low_memory_mode"),
         preemptive_memory_release = _parse_bool(dict, "preemptive_memory_release"),
         use_variable_source_strengths = _parse_bool(dict, "use_variable_source_strengths"),
@@ -286,6 +291,7 @@ function Base.Dict{String,String}(cfg::CSConfig)
     a["precision"] = _precision_str(cfg.precision)
     a["use_64bit_indexing"] = _bool_str(cfg.use_64bit_indexing)
     a["cholmod_batch_size"] = string(cfg.cholmod_batch_size)
+    a["residual_tolerance"] = _tolerance_str(cfg.residual_tolerance)
     a["low_memory_mode"] = _bool_str(cfg.low_memory_mode)
     a["preemptive_memory_release"] = _bool_str(cfg.preemptive_memory_release)
     a["use_variable_source_strengths"] = _bool_str(cfg.use_variable_source_strengths)
@@ -380,6 +386,7 @@ function init_config()
     a["log_file"] = "None"
     a["log_level"] = "INFO"
     a["cholmod_batch_size"] = "1000"
+    a["residual_tolerance"] = "auto"
     a["use_64bit_indexing"] = "true"
     a["write_as_tif"] = "false"
     a["suppress_messages"] = "false"
@@ -437,6 +444,7 @@ function write_config(cfg::CSConfig)
 
         [Calculation options]
         solver = $(_solver_str(cfg.solver))
+        residual_tolerance = $(_tolerance_str(cfg.residual_tolerance))
 
         [Output options]
         write_cum_cur_map_only = $(cfg.write_cum_cur_map_only)

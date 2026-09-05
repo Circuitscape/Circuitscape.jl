@@ -12,11 +12,11 @@ function construct_cholesky_factor(matrix, ::AccelerateSolver)
     factor
 end
 
-function solve_linear_system(factor::AppleAccelerate.AAFactorization, matrix, rhs)
+function solve_linear_system(factor::AppleAccelerate.AAFactorization, matrix, rhs; tol = 1e-4)
     lhs = factor \ rhs
     for col = 1:size(rhs, 2)
         residual = norm(matrix * lhs[:, col] .- rhs[:, col]) / norm(rhs[:, col])
-        residual < 1e-4 || error("Apple Accelerate solver residual $residual exceeds tolerance 1e-4 for column $col")
+        residual < tol || error("Apple Accelerate solver residual $residual exceeds tolerance $tol for column $col")
     end
     lhs
 end

@@ -31,14 +31,14 @@ end
 construct_cholesky_factor(matrix, ::PardisoSolver) =
     PardisoFactorize()
 
-function solve_linear_system(factor::PardisoFactorize, matrix, rhs)
+function solve_linear_system(factor::PardisoFactorize, matrix, rhs; tol = 1e-4)
     lhs = similar(rhs)
     mat = sparse(10eps(eltype(matrix)) * I, size(matrix)...) + matrix
     x = zeros(eltype(matrix), size(matrix, 1))
     for i = 1:size(lhs, 2)
         factor(x, mat, rhs[:, i])
         residual = norm(mat * x .- rhs[:, i]) / norm(rhs[:, i])
-        residual < 1e-4 || error("Pardiso solver residual $residual exceeds tolerance 1e-4 for column $i")
+        residual < tol || error("Pardiso solver residual $residual exceeds tolerance $tol for column $i")
         lhs[:, i] .= x
     end
     lhs

@@ -234,7 +234,7 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
                 current[comp_j] = 1
 
                 log && haskey(pair_numbers, (src_node, dst_node)) && @debug("Solving pair $(pair_numbers[(src_node, dst_node)]) of $num_pairs")
-                voltages = @timeit local_timer "solve linear system" solve_linear_system(matrix, current, local_P)
+                voltages = @timeit local_timer "solve linear system" solve_linear_system(matrix, current, local_P; tol = residual_tolerance(cfg, T))
 
                 voltages .= voltages .- voltages[comp_i]
                 resistance = voltages[comp_j] - voltages[comp_i]
@@ -471,7 +471,7 @@ function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, PardisoSolv
                 rhs[node.cc_idx[2], col] = 1
             end
 
-            lhs = solve_linear_system(factor, matrix, rhs)
+            lhs = solve_linear_system(factor, matrix, rhs; tol = residual_tolerance(cfg, T))
 
             # Normalisation step
             for (col, batch_pos) in enumerate(batch_range)
@@ -644,21 +644,57 @@ function sum_off_diag(G, i)
      sum
  end
 
+"""
+    residual_tolerance(cfg, T)
+
+Largest acceptable true relative residual `‖Gv − b‖ / ‖b‖` for a solve in
+precision `T`. `cfg.residual_tolerance` when the user set one; otherwise
+`1e-4` in double and `1e-3` in single, since Float32 round-off puts `1e-4`
+at the edge of what CG can reach (the fixed `1e-4` gate broke every single
+precision run).
+"""
+residual_tolerance(cfg, ::Type{T}) where {T} =
+    cfg.residual_tolerance > 0 ? cfg.residual_tolerance :
+    T === Float32 ? TOL_SINGLE : TOL_DOUBLE
+
+"""
+    solve_linear_system(G, curr, M; tol)
+
+Preconditioned CG. Krylov's stopping test is on the *preconditioned* residual
+`sqrt(r' M⁻¹ r)`, while the result is accepted on the true 2-norm relative
+residual. When the AMG preconditioner is a poor fit for a component the two
+diverge: CG reports success in its own norm while the true residual is still
+above `tol` (issue #470). Rather than abort a multi-hour job on one such
+solve, tighten the stopping tolerances and retry; solves that pass first time
+are unaffected.
+"""
 function solve_linear_system(
             G::SparseMatrixCSC{T,V},
-            curr::Vector{T}, M)::Vector{T} where {T,V}
-    v, stats = Krylov.cg(G, curr, M=M, ldiv=true, rtol=T(1e-6), itmax=100_000)
-    residual = norm(G*v .- curr) / norm(curr)
-    residual < 1e-4 || error("CG solver did not converge: relative residual $residual exceeds tolerance 1e-4")
-    v
+            curr::Vector{T}, M; tol = TOL_DOUBLE)::Vector{T} where {T,V}
+    # Krylov's own default for atol; in Float32 it is ~3e-4 and is what
+    # actually stops CG, so it has to be tightened along with rtol.
+    atol = sqrt(eps(T))
+    rtol = T === Float32 ? T(1e-5) : T(1e-6)
+    local v, stats, residual
+    for attempt in 1:3
+        v, stats = Krylov.cg(G, curr, M=M, ldiv=true, atol=atol, rtol=rtol, itmax=100_000)
+        residual = norm(G*v .- curr) / norm(curr)
+        residual < tol && return v
+        attempt < 3 && @warn("CG stopped after $(stats.niter) iterations ($(stats.status)) " *
+                             "but the relative residual $residual exceeds $tol; " *
+                             "retrying with rtol = $(rtol / 100)")
+        atol /= 100
+        rtol /= 100
+    end
+    error("CG solver did not converge: relative residual $residual exceeds tolerance $tol " *
+          "after 3 attempts (last rtol = $(rtol * 100), $(stats.niter) iterations, $(stats.status))")
 end
 
-
-function solve_linear_system(factor::SuiteSparse.CHOLMOD.Factor, matrix, rhs)
+function solve_linear_system(factor::SuiteSparse.CHOLMOD.Factor, matrix, rhs; tol = TOL_DOUBLE)
     lhs = factor \ rhs
     for col = 1:size(rhs, 2)
         residual = norm(matrix*lhs[:,col] .- rhs[:,col]) / norm(rhs[:,col])
-        residual < 1e-4 || error("CHOLMOD solver residual $residual exceeds tolerance 1e-4 for column $col")
+        residual < tol || error("CHOLMOD solver residual $residual exceeds tolerance $tol for column $col")
     end
     lhs
 end
