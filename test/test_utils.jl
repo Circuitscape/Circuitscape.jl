@@ -1,4 +1,5 @@
 using Circuitscape
+using Circuitscape: compute
 using Test
 using DelimitedFiles
 

@@ -1,7 +1,8 @@
 # Issue 341: included pairs file should restrict which pairs are solved
 # https://github.com/Circuitscape/Circuitscape.jl/issues/341
 
-using Circuitscape, Test, DelimitedFiles
+using Circuitscape
+using Circuitscape: compute, Test, DelimitedFiles
 
 # Test 1: Simple synthetic - 3 focal points, include only pair (1,2)
 let

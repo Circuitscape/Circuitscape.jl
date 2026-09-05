@@ -1,7 +1,3 @@
-export  accumulate_current_maps,
-        calculate_cum_current_map,
-        calculate_max_current_map
-
 const IO_LOCK = ReentrantLock()
 
 """
