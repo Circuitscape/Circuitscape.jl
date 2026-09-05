@@ -616,3 +616,59 @@ output_file = $(joinpath(dir, "out.out"))
     @test r[2, 3] ≈ 5.0
 end
 
+
+# Test 13: one-to-all with focal regions and an include file. Only the focal
+# points active for a given solve may be collapsed into a single node, so the
+# polymap, nodemap, graph and Laplacian have to be rebuilt per focal point from
+# the pruned point map (single-cell focal points never change the topology and
+# share one graph). The nodemap used to be built from the raw polygon file and
+# the Laplacian was never rebuilt, so node numbering and G disagreed and the
+# wrong cells were grounded.
+let
+    function onetoall_regions(pts, inc)
+        dir = mktempdir()
+        write(joinpath(dir, "cell.asc"),
+              _asc_hdr_341(6) * join(fill(join(fill("1", 6), " "), 6), "\n") * "\n")
+        write(joinpath(dir, "pts.asc"), _asc_hdr_341(6) * pts)
+        inc === nothing || write(joinpath(dir, "include.txt"), inc)
+        ini = joinpath(dir, "job.ini")
+        write(ini, """[Circuitscape mode]
+data_type = raster
+scenario = one-to-all
+[Habitat raster or graph]
+habitat_file = $(joinpath(dir, "cell.asc"))
+habitat_map_is_resistances = True
+[Options for pairwise and one-to-all and all-to-one modes]
+point_file = $(joinpath(dir, "pts.asc"))
+use_included_pairs = $(inc === nothing ? "False" : "True")
+included_pairs_file = $(joinpath(dir, "include.txt"))
+output_file = $(joinpath(dir, "out.out"))
+""" * _INI_TAIL_341)
+        compute(ini)
+    end
+    # Three two-cell focal regions.
+    pts123 = "1 1 0 0 2 2\n0 0 0 0 0 0\n0 0 0 0 0 0\n0 0 0 0 0 0\n0 0 0 0 0 0\n3 3 0 0 0 0\n"
+    pts12  = "1 1 0 0 2 2\n0 0 0 0 0 0\n0 0 0 0 0 0\n0 0 0 0 0 0\n0 0 0 0 0 0\n0 0 0 0 0 0\n"
+    pts13  = "1 1 0 0 0 0\n0 0 0 0 0 0\n0 0 0 0 0 0\n0 0 0 0 0 0\n0 0 0 0 0 0\n3 3 0 0 0 0\n"
+
+    r_all = onetoall_regions(pts123, nothing)
+    @test size(r_all) == (3, 2)
+    @test all(r_all[:, 2] .> 0)
+
+    # Including every pair must reproduce the no-include-file result.
+    r_inc_all = onetoall_regions(pts123, "mode\tinclude\n1\t2\n1\t3\n2\t3\n")
+    @test r_inc_all ≈ r_all
+
+    # With only (1,2) and (1,3) included, region 3 is inactive while point 2 is
+    # solved (and region 2 while point 3 is solved), so each must match the
+    # raster that simply lacks the inactive region. Point 1 still sees both.
+    r_inc = onetoall_regions(pts123, "mode\tinclude\n1\t2\n1\t3\n")
+    r12 = onetoall_regions(pts12, nothing)
+    r13 = onetoall_regions(pts13, nothing)
+    @test r_inc[:, 1] == [1.0, 2.0, 3.0]
+    @test r_inc[1, 2] ≈ r_all[1, 2]
+    @test r_inc[2, 2] ≈ r12[2, 2]
+    @test r_inc[3, 2] ≈ r13[2, 2]
+    # Removing a region changes the answer, so this is not vacuous.
+    @test !(r_inc[2, 2] ≈ r_all[2, 2])
+end
