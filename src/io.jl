@@ -256,14 +256,12 @@ function read_point_map(V, file, habitatmeta)
         (i,j,v) =  (getindex.(_I, 1), getindex.(_I, 2), _points_rc[_I])
     end
 
+    # Drop negative focal-node values. Delete all indices in one call: deleting
+    # them one at a time from a precomputed list shifts every later index.
     ind = findall(x -> x < 0, v)
-
-    # Get rid of negative resistances
-    for index in ind
-        deleteat!(i, index)
-        deleteat!(j, index)
-        deleteat!(v, index)
-    end
+    deleteat!(i, ind)
+    deleteat!(j, ind)
+    deleteat!(v, ind)
 
     # Sort them
     idx = sortperm(v)
