@@ -98,23 +98,16 @@ function _pt_file_polygons_path(rasterdata::RasterData{T,V},
     pts = unique(points_rc[3])
     resistances = -1 * ones(length(pts), length(pts))
 
-    n = calc_num_pairs(pts)
+    pairs = pairs_to_solve(pts, exclude_pairs)
+    n = length(pairs)
     @info("Total number of pair solves = $n")
 
-    k = 1
-    for i = 1:size(pts, 1)
-        pt1 = pts[i]
-        for j = i+1:size(pts, 1)
-            pt2 = pts[j]
-            @info("Solving pair $k of $n")
-            k += 1
-			if (pt1,pt2) in exclude_pairs || (pt2, pt1) in exclude_pairs 
-				continue
-			end
-            graphdata = compute_graph_data_polygons(rasterdata, flags, pt1, pt2, cum, cfg)
-            pairwise_resistance = single_ground_all_pairs(graphdata, flags, cfg, false)
-            resistances[i,j] = resistances[j,i] = pairwise_resistance[2,3]
-        end
+    for (k, (i, j)) in enumerate(pairs)
+        pt1, pt2 = pts[i], pts[j]
+        @info("Solving pair $k of $n")
+        graphdata = compute_graph_data_polygons(rasterdata, flags, pt1, pt2, cum, cfg)
+        pairwise_resistance = single_ground_all_pairs(graphdata, flags, cfg, false)
+        resistances[i,j] = resistances[j,i] = pairwise_resistance[2,3]
     end
     for i = 1:size(pts, 1)
         resistances[i,i] = 0
@@ -134,14 +127,18 @@ function _pt_file_polygons_path(rasterdata::RasterData{T,V},
     r
 end
 
-function calc_num_pairs(pts)
-    n = 0
-    for i = 1:size(pts, 1)
-        for j = i+1:size(pts, 1)
-            n += 1
-        end
-    end
-    n
+"""
+    pairs_to_solve(pts, exclude_pairs)
+
+Index pairs `(i, j)` with `i < j` into `pts` whose node IDs are not listed in
+`exclude_pairs` (in either order). This is exactly the set of pairs the
+polygon path solves, so counting it keeps the reported number of pair solves
+consistent with the include/exclude file (issue #341).
+"""
+function pairs_to_solve(pts, exclude_pairs)
+    excluded = Set(exclude_pairs)
+    [(i, j) for i in 1:length(pts) for j in i+1:length(pts)
+        if (pts[i], pts[j]) ∉ excluded && (pts[j], pts[i]) ∉ excluded]
 end
 
 

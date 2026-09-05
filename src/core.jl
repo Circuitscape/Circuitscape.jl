@@ -139,9 +139,9 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
             !write_cum_cur_map_only && !write_max_cur_maps &&
             isempty(exclude)
         get_shortcut_resistances = true
-        @info("Triggering resistance calculation shortcut")
+        log && @info("Triggering resistance calculation shortcut")
         num_pairs, pair_numbers = get_num_pairs_shortcut(cc, points, exclude, orig_pts)
-        @info("Total number of pair solves has been reduced to $num_pairs ")
+        log && @info("Total number of pair solves has been reduced to $num_pairs")
     end
     shortcut = Shortcut(get_shortcut_resistances, voltmatrix, shortcut_res)
 
