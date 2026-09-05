@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   test-with-accelerate:
-    name: Julia ${{ matrix.version }} - ${{ matrix.os }} - Accelerate - ${{ github.event_name }}
+    name: Julia ${{ matrix.version }} - ${{ matrix.os }} - CG+AMG, CHOLMOD, Accelerate - ${{ github.event_name }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -41,7 +41,7 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
 
   test-with-pardiso:
-    name: Julia ${{ matrix.version }} - ${{ matrix.os }} - Pardiso - ${{ github.event_name }}
+    name: Julia ${{ matrix.version }} - ${{ matrix.os }} - CG+AMG, CHOLMOD, Pardiso - ${{ github.event_name }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
