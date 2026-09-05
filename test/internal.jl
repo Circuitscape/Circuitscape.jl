@@ -176,6 +176,111 @@ let
 
 end
 
+# construct_graph must return exactly the matrix the original push!/`a + a'`
+# implementation did (same sparsity pattern, same values). The old version is
+# kept here as the reference.
+let
+    function construct_graph_ref(gmap, nodemap::Matrix{S}, avg_res, four_neighbors) where S
+        f1 = avg_res ? Circuitscape.res_avg : Circuitscape.cond_avg
+        f2 = avg_res ? Circuitscape.weirder_avg : Circuitscape.weird_avg
+        I = Vector{S}()
+        J = Vector{S}()
+        V = Vector{eltype(gmap)}()
+        for j = 1:size(gmap, 2)
+            for i = 1:size(gmap, 1)
+                if nodemap[i,j] == 0
+                    continue
+                else
+                    if j != size(gmap, 2) && nodemap[i,j+1] != 0
+                        push!(I, nodemap[i,j]); push!(J, nodemap[i,j+1])
+                        push!(V, f1(gmap[i,j], gmap[i,j+1]))
+                    end
+                    if i != size(gmap, 1) && nodemap[i+1, j] != 0
+                        push!(I, nodemap[i,j]); push!(J, nodemap[i+1,j])
+                        push!(V, f1(gmap[i,j], gmap[i+1,j]))
+                    end
+                    if !four_neighbors
+                        if i != size(gmap, 1) && j != size(gmap, 2) && nodemap[i+1, j+1] != 0
+                            push!(I, nodemap[i,j]); push!(J, nodemap[i+1,j+1])
+                            push!(V, f2(gmap[i,j], gmap[i+1,j+1]))
+                        end
+                        if i != 1 && j != size(gmap, 2) && nodemap[i-1, j+1] != 0
+                            push!(I, nodemap[i,j]); push!(J, nodemap[i-1,j+1])
+                            push!(V, f2(gmap[i,j], gmap[i-1,j+1]))
+                        end
+                    end
+                end
+            end
+        end
+        m = maximum(nodemap)
+        a = SparseArrays.sparse(I,J,V, m, m)
+        a = a + a'
+        a
+    end
+
+    # Number nodes column-major over the non-zero cells of a mask
+    function mask_nodemap(mask)
+        nodemap = zeros(Int, size(mask))
+        k = 0
+        for j in 1:size(mask, 2), i in 1:size(mask, 1)
+            if mask[i,j]
+                k += 1
+                nodemap[i,j] = k
+            end
+        end
+        nodemap
+    end
+
+    function check_same(gmap, nodemap)
+        for avg_res in (true, false), four_neighbors in (true, false)
+            A = Circuitscape.construct_graph(gmap, nodemap, avg_res, four_neighbors)
+            R = construct_graph_ref(gmap, nodemap, avg_res, four_neighbors)
+            @test A isa SparseArrays.SparseMatrixCSC
+            @test size(A) == size(R)
+            @test SparseArrays.nnz(A) == SparseArrays.nnz(R)
+            @test A.colptr == R.colptr
+            @test A.rowval == R.rowval
+            @test A.nzval == R.nzval
+            @test A == R
+            @test LinearAlgebra.issymmetric(A)
+        end
+    end
+
+    # 5x5 all-ones grid
+    check_same(ones(5, 5), mask_nodemap(trues(5, 5)))
+
+    # Non-uniform resistances, so that f1/f2 are exercised with distinct values
+    check_same(Float64[1 + (i * j) % 7 for i in 1:5, j in 1:5], mask_nodemap(trues(5, 5)))
+
+    # NODATA holes in the interior and on the edges
+    mask = trues(6, 7)
+    mask[3, 4] = false   # interior
+    mask[4, 4] = false   # adjacent interior
+    mask[1, 2] = false   # top edge
+    mask[6, 7] = false   # bottom-right corner
+    mask[3, 1] = false   # left edge
+    mask[1, 7] = false   # top-right corner
+    gmap = Float64[1 + (i + 2j) % 5 for i in 1:6, j in 1:7]
+    gmap[.!mask] .= 0
+    check_same(gmap, mask_nodemap(mask))
+
+    # 1xN and Nx1 grids
+    check_same(ones(1, 9), mask_nodemap(trues(1, 9)))
+    check_same(ones(9, 1), mask_nodemap(trues(9, 1)))
+    check_same(Float64[1 2 3 4 5 6 7], mask_nodemap(trues(1, 7)))
+    check_same(Float64[1 2 3 4 5 6 7]', mask_nodemap(trues(7, 1)))
+
+    # Polygons: several adjacent cells share one node, producing duplicate
+    # (i, j) pairs and self-loops which `sparse` must sum exactly as `a + a'` did
+    nodemap = [1 1 2
+               1 3 2
+               4 3 5]
+    check_same(Float64[1 2 3; 4 5 6; 7 8 9], nodemap)
+
+    # Original test fixture
+    check_same(Float64[0 1 2; 2 0 0; 2 0 2], [0 3 4; 1 0 0; 2 0 5])
+end
+
 # 2D Model Problems
 
 SIZE_2 =

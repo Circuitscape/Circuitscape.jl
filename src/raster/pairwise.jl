@@ -240,52 +240,121 @@ function relabel!(nodemap::Matrix{V}, offset = V(0)) where V
     nodemap[findall(x->x!=0,nodemap)] = newlabels .- V(1) .+ offset
 end
 
+"""
+    construct_graph(gmap, nodemap, avg_res, four_neighbors)
+
+Build the symmetric weighted adjacency matrix of the raster graph. Every
+non-zero cell of `nodemap` is a node; each node is connected to its right and
+lower neighbours (and, unless `four_neighbors`, to its two right-hand diagonal
+neighbours). Edge weights are the conductance between the two cells, averaged
+either as resistances (`avg_res`) or as conductances.
+
+Edges are counted in a first pass so that the COO buffers can be allocated
+exactly, and both orientations of every edge are emitted in the second pass so
+that `sparse` yields the symmetric matrix directly. This avoids the repeated
+`push!` reallocations and the `a + a'` step (a second full matrix plus its
+transpose) of the previous implementation, cutting peak memory at load time,
+which is where the largest grids used to run out of memory.
+"""
 function construct_graph(gmap, nodemap::Matrix{S}, avg_res, four_neighbors) where S
     f1 = avg_res ? res_avg : cond_avg
     f2 = avg_res ? weirder_avg : weird_avg
-    I = Vector{S}()
-    J = Vector{S}()
-    V = Vector{eltype(gmap)}()
-    for j = 1:size(gmap, 2)
-        for i = 1:size(gmap, 1)
-            if nodemap[i,j] == 0
-                continue
-            else
-                # Horizontal neighbour
-                if j != size(gmap, 2) && nodemap[i,j+1] != 0
-                    push!(I, nodemap[i,j])
-                    push!(J, nodemap[i,j+1])
-                    push!(V, f1(gmap[i,j], gmap[i,j+1]))
+    nrows, ncols = size(gmap)
+    size(nodemap) == (nrows, ncols) ||
+        throw(DimensionMismatch("gmap is $(size(gmap)) but nodemap is $(size(nodemap))"))
+
+    nedges = count_graph_edges(nodemap, four_neighbors)
+
+    I = Vector{S}(undef, 2nedges)
+    J = Vector{S}(undef, 2nedges)
+    V = Vector{eltype(gmap)}(undef, 2nedges)
+
+    k = 0
+    @inbounds for j = 1:ncols
+        for i = 1:nrows
+            n = nodemap[i,j]
+            n == 0 && continue
+            g = gmap[i,j]
+
+            # Horizontal neighbour
+            if j != ncols && nodemap[i,j+1] != 0
+                k = _emit_edge!(I, J, V, k, n, nodemap[i,j+1], f1(g, gmap[i,j+1]))
+            end
+
+            # Vertical neighbour
+            if i != nrows && nodemap[i+1,j] != 0
+                k = _emit_edge!(I, J, V, k, n, nodemap[i+1,j], f1(g, gmap[i+1,j]))
+            end
+
+            if !four_neighbors
+                # Diagonal neighbours
+                if i != nrows && j != ncols && nodemap[i+1,j+1] != 0
+                    k = _emit_edge!(I, J, V, k, n, nodemap[i+1,j+1], f2(g, gmap[i+1,j+1]))
                 end
 
-                # Vertical neighbour
-                if i != size(gmap, 1) && nodemap[i+1, j] != 0
-                    push!(I, nodemap[i,j])
-                    push!(J, nodemap[i+1,j])
-                    push!(V, f1(gmap[i,j], gmap[i+1,j]))
-                end
-
-                if !four_neighbors
-                    # Diagonal neighbour
-                    if i != size(gmap, 1) && j != size(gmap, 2) && nodemap[i+1, j+1] != 0
-                        push!(I, nodemap[i,j])
-                        push!(J, nodemap[i+1,j+1])
-                        push!(V, f2(gmap[i,j], gmap[i+1,j+1]))
-                    end
-
-                    if i != 1 && j != size(gmap, 2) && nodemap[i-1, j+1] != 0
-                        push!(I, nodemap[i,j])
-                        push!(J, nodemap[i-1,j+1])
-                        push!(V, f2(gmap[i,j], gmap[i-1,j+1]))
-                    end
+                if i != 1 && j != ncols && nodemap[i-1,j+1] != 0
+                    k = _emit_edge!(I, J, V, k, n, nodemap[i-1,j+1], f2(g, gmap[i-1,j+1]))
                 end
             end
         end
     end
+    @assert k == 2nedges
+
     m = maximum(nodemap)
-    a = sparse(I,J,V, m, m)
-    a = a + a'
-    a
+
+    # `sparse!` is the driver behind `sparse`; it lets us hand it the COO
+    # buffers J and V as the storage for the result's rowval and nzval, so no
+    # fresh CSC is allocated. colptr gets its own (m + 1)-vector: recycling I
+    # for it would shrink I's length but keep its 2*nedges buffer alive.
+    # (`sparse!` sums duplicate (i, j) pairs, exactly as `a + a'` did when a
+    # polygon maps adjacent cells to the same node.)
+    csrrowptr = Vector{S}(undef, m + 1)
+    csrcolval = Vector{S}(undef, length(I))
+    csrnzval = Vector{eltype(gmap)}(undef, length(I))
+    klasttouch = Vector{S}(undef, m)
+    colptr = Vector{S}(undef, m + 1)
+    SparseArrays.sparse!(I, J, V, m, m, +, klasttouch,
+                         csrrowptr, csrcolval, csrnzval, colptr, J, V)
+end
+
+# Write edge (a, b, v) in both orientations at positions k+1 and k+2.
+@inline function _emit_edge!(I, J, V, k, a, b, v)
+    @inbounds begin
+        I[k+1] = a; J[k+1] = b; V[k+1] = v
+        I[k+2] = b; J[k+2] = a; V[k+2] = v
+    end
+    k + 2
+end
+
+"""
+    count_graph_edges(nodemap, four_neighbors)
+
+Number of undirected edges `construct_graph` will emit for `nodemap`, using the
+same neighbour rules, so that its output buffers can be sized exactly.
+"""
+function count_graph_edges(nodemap, four_neighbors)
+    nrows, ncols = size(nodemap)
+    n = 0
+    @inbounds for j = 1:ncols
+        for i = 1:nrows
+            nodemap[i,j] == 0 && continue
+            if j != ncols && nodemap[i,j+1] != 0
+                n += 1
+            end
+            if i != nrows && nodemap[i+1,j] != 0
+                n += 1
+            end
+            if !four_neighbors
+                if i != nrows && j != ncols && nodemap[i+1,j+1] != 0
+                    n += 1
+                end
+                if i != 1 && j != ncols && nodemap[i-1,j+1] != 0
+                    n += 1
+                end
+            end
+        end
+    end
+    n
 end
 
 res_avg(x, y) = 1 / ((1/x + 1/y) / 2)
