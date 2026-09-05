@@ -290,8 +290,8 @@ prepare!(solver::DirectSolver, matrix) =
 
 Solve every job in `groups` and call `handle_pair(job, voltages)` with the
 voltages referenced to the source node. The iterative path solves one pair at
-a time and parallelizes over source nodes, each task with its own
-preconditioner workspace; the direct path factorizes once and solves batches
+a time in equal-sized chunks of pairs, each task with its own preconditioner
+workspace; the direct path factorizes once and solves batches
 of right-hand sides, parallelizing the postprocessing of each batch.
 """
 function solve_pairs!(handle_pair, P, ::AMGSolver, matrix::SparseMatrixCSC{T},
@@ -319,14 +319,21 @@ function solve_pairs!(handle_pair, P, ::AMGSolver, matrix::SparseMatrixCSC{T},
         timer
     end
 
-    # NOTE: Work is distributed by source point, giving a triangular load:
-    # task 1 solves n-1 pairs, task 2 solves n-2, ..., task n solves 0.
-    # This causes significant load imbalance with many threads.
-    timers = [TimerOutput() for _ in groups]
+    # Every pair costs about the same (same matrix, same preconditioner), so
+    # equal-count chunks are equal-work chunks. Splitting by source node gave
+    # a triangular load: task 1 solved n-1 pairs, task n none, so the wall
+    # time was bounded by the first source rather than pairs/threads. A few
+    # chunks per thread leaves the scheduler slack for stragglers while still
+    # amortizing the workspace copy each task makes.
+    jobs = collect(Iterators.flatten(groups))
+    isempty(jobs) && return nothing
+    nchunks = cfg.parallelize ? min(length(jobs), 4 * Threads.nthreads()) : 1
+    chunks = collect(Iterators.partition(jobs, cld(length(jobs), nchunks)))
+    timers = [TimerOutput() for _ in chunks]
     @timeit CSTIMER[] "solve and accumulate pairs" if cfg.parallelize
-        fetch.(map(i -> Threads.@spawn(task(groups[i], timers[i])), eachindex(groups)))
+        fetch.(map(i -> Threads.@spawn(task(chunks[i], timers[i])), eachindex(chunks)))
     else
-        foreach(i -> task(groups[i], timers[i]), eachindex(groups))
+        foreach(i -> task(chunks[i], timers[i]), eachindex(chunks))
     end
     foreach(t -> merge!(CSTIMER[], t), timers)
     nothing
