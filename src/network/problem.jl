@@ -1,5 +1,6 @@
-# Graph construction for a network: the edge list becomes a symmetric
-# adjacency matrix, and the output geometry is the identity on node ids.
+# The network side of problem construction (see problem.jl): the edge list
+# becomes a symmetric adjacency matrix, and the output geometry is the
+# identity on node ids.
 
 function build_graph(data::NetworkData{T,V}, cfg) where {T,V}
 
