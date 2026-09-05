@@ -473,11 +473,7 @@ end
 Write the cumulative (and maximum) current maps accumulated over a pairwise
 run, in whatever form the geometry calls for.
 """
-function write_cum_maps(cum, geometry::RasterGeometry, cfg)
-    if cfg.write_cur_maps || cfg.write_cum_cur_map_only
-        write_cum_maps(cum, geometry.hbmeta, cfg)
-    end
-end
+write_cum_maps(cum, geometry::RasterGeometry, cfg) = write_cum_maps(cum, geometry.hbmeta, cfg)
 
 function write_cum_maps(cum, geometry::NetworkGeometry, cfg)
     cfg.write_cur_maps || return nothing
@@ -489,13 +485,14 @@ function write_cum_maps(cum, geometry::NetworkGeometry, cfg)
     write_currents(cum_node_curr, cum_branch_curr, "_cum", cfg)
 end
 
+# Grid form, shared with the paths that keep a cumulative map of their own
+# (focal regions, one-to-all).
 function write_cum_maps(cum, hbmeta::RasterMeta, cfg)
+    (cfg.write_cur_maps || cfg.write_cum_cur_map_only) || return nothing
 
-    if cfg.write_cum_cur_map_only || cfg.write_cur_maps
-        cum_curr = cum.cum_curr
-        postprocess_cum_curmap!(cum_curr)
-        write_grid(cum_curr, "", cfg, hbmeta, cum = true)
-    end
+    cum_curr = cum.cum_curr
+    postprocess_cum_curmap!(cum_curr)
+    write_grid(cum_curr, "", cfg, hbmeta, cum = true)
 
     if cfg.write_max_cur_maps
         max_curr = cum.max_curr

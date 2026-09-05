@@ -46,10 +46,6 @@ struct RasterMeta
     wkt::String
 end
 
-function RasterMeta()
-    RasterMeta(0,0,0,0,0,0,[0.0],"")
-end
-
 struct RasterData{T,V} <: Data
     cellmap::Matrix{T}
     polymap::Matrix{V}

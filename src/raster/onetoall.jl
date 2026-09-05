@@ -159,9 +159,7 @@ function run_onetoall(data::RasterData{T,V}, cfg)::Matrix{T} where {T,V}
         cfg.write_max_cur_maps && (cum.max_curr .= max.(cum.max_curr, curr))
     end
 
-    if cfg.write_cur_maps || cfg.write_cum_cur_map_only
-        write_cum_maps(cum, hbmeta, cfg)
-    end
+    write_cum_maps(cum, hbmeta, cfg)
 
     hcat(points_unique, res)
 end

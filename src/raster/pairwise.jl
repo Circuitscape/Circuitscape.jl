@@ -86,9 +86,7 @@ function pairwise_regions(rasterdata::RasterData{T,V}, cfg)::Matrix{T} where {T,
     P = [0, pts...]
     r = hcat(P, vcat(pts', resistances))
 
-    if cfg.write_cur_maps || cfg.write_cum_cur_map_only
-        write_cum_maps(cum, rasterdata.hbmeta, cfg)
-    end
+    write_cum_maps(cum, rasterdata.hbmeta, cfg)
 
     # save resistances
     save_resistances(r, cfg)
