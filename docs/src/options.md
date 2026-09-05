@@ -389,7 +389,7 @@ Files should be in tab-delimited text with a .txt extension.
 
 ### Current and Voltage Data
 
-Current and voltage data for networks are written in text list formats. Raster voltage and current maps are written in ASCII raster format (or GeoTIFF if `write_as_tif = True`).
+Current and voltage data for networks are written in text list formats. Raster voltage and current maps are written in ESRI ASCII raster format (`.asc`), or GeoTIFF if `write_as_tif = True`. ASCII grids are read and written natively; when the input raster carries a projection, it is written alongside each `.asc` output as a `.prj` sidecar, as GIS tools expect.
 
 ### Resistance Files
 

@@ -392,3 +392,60 @@ end
     write(joinpath(dir, "reclass.txt"), "7\t9\n")
     @test compute(d) ≈ base
 end
+
+# Native ESRI ASCII grid I/O (no GDAL on the .asc path)
+@testset "ASCII grid I/O" begin
+    dir = mktempdir()
+    a = [1.0 2.5 -9999.0; 4.0 5.0 6.0]
+    tr = [10.0, 0.5, 0.0, 21.0, 0.0, -0.5]      # xll=10, cellsize=0.5, 2 rows -> yll=20
+
+    # Round trip with and without a projection sidecar
+    Circuitscape.write_raster(joinpath(dir, "r"), a, "PROJCS[\"x\"]", tr, "asc")
+    b, wkt, tr2 = Circuitscape.read_raster(joinpath(dir, "r.asc"), Float64)
+    @test b == a && tr2 == tr && wkt == "PROJCS[\"x\"]"
+    @test isfile(joinpath(dir, "r.prj"))
+    Circuitscape.write_raster(joinpath(dir, "q"), a, "", tr, "asc")
+    @test !isfile(joinpath(dir, "q.prj"))
+    @test Circuitscape.read_raster(joinpath(dir, "q.asc"), Float32)[1] == Float32.(a)
+    @test occursin("cellsize", read(joinpath(dir, "q.asc"), String))
+
+    # Header dialects GDAL accepts: center origin, dx/dy, no NODATA line,
+    # tabs, CRLF, mixed case, custom nodata
+    write(joinpath(dir, "c.asc"),
+          "NCOLS 3\r\nNROWS 2\r\nxllcenter\t10.25\r\nyllcenter\t20.25\r\ncellsize 0.5\r\n1 2 3\r\n4 5 6\r\n")
+    b, _, tr2 = Circuitscape.read_raster(joinpath(dir, "c.asc"), Float64)
+    @test b == [1.0 2 3; 4 5 6] && tr2 == tr
+    write(joinpath(dir, "d.asc"),
+          "ncols 3\nnrows 2\nxllcorner 0\nyllcorner 0\ndx 1\ndy 2\nNODATA_value -1\n1 -1 3\n4 5 NaN\n")
+    b, _, tr2 = Circuitscape.read_raster(joinpath(dir, "d.asc"), Float64)
+    @test b == [1.0 -9999 3; 4 5 -9999] && tr2 == [0.0, 1.0, 0.0, 4.0, 0.0, -2.0]
+    Circuitscape.write_raster(joinpath(dir, "e"), b, "", tr2, "asc")
+    @test occursin("dx", read(joinpath(dir, "e.asc"), String))
+    @test Circuitscape.read_raster(joinpath(dir, "e.asc"), Float64)[3] == tr2
+
+    # Single-row grid and gzipped input
+    write(joinpath(dir, "one.asc"), "ncols 2\nnrows 1\nxllcorner 0\nyllcorner 0\ncellsize 1\n7 8\n")
+    @test Circuitscape.read_raster(joinpath(dir, "one.asc"), Float64)[1] == [7.0 8.0]
+    Circuitscape.GZip.open(joinpath(dir, "z.asc.gz"), "w") do io
+        write(io, read(joinpath(dir, "r.asc")))
+    end
+    @test Circuitscape.read_raster(joinpath(dir, "z.asc.gz"), Float64)[1] == a
+
+    # Bad headers are reported by file
+    write(joinpath(dir, "bad.asc"), "ncols 3\nnrows 3\nxllcorner 0\nyllcorner 0\ncellsize 1\n1 2 3\n4 5 6\n")
+    @test_throws ErrorException Circuitscape.read_raster(joinpath(dir, "bad.asc"), Float64)
+
+    # Every .asc shipped with the tests reads the same as through GDAL. GDAL's
+    # AAIGrid driver stores these values as Float32 (2.002 -> 2.0020000934);
+    # the native parser is exact, hence the Float32-level tolerance.
+    files = String[]
+    for (root, _, fs) in walkdir("input"), f in fs
+        endswith(f, ".asc") && push!(files, joinpath(root, f))
+    end
+    @test length(files) > 100
+    for f in files
+        a1, w1, t1 = Circuitscape.read_asc(f, Float64)
+        a2, w2, t2 = Circuitscape.read_raster_gdal(f, Float64)
+        @test isapprox(a1, a2; rtol = 1e-6) && t1 ≈ t2 && w1 == w2
+    end
+end

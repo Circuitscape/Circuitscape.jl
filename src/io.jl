@@ -150,8 +150,6 @@ function read_cellmap(habitat_file::String, is_res::Bool, ::Type{T};
 end
 
 function _grid_reader(T, file)
-    endswith(file, ".gz") ? file = "/vsigzip/$(file)" : ()
-
     c, wkt, transform = read_raster(file, T)
 
     rastermeta = get_raster_meta(c, wkt, transform)
@@ -566,12 +564,103 @@ function update!(cellmap::Matrix{T}, m::String, hbmeta) where {T}
     cellmap .= cellmap .* mask
 end
 
-# Inspired by GeoArrays.read()
-function read_raster(path::String, T)
-    # Check if file exists (ArchGDAL error is cryptic)
-    check_path = endswith(path, ".gz") ? path[10:lastindex(path)] : path
-    !isfile(check_path) && error("the file \"$(check_path)\" does not exist")
+_strip_gz(path) = endswith(lowercase(path), ".gz") ? path[1:end-3] : path
+is_asc(path) = endswith(lowercase(_strip_gz(path)), ".asc")
 
+"""
+    read_raster(path, T) -> (array, wkt, transform)
+
+Read a single-band raster as a `nrows × ncols` matrix of `T` with NODATA and
+NaN mapped to -9999. ESRI ASCII grids (`.asc`, optionally gzipped) are parsed
+natively; every other format goes through GDAL.
+"""
+function read_raster(path::String, T)
+    !isfile(path) && error("the file \"$(path)\" does not exist")
+    is_asc(path) ? read_asc(path, T) : read_raster_gdal(path, T)
+end
+
+const ASC_HEADER_KEYS = ("ncols", "nrows", "xllcorner", "yllcorner", "xllcenter",
+                         "yllcenter", "cellsize", "dx", "dy", "nodata_value")
+
+"""
+    read_asc(path, T)
+
+Native ESRI ASCII grid reader. Accepts the header variants GDAL does —
+`xllcorner`/`yllcorner` or `xllcenter`/`yllcenter`, `cellsize` or `dx`/`dy`,
+optional `NODATA_value` — in any order and case, and a gzipped file. A `.prj`
+sidecar, if present, supplies the projection WKT.
+"""
+function read_asc(path::String, ::Type{T}) where {T}
+    io = _open(path)
+    header = Dict{String,Float64}()
+    local array
+    try
+        # Header: key/value lines until the first line that is not one.
+        line = ""
+        while !eof(io)
+            line = readline(io)
+            toks = split(line)
+            isempty(toks) && continue
+            key = lowercase(toks[1])
+            (length(toks) == 2 && key in ASC_HEADER_KEYS) || break
+            header[key] = parse(Float64, toks[2])
+            line = ""
+        end
+        for k in ("ncols", "nrows")
+            haskey(header, k) || error("$path: ASCII grid header is missing $k")
+        end
+        nrows, ncols = Int(header["nrows"]), Int(header["ncols"])
+
+        # Body: one row per line, any whitespace between values (fixtures in
+        # the wild mix tabs, runs of spaces, trailing delimiters and CRLF,
+        # which trips readdlm's delimiter detection).
+        array = Matrix{T}(undef, nrows, ncols)
+        r = 0
+        while true
+            toks = split(line)
+            if !isempty(toks)
+                r += 1
+                r > nrows && error("$path: header declares $nrows rows but the file holds more")
+                length(toks) == ncols ||
+                    error("$path: row $r has $(length(toks)) values, header declares $ncols columns")
+                @inbounds for c in 1:ncols
+                    array[r, c] = parse(T, toks[c])
+                end
+            end
+            eof(io) && break
+            line = readline(io)
+        end
+        r == nrows || error("$path: header declares $nrows rows but the file holds $r")
+    finally
+        close(io)
+    end
+    nrows, ncols = size(array)
+
+    dx = get(header, "dx", get(header, "cellsize", NaN))
+    dy = get(header, "dy", dx)
+    isnan(dx) && error("$path: ASCII grid header needs cellsize or dx/dy")
+    xll = haskey(header, "xllcorner") ? header["xllcorner"] :
+          haskey(header, "xllcenter") ? header["xllcenter"] - dx / 2 :
+          error("$path: ASCII grid header needs xllcorner or xllcenter")
+    yll = haskey(header, "yllcorner") ? header["yllcorner"] :
+          haskey(header, "yllcenter") ? header["yllcenter"] - dy / 2 :
+          error("$path: ASCII grid header needs yllcorner or yllcenter")
+
+    nodata = T(get(header, "nodata_value", -9999.0))
+    @inbounds for i in eachindex(array)
+        (array[i] == nodata || isnan(array[i])) && (array[i] = T(-9999))
+    end
+
+    # GDAL-style geotransform: origin at the top-left corner, negative row step
+    transform = [xll, dx, 0.0, yll + nrows * dy, 0.0, -dy]
+    prj = _strip_gz(path)[1:end-4] * ".prj"
+    wkt = isfile(prj) ? String(strip(read(prj, String))) : ""
+    array, wkt, transform
+end
+
+# Inspired by GeoArrays.read()
+function read_raster_gdal(path::String, T)
+    endswith(path, ".gz") && (path = "/vsigzip/$(path)")
     ArchGDAL.read(path) do raw
         # Extract 1st band (should only be one band anyway)
         # to get a 2D array instead of 3D
@@ -600,7 +689,7 @@ function read_raster(path::String, T)
 
         # Line to handle NaNs in datasets read from tifs
         array[isnan.(array)] .= -9999.0
-        
+
         transform = ArchGDAL.getgeotransform(raw)
         wkt = ArchGDAL.getproj(raw)
         array, wkt, transform # wkt and transform are needed later for write_raster
