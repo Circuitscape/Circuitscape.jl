@@ -514,3 +514,34 @@ end
     @test hasmethod(Circuitscape.start, Tuple{})
     @test_throws MethodError Circuitscape.start(1)
 end
+
+# Network cumulative currents: the branch index must resolve either
+# orientation of an edge to one slot, keep the first slot for a duplicated
+# edge, and the accumulated result must not depend on how edges are listed.
+@testset "network cumulative branch index" begin
+    coords = ([1, 3, 2, 3, 4], [2, 2, 1, 4, 3], [1.0, 1.0, 1.0, 1.0, 1.0])  # (2,1) duplicates (1,2); (4,3) duplicates (3,4)
+    cum = Circuitscape.initialize_cum_vectors(coords, 4)
+    @test cum.branch_index[(1, 2)] == 1 && cum.branch_index[(2, 1)] == 1
+    @test cum.branch_index[(3, 2)] == 2 && cum.branch_index[(2, 3)] == 2
+    @test cum.branch_index[(3, 4)] == 4 && cum.branch_index[(4, 3)] == 4
+    @test length(cum.cum_branch_curr) == 5
+
+    # Path 1-2-3-4-5 with rows deliberately listed in mixed orientation. One
+    # focal pair, so the cumulative branch currents equal that pair's own.
+    dir = mktempdir()
+    write(joinpath(dir, "g.txt"), "2\t1\t1.0\n2\t3\t2.0\n4\t3\t1.0\n4\t5\t3.0\n")
+    write(joinpath(dir, "fp.txt"), "1\n5\n")
+    d = Circuitscape.init_config()
+    d["data_type"] = "network"; d["scenario"] = "pairwise"
+    d["habitat_file"] = joinpath(dir, "g.txt"); d["habitat_map_is_resistances"] = "True"
+    d["point_file"] = joinpath(dir, "fp.txt"); d["output_file"] = joinpath(dir, "o.out")
+    d["write_cur_maps"] = "True"
+    r = compute(d)
+    @test r[2, 3] ≈ 7.0   # series resistances 1 + 2 + 1 + 3
+    keyed(m) = Dict(minmax(Int(m[i, 1]), Int(m[i, 2])) => m[i, 3] for i in axes(m, 1))
+    pair = keyed(readdlm(joinpath(dir, "o_branch_currents_1_5.txt")))
+    cum = keyed(readdlm(joinpath(dir, "o_branch_currents_cum.txt")))
+    @test length(cum) == 4 && keys(cum) == keys(pair)
+    @test all(cum[k] ≈ pair[k] for k in keys(cum))
+    @test all(v ≈ 1.0 for v in values(cum))   # unit current through every series branch
+end

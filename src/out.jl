@@ -63,16 +63,18 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
 		cum_branch_curr = output.cum.cum_branch_curr
 		cum_node_curr = output.cum.cum_node_curr
 
+        # Resolve every branch to its slot before taking the lock, so the
+        # critical section is just the adds.
+        bca = branch_currents_array
+        bidx = output.cum.branch_index
+        V = keytype(bidx).parameters[1]
+        slots = [bidx[(V(bca[i,1]), V(bca[i,2]))] for i in 1:size(bca, 1)]
+
         lock(output.cum.lock) do
         # Accumulate branch currents
-		bca = branch_currents_array
 		cbc = cum_branch_curr
-
-		k = output.cum.coords
-		@inbounds for i = 1:size(branch_currents_array, 1)
-			idx = findfirst(isequal((Int(bca[i,1]), Int(bca[i,2]))), k)
-			idx == nothing && (idx = findfirst(isequal((Int(bca[i,2]), Int(bca[i,1]))), k))
-			cbc[idx] += bca[i,3]
+		@inbounds for i = 1:size(bca, 1)
+			cbc[slots[i]] += bca[i,3]
 		end
 
 
