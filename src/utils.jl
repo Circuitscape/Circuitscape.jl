@@ -34,7 +34,8 @@ function get_output_flags(cfg)
     OutputFlags(cfg.write_volt_maps, cfg.write_cur_maps,
                 cfg.write_cum_cur_map_only, cfg.write_max_cur_maps,
                 cfg.set_null_currents_to_nodata, cfg.set_null_voltages_to_nodata,
-                cfg.compress_grids, cfg.log_transform_maps)
+                cfg.compress_grids, cfg.log_transform_maps,
+                cfg.set_focal_node_currents_to_zero)
 end
 
 
@@ -185,7 +186,7 @@ function compute_omniscape_current(
     # Generate advanced data
     o = OutputFlags(
         false, false, false, false,
-        false, false, false, false
+        false, false, false, false, false
     )
 
     cfg = CSConfig(cs_cfg)
