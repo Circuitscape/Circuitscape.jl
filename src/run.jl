@@ -1,4 +1,3 @@
-export compute
 
 """
     Circuitscape.compute(path::String) -> Matrix

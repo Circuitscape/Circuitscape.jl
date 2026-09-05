@@ -1,5 +1,6 @@
 import Circuitscape: construct_node_map, compute_omniscape_current
 using Circuitscape
+using Circuitscape: compute
 import LinearAlgebra
 import Graphs, SparseArrays, Random
 
