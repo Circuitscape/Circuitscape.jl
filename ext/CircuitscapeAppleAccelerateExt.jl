@@ -3,7 +3,7 @@ module CircuitscapeAppleAccelerateExt
 using AppleAccelerate
 using SparseArrays
 using LinearAlgebra
-import Circuitscape: AccelerateSolver, construct_cholesky_factor, solve_linear_system
+import Circuitscape: AccelerateSolver, construct_cholesky_factor, solve_linear_system, refine_columns!
 
 function construct_cholesky_factor(matrix, ::AccelerateSolver)
     T = eltype(matrix)
@@ -13,12 +13,7 @@ function construct_cholesky_factor(matrix, ::AccelerateSolver)
 end
 
 function solve_linear_system(factor::AppleAccelerate.AAFactorization, matrix, rhs; tol = 1e-4)
-    lhs = factor \ rhs
-    for col = 1:size(rhs, 2)
-        residual = norm(matrix * lhs[:, col] .- rhs[:, col]) / norm(rhs[:, col])
-        residual < tol || error("Apple Accelerate solver residual $residual exceeds tolerance $tol for column $col")
-    end
-    lhs
+    refine_columns!(factor \ rhs, factor, matrix, rhs, tol, "Apple Accelerate")
 end
 
 end # module CircuitscapeAppleAccelerateExt

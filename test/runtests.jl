@@ -25,6 +25,7 @@ catch
 end
 if accelerate_available
     runtests(solver="accelerate", parallel=true)
+    runtests(solver="accelerate", parallel=true, precision="single")
 else
     println("Skipping Apple Accelerate tests (not available)")
 end

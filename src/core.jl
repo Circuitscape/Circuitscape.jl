@@ -533,13 +533,35 @@ function solve_linear_system(
           "after 3 attempts (last rtol = $(rtol * 100), $(stats.niter) iterations, $(stats.status))")
 end
 
-function solve_linear_system(factor::SuiteSparse.CHOLMOD.Factor, matrix, rhs; tol = TOL_DOUBLE)
-    lhs = factor \ rhs
+"""
+    refine_columns!(lhs, factor, matrix, rhs, tol, name)
+
+Check every column of a direct solve against `tol`, applying iterative
+refinement with the existing factor where needed. In single precision a
+Cholesky solve of an ill-conditioned Laplacian lands at 1e-3..1e-2, well short
+of what CG reaches with its 1e-5 rtol; each step costs one triangular solve
+and recovers several digits. Double precision residuals are far below the
+target and take no steps. Shared by the CHOLMOD and Accelerate backends.
+"""
+function refine_columns!(lhs, factor, matrix, rhs, tol, name)
+    target = min(tol, 1e-5)
     for col = 1:size(rhs, 2)
-        residual = norm(matrix*lhs[:,col] .- rhs[:,col]) / norm(rhs[:,col])
-        residual < tol || error("CHOLMOD solver residual $residual exceeds tolerance $tol for column $col")
+        x = view(lhs, :, col)
+        b = view(rhs, :, col)
+        residual = norm(matrix*x .- b) / norm(b)
+        steps = 0
+        while residual >= target && steps < 2
+            x .+= factor \ (b .- matrix*x)
+            residual = norm(matrix*x .- b) / norm(b)
+            steps += 1
+        end
+        residual < tol || error("$name solver residual $residual exceeds tolerance $tol for column $col after $steps refinement steps")
     end
     lhs
+end
+
+function solve_linear_system(factor::SuiteSparse.CHOLMOD.Factor, matrix, rhs; tol = TOL_DOUBLE)
+    refine_columns!(factor \ rhs, factor, matrix, rhs, tol, "CHOLMOD")
 end
 
 function postprocess(output, component_data, flags, shortcut, cfg)
