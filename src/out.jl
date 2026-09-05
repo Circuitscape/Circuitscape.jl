@@ -336,50 +336,13 @@ function process_grid!(cmap, cellmap, hbmeta; log_transform = false,
 
 end
 
-function write_grid(cmap, name, cfg, hbmeta;
-                        voltage = false, cum = false,
-                        max = false)
-
-
-    str = "curmap"
-    if cum
-        str = "cum_$(str)"
-    elseif max
-        str = "max_$(str)"
-    elseif voltage
-        str = "voltmap"
-    end
-
-    pref = split(cfg.output_file, ".out")[1]
-    filename = "$(pref)_$(str)$(name)"
-
-    cfg.write_as_tif ? (file_format = "tif") :
-            (file_format = "asc")
-
-    write_raster(filename,
-                 cmap,
-                 hbmeta.wkt,
-                 hbmeta.transform,
-                 file_format)
-end
-
-
-function write_grid(cmap, name, cfg, hbmeta, cellmap;
+function write_grid(cmap, name, cfg, hbmeta, cellmap = nothing;
                         voltage = false, cum = false, max = false,
                         log_transform = false, set_null_to_nodata = false)
 
-    pref = split(cfg.output_file, ".out")[1]
-
-    if log_transform
-        map!(x -> x > 0 ? log10(x) : float(hbmeta.nodata), cmap, cmap)
-    end
-
-    if set_null_to_nodata
-        for i in eachindex(cmap)
-            if cellmap[i] == 0
-                cmap[i] = hbmeta.nodata
-            end
-        end
+    if cellmap !== nothing
+        process_grid!(cmap, cellmap, hbmeta, log_transform = log_transform,
+                            set_null_to_nodata = set_null_to_nodata)
     end
 
     str = "curmap"
@@ -391,6 +354,7 @@ function write_grid(cmap, name, cfg, hbmeta, cellmap;
         str = "voltmap"
     end
 
+    pref = split(cfg.output_file, ".out")[1]
     filename = "$(pref)_$(str)$(name)"
 
     cfg.write_as_tif ? (file_format = "tif") :
