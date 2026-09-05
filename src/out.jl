@@ -15,15 +15,68 @@ function compute_3col(resistances::Matrix{T}) where {T}
 end
 
 
-function write_cur_maps(name, output, component_data, finitegrounds, cfg)
+"""
+    write_cur_maps(name, output, component_data, finitegrounds, cfg)
 
-    # Get desired data
-    G = component_data.matrix
-    voltages = _voltages(output)
-    cc = component_data.cc
-    nodemap = component_data.local_nodemap
-    hbmeta = component_data.hbmeta
-    cellmap = component_data.cellmap
+Current map of one solve on a connected component, accumulated into the
+cumulative maps when `output` is a pairwise `Output` and written per solve
+when the options ask for it. Where the currents go is decided by the
+component's geometry: a grid for rasters, node and branch lists for networks.
+"""
+write_cur_maps(name, output, component_data, finitegrounds, cfg) =
+    write_cur_maps(component_data.geometry, name, output, component_data, finitegrounds, cfg)
+
+function write_cur_maps(geometry::NetworkGeometry, name, output, component_data, finitegrounds, cfg)
+
+    node_currents, branch_currents = _create_current_maps(component_data.matrix,
+                                            _voltages(output), finitegrounds, geometry)
+
+    nodes = geometry.nodes
+    branch_currents_array = _convert_to_3col(branch_currents, nodes)
+    node_currents_array = _append_name_to_node_currents(node_currents, nodes)
+
+    accumulate_currents!(output, node_currents_array, branch_currents_array)
+
+    write_currents(node_currents_array, branch_currents_array, name, cfg)
+    nothing
+end
+
+# Advanced mode writes each solve's currents as they are; only the pairwise
+# kernel keeps cumulative node and branch currents.
+accumulate_currents!(::AbstractVector, node_currents_array, branch_currents_array) = nothing
+
+function accumulate_currents!(output::Output, node_currents_array, branch_currents_array)
+    cum_branch_curr = output.cum.cum_branch_curr
+    cum_node_curr = output.cum.cum_node_curr
+
+    # Resolve every branch to its slot before taking the lock, so the
+    # critical section is just the adds.
+    bca = branch_currents_array
+    bidx = output.cum.branch_index
+    V = keytype(bidx).parameters[1]
+    slots = [bidx[(V(bca[i,1]), V(bca[i,2]))] for i in 1:size(bca, 1)]
+
+    lock(output.cum.lock) do
+        # Accumulate branch currents
+        cbc = cum_branch_curr
+        @inbounds for i = 1:size(bca, 1)
+            cbc[slots[i]] += bca[i,3]
+        end
+
+        # Accumulate node currents
+        cnc = cum_node_curr
+        nca = node_currents_array
+        @inbounds for i = 1:size(nca, 1)
+            cnc[Int(nca[i,1])] += nca[i,2]
+        end
+    end
+    nothing
+end
+
+function write_cur_maps(geometry::RasterGeometry, name, output::Output, component_data, finitegrounds, cfg)
+
+    nodemap = geometry.nodemap
+    hbmeta = geometry.hbmeta
 
     # Output options
     log_transform = cfg.log_transform_maps
@@ -31,85 +84,37 @@ function write_cur_maps(name, output, component_data, finitegrounds, cfg)
     write_max_cur_maps = cfg.write_max_cur_maps
     write_cum_cur_map_only = cfg.write_cum_cur_map_only
 
-    node_currents, branch_currents = _create_current_maps(G, voltages, finitegrounds, cfg, nodemap = nodemap, hbmeta = hbmeta)
+    cmap, _ = _create_current_maps(component_data.matrix, output.voltages, finitegrounds, geometry)
+    cum_curr = output.cum.cum_curr
+    max_curr = output.cum.max_curr
 
-    if !is_raster(cfg)
+    # Issue 342: with set_focal_node_currents_to_zero the two focal nodes
+    # being solved carry no current in this pair's map, so the cumulative
+    # map shows only current that flows *through* a focal region when
+    # other pairs are active (Dickson et al. 2013).
+    if cfg.set_focal_node_currents_to_zero
+        zero_focal_cells!(cmap, nodemap, output.comp_idx)
+    end
 
-        # Branch currents
-        branch_currents_array = _convert_to_3col(branch_currents, cc)
+    # Process the current map
+    process_grid!(cmap, geometry.cellmap, hbmeta, log_transform = log_transform,
+                        set_null_to_nodata = set_null_currents_to_nodata)
 
-        # Node currents
-        node_currents_array = _append_name_to_node_currents(node_currents, cc)
+    # Accumulate by default
+    lock(output.cum.lock) do
+        cum_curr .+= cmap
 
-		if is_advanced(cfg)
-			write_currents(node_currents_array, branch_currents_array, name, cfg)
-			return nothing
-		end
-
-        # TODO: implement cumulative maps for network mode
-		cum_branch_curr = output.cum.cum_branch_curr
-		cum_node_curr = output.cum.cum_node_curr
-
-        # Resolve every branch to its slot before taking the lock, so the
-        # critical section is just the adds.
-        bca = branch_currents_array
-        bidx = output.cum.branch_index
-        V = keytype(bidx).parameters[1]
-        slots = [bidx[(V(bca[i,1]), V(bca[i,2]))] for i in 1:size(bca, 1)]
-
-        lock(output.cum.lock) do
-        # Accumulate branch currents
-		cbc = cum_branch_curr
-		@inbounds for i = 1:size(bca, 1)
-			cbc[slots[i]] += bca[i,3]
-		end
-
-
-        # Accumulate node currents
-        cnc = cum_node_curr
-		nca = node_currents_array
-		@inbounds for i = 1:size(nca, 1)
-			cnc[Int(nca[i,1])] += nca[i,2]
-		end
+        # Max current if user asks for it
+        if write_max_cur_maps
+            max_curr .= max.(max_curr, cmap)
         end
+    end
 
-        # !write_cum_cur_map_only &&
-        write_currents(node_currents_array, branch_currents_array, name, cfg)
-		return nothing
-    else
+    # Write current maps
+    !write_cum_cur_map_only && cfg.write_cur_maps &&
+                    write_grid(cmap, name, cfg, hbmeta)
 
-        cmap = node_currents
-        cum_curr = output.cum.cum_curr
-        max_curr = output.cum.max_curr
-
-        # Issue 342: with set_focal_node_currents_to_zero the two focal nodes
-        # being solved carry no current in this pair's map, so the cumulative
-        # map shows only current that flows *through* a focal region when
-        # other pairs are active (Dickson et al. 2013).
-        if cfg.set_focal_node_currents_to_zero
-            zero_focal_cells!(cmap, nodemap, output.comp_idx)
-        end
-
-        # Process the current map
-        process_grid!(cmap, cellmap, hbmeta, log_transform = log_transform,
-                            set_null_to_nodata = set_null_currents_to_nodata)
-
-        # Accumulate by default
-        lock(output.cum.lock) do
-            cum_curr .+= cmap
-
-            # Max current if user asks for it
-            if write_max_cur_maps
-                max_curr .= max.(max_curr, cmap)
-            end
-        end
-
-        # Write current maps
-        !write_cum_cur_map_only && cfg.write_cur_maps && 
-                        write_grid(cmap, name, cfg, hbmeta)
-
-		return nothing
-   end
+    nothing
 end
 
 # Zero every cell of `cmap` whose local node index is one of `nodes`. Focal
@@ -154,32 +159,34 @@ function _convert_to_3col(branch_currents, cc)
     graph
 end
 
-function _create_current_maps(G, voltages, finitegrounds, cfg; nodemap = Matrix{Float64}(), hbmeta = RasterMeta())
-
+# Node and branch currents of one solve. For a network both are returned as
+# vectors over the matrix rows / sparse branch matrix; for a raster the node
+# currents are spread onto the grid and there are no branch currents.
+function _create_current_maps(G, voltages, finitegrounds, ::NetworkGeometry)
     node_currents = get_node_currents(G, voltages, finitegrounds)
+    branch_currents = _get_branch_currents(G, voltages, true)
+    branch_currents = abs.(branch_currents)
+    node_currents, branch_currents
+end
 
-    if cfg.data_type == dt_network
+function _create_current_maps(G, voltages, finitegrounds, geometry::RasterGeometry)
+    node_currents = get_node_currents(G, voltages, finitegrounds)
+    nodemap = geometry.nodemap
+    hbmeta = geometry.hbmeta
 
-        branch_currents = _get_branch_currents(G, voltages, true)
-        branch_currents = abs.(branch_currents)
-        return node_currents, branch_currents
-
-    else
-
-        current_map = zeros(eltype(G), hbmeta.nrows, hbmeta.ncols)
-        for j = 1:size(nodemap, 2)
-            for i = 1:size(nodemap, 1)
-                idx = nodemap[i,j]
-                if idx == 0
-                    continue
-                else
-                    current_map[i,j] = node_currents[idx]
-                end
+    current_map = zeros(eltype(G), hbmeta.nrows, hbmeta.ncols)
+    for j = 1:size(nodemap, 2)
+        for i = 1:size(nodemap, 1)
+            idx = nodemap[i,j]
+            if idx == 0
+                continue
+            else
+                current_map[i,j] = node_currents[idx]
             end
         end
-
-        return current_map, nothing
     end
+
+    current_map, nothing
 end
 
 """
@@ -391,28 +398,17 @@ function write_grid(cmap, name, cfg, hbmeta, cellmap = nothing;
                  file_format)
 end
 
-function write_volt_maps(name, output, component_data, cfg)
+write_volt_maps(name, output, component_data, cfg) =
+    write_volt_maps(component_data.geometry, name, _voltages(output), cfg)
 
-    voltages = _voltages(output)
+write_volt_maps(geometry::NetworkGeometry, name, voltages, cfg) =
+    write_voltages(cfg.output_file, name, voltages, geometry.nodes)
 
-    if !is_raster(cfg)
-
-        cc = component_data.cc
-        write_voltages(cfg.output_file, name, voltages, cc)
-
-    else
-
-        # Desired data
-        # voltages = output.voltages
-        cc = component_data.cc
-        hbmeta = component_data.hbmeta
-        nodemap = component_data.local_nodemap
-        set_null_voltages_to_nodata = cfg.set_null_voltages_to_nodata
-
-        vm = _create_voltage_map(voltages, nodemap, hbmeta)
-        write_grid(vm, name, cfg, hbmeta, component_data.cellmap, voltage = true,
-                        set_null_to_nodata = set_null_voltages_to_nodata)
-    end
+function write_volt_maps(geometry::RasterGeometry, name, voltages, cfg)
+    hbmeta = geometry.hbmeta
+    vm = _create_voltage_map(voltages, geometry.nodemap, hbmeta)
+    write_grid(vm, name, cfg, hbmeta, geometry.cellmap, voltage = true,
+                    set_null_to_nodata = cfg.set_null_voltages_to_nodata)
 end
 
 function write_voltages(output, name, voltages::Vector{T}, cc) where {T}
@@ -439,23 +435,24 @@ function _create_voltage_map(voltages::Vector{T}, nodemap, hbmeta) where {T}
     voltmap
 end
 
-alloc_map(hbmeta) = zeros(hbmeta.nrows, hbmeta.ncols)
-
-function accum_voltages!(base, newvolt, nodemap, hbmeta)
-    voltmap = _create_voltage_map(newvolt, nodemap, hbmeta)
+# Advanced mode solves every component into one map: each component's
+# voltages / currents are spread onto the grid through its local geometry and
+# added to `base`. Networks keep whole-graph vectors instead, so nothing to do.
+function accum_voltages!(base, voltages, geometry::RasterGeometry)
+    voltmap = _create_voltage_map(voltages, geometry.nodemap, geometry.hbmeta)
     for i in eachindex(base)
         base[i] += voltmap[i]
     end
 end
+accum_voltages!(base, voltages, ::NetworkGeometry) = nothing
 
-function accum_currents!(base, newcurr, cfg, G, voltages, finitegrounds, nodemap, hbmeta)
-    node_currents, branch_currents = _create_current_maps(G, voltages, finitegrounds, cfg,
-                                                            nodemap = nodemap, hbmeta = hbmeta)
-
+function accum_currents!(base, G, voltages, finitegrounds, geometry::RasterGeometry)
+    node_currents, _ = _create_current_maps(G, voltages, finitegrounds, geometry)
     for i in eachindex(base)
         base[i] += node_currents[i]
     end
 end
+accum_currents!(base, G, voltages, finitegrounds, ::NetworkGeometry) = nothing
 
 function save_resistances(r, cfg)
     pref = split(cfg.output_file, ".out")[1]
@@ -470,13 +467,32 @@ function save_resistances(r, cfg)
     end
 end
 
-function write_cum_maps(cum, cellmap::Matrix{T}, cfg, hbmeta) where T
+"""
+    write_cum_maps(cum, geometry, cfg)
 
-    if cfg.write_cum_cur_map_only || cfg.write_cur_maps
-        cum_curr = cum.cum_curr
-        postprocess_cum_curmap!(cum_curr)
-        write_grid(cum_curr, "", cfg, hbmeta, cum = true)
-    end
+Write the cumulative (and maximum) current maps accumulated over a pairwise
+run, in whatever form the geometry calls for.
+"""
+write_cum_maps(cum, geometry::RasterGeometry, cfg) = write_cum_maps(cum, geometry.hbmeta, cfg)
+
+function write_cum_maps(cum, geometry::NetworkGeometry, cfg)
+    cfg.write_cur_maps || return nothing
+    cum_node_curr = cum.cum_node_curr
+    cum_branch_curr = cum.cum_branch_curr
+    cum_node_curr = hcat(1:length(cum_node_curr), cum_node_curr)
+    coords = cum.coords
+    cum_branch_curr = hcat(getindex.(coords, 1), getindex.(coords, 2), cum_branch_curr)
+    write_currents(cum_node_curr, cum_branch_curr, "_cum", cfg)
+end
+
+# Grid form, shared with the paths that keep a cumulative map of their own
+# (focal regions, one-to-all).
+function write_cum_maps(cum, hbmeta::RasterMeta, cfg)
+    (cfg.write_cur_maps || cfg.write_cum_cur_map_only) || return nothing
+
+    cum_curr = cum.cum_curr
+    postprocess_cum_curmap!(cum_curr)
+    write_grid(cum_curr, "", cfg, hbmeta, cum = true)
 
     if cfg.write_max_cur_maps
         max_curr = cum.max_curr

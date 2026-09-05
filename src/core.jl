@@ -10,26 +10,26 @@ struct Cumulative{T,V}
     lock::ReentrantLock
 end
 
-struct GraphProblem{T,V,W}
+# A pairwise problem: the graph Laplacian, its connected components, the focal
+# nodes (graph indices, with the user's ids alongside) and where each node
+# lands in the output. Raster and network differ only in `geometry`.
+struct GraphProblem{T,V,W,Geom<:Geometry}
     G::SparseMatrixCSC{T,V}
     cc::Vector{Vector{V}}
     points::Vector{V}
     user_points::Vector{V}
     exclude_pairs::Vector{Tuple{V,V}}
-    nodemap::Matrix{V}
-    polymap::Matrix{V}
-    hbmeta::RasterMeta
-    cellmap::Matrix{T}
+    geometry::Geom
     cum::Cumulative{T}
     solver::W
 end
 
-struct ComponentData{T,V}
+# One connected component as the output writers see it: its node list, its
+# matrix and its geometry restricted to the component's local numbering.
+struct ComponentData{T,V,Geom<:Geometry}
     cc::Vector{V}
     matrix::SparseMatrixCSC{T,V}
-    local_nodemap::Matrix{V}
-    hbmeta::RasterMeta
-    cellmap::Matrix{T}
+    geometry::Geom
 end
 
 struct Output{T,V}
@@ -193,11 +193,8 @@ function solve(prob::GraphProblem{T,V}, solver::Solver, cfg, log)::Matrix{T} whe
     cc = prob.cc
     points = prob.points
     exclude = prob.exclude_pairs
-    nodemap = prob.nodemap
-    polymap = prob.polymap
     orig_pts = prob.user_points
-    hbmeta = prob.hbmeta
-    cellmap = prob.cellmap
+    geometry = prob.geometry
     cum = prob.cum
 
     # Output options
@@ -222,7 +219,7 @@ function solve(prob::GraphProblem{T,V}, solver::Solver, cfg, log)::Matrix{T} whe
     comps = getindex.([a], cc, cc)
 
     get_shortcut_resistances = false
-    if is_raster(cfg) && !write_volt_maps && !write_cur_maps &&
+    if is_raster(geometry) && !write_volt_maps && !write_cur_maps &&
             !write_cum_cur_map_only && !write_max_cur_maps &&
             isempty(exclude)
         get_shortcut_resistances = true
@@ -249,10 +246,10 @@ function solve(prob::GraphProblem{T,V}, solver::Solver, cfg, log)::Matrix{T} whe
         matrix = comps[cid]
         handle = prepare!(solver, matrix)
 
-        # Get local nodemap for CC - useful for output writing
-        local_nodemap = @timeit CSTIMER[] "construct local nodemap" construct_local_node_map(nodemap, comp, polymap)
+        # Geometry of this CC in local numbering - for output writing
+        local_geometry = @timeit CSTIMER[] "construct local nodemap" restrict(geometry, comp)
 
-        component_data = ComponentData(comp, matrix, local_nodemap, hbmeta, cellmap)
+        component_data = ComponentData(comp, matrix, local_geometry)
 
         groups = pair_jobs(csub, comp, points, orig_pts, exclude, get_shortcut_resistances;
                            positions)
@@ -612,10 +609,6 @@ end
 function postprocess(output, component_data, shortcut, cfg)
 
 
-    voltages = output.voltages
-    matrix = component_data.matrix
-    local_nodemap = component_data.local_nodemap
-    hbmeta = component_data.hbmeta
     orig_pts = output.orig_pts
 
     # Shortcut flags and data

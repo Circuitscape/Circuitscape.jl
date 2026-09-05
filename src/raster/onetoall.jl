@@ -1,13 +1,14 @@
-function raster_one_to_all(T, V, cfg)::Matrix{T}
+"""
+    run_onetoall(data::RasterData, cfg)
 
-    # Load the data
-    rasterdata = load_raster_data(T, V, cfg)
-
-    # Send to main kernel
-    onetoall_kernel(rasterdata, cfg)
-end
-
-function onetoall_kernel(data::RasterData{T,V}, cfg)::Matrix{T} where {T,V}
+One-to-all and all-to-one modes. Every focal point becomes a node of one
+shared graph; then for each focal node in turn the source and ground
+vectors are built (one-to-all: it is the source and the others are direct
+grounds; all-to-one: it is the ground and the others are sources) and the
+advanced kernel solves its component. Returns the focal ids with the
+effective resistance of each.
+"""
+function run_onetoall(data::RasterData{T,V}, cfg)::Matrix{T} where {T,V}
 
     # Data
     strengths = data.strengths
@@ -16,15 +17,12 @@ function onetoall_kernel(data::RasterData{T,V}, cfg)::Matrix{T} where {T,V}
     gmap = data.cellmap
     polymap = data.polymap
     hbmeta = data.hbmeta
-    source_map = data.source_map
 
     # Options
     use_variable_strengths = !isempty(strengths)
     use_included_pairs = !isempty(included_pairs)
     mode = included_pairs.mode == :include ? 0 : 1
     one_to_all = is_onetoall(cfg)
-    avg_res = cfg.connect_using_avg_resistances
-    four_neighbors = cfg.connect_four_neighbors_only
 
     if use_included_pairs
         prune_points!(points_rc, included_pairs.point_ids)
@@ -42,23 +40,16 @@ function onetoall_kernel(data::RasterData{T,V}, cfg)::Matrix{T} where {T,V}
 
     points_unique = unique(points_rc[3])
 
+    # The shared graph: focal points merged into the polygons
     newpoly = create_new_polymap(gmap, polymap, points_rc, 0, 0, point_map)
+    G, cc, geometry = build_graph(data, cfg, newpoly)
+    nodemap = geometry.nodemap
+    @info("There are $(size(G, 1)) points and $(length(cc)) connected components")
 
-    nodemap = construct_node_map(gmap, newpoly)
-
-    a = construct_graph(gmap, nodemap, avg_res, four_neighbors)
-    cc = connected_components(a)
-    G = laplacian!(a)
-    @info("There are $(size(a, 1)) points and $(length(cc)) connected components")
-
-    # source_map = Matrix{eltype(a)}(0, 0)
-    # ground_map = Matrix{eltype(a)}(0, 0)
-    s = zeros(eltype(a), size(point_map))
-    z = deepcopy(s)
     cum = initialize_cum_maps(gmap, cfg.write_max_cur_maps)
 
     point_ids = included_pairs.point_ids
-    res = zeros(eltype(a), size(points_unique, 1))
+    res = zeros(T, size(points_unique, 1))
     num_points_to_solve = size(points_unique, 1)
     original_point_map = copy(point_map)
     unique_point_map = zeros(V, size(gmap))
@@ -72,17 +63,17 @@ function onetoall_kernel(data::RasterData{T,V}, cfg)::Matrix{T} where {T,V}
     # With an include/exclude file the set of focal points that act as
     # sources/grounds changes from one focal point to the next. When every focal
     # point is a single cell that never changes the graph: an inactive point is
-    # still an ordinary node, so the nodemap, graph and Laplacian built above are
-    # valid for every solve and only the source/ground vectors differ. Only when
-    # a focal point spans several cells (a focal region) does the topology
-    # depend on which points are active, because a region collapses into one
-    # node only while it is active. That is the one case that needs a rebuild
-    # per focal point. (Same test as `raster_pairwise`.)
+    # still an ordinary node, so the graph built above is valid for every solve
+    # and only the source/ground vectors differ. Only when a focal point spans
+    # several cells (a focal region) does the topology depend on which points
+    # are active, because a region collapses into one node only while it is
+    # active. That is the one case that needs a rebuild per focal point. (Same
+    # test as `has_focal_regions`.)
     point_file_no_polygons = length(points_rc[1]) == length(points_unique)
 
-    # @distributed for i = 1:num_points_to_solve
+    # Solve focal point `i`; returns its current map, or nothing if skipped
     function f(i)
-        let point_map = copy(original_point_map), s = copy(z), strength_map = copy(strength_map), source_map = source_map, newpoly = newpoly, nodemap = nodemap, G = G, cc = cc
+        let point_map = copy(original_point_map), strength_map = copy(strength_map), newpoly = newpoly, nodemap = nodemap, G = G, cc = cc
         str = use_variable_strengths ? strengths[i,2] : 1
         @info("Solving point $i of $num_points_to_solve")
         n = points_unique[i]
@@ -100,16 +91,11 @@ function onetoall_kernel(data::RasterData{T,V}, cfg)::Matrix{T} where {T,V}
             end
             if !point_file_no_polygons
                 # Focal regions: excluded regions must not be merged into a
-                # single node for this solve, so rebuild the polymap, nodemap,
-                # graph and Laplacian from the pruned point map. The nodemap
-                # has to come from `newpoly` (not `polymap`) and G/cc have to be
-                # rebuilt with it, otherwise node numbering and the Laplacian
-                # disagree and the wrong cells are grounded.
+                # single node for this solve, so rebuild the graph from the
+                # pruned point map.
                 newpoly = create_new_polymap(gmap, polymap, points_rc, 0, 0, point_map)
-                nodemap = construct_node_map(gmap, newpoly)
-                a_i = construct_graph(gmap, nodemap, avg_res, four_neighbors)
-                cc = connected_components(a_i)
-                G = laplacian!(a_i)
+                G, cc, point_geometry = build_graph(data, cfg, newpoly)
+                nodemap = point_geometry.nodemap
             end
         end
         if use_variable_strengths
@@ -139,28 +125,22 @@ function onetoall_kernel(data::RasterData{T,V}, cfg)::Matrix{T} where {T,V}
             ground_map = map(x -> x == n ? Inf : T(0), point_map)
         end
 
-        # `i` indexes `points_unique`, not the rows of `points_rc`; the two only
-        # coincide when every focal point is a single cell. Look the cell up by
-        # node ID so focal regions get the right node.
+        # Only the component holding this focal node is solved. `i` indexes
+        # `points_unique`, not the rows of `points_rc`; look the cell up by id
+        # so focal regions get the right node.
         ind = findfirst(isequal(n), points_rc[3])
         check_node = nodemap[points_rc[1][ind], points_rc[2][ind]]
 
+        point_geometry = RasterGeometry(nodemap, newpoly, hbmeta, gmap)
         policy = one_to_all ? :rmvgnd : :rmvsrc
         sources, grounds, finite_grounds =
-                    _get_sources_and_grounds(source_map, ground_map,
-                            cfg, G, nodemap, policy)
+                    sources_and_grounds(point_geometry, source_map, ground_map, G, cfg, policy)
 
+        prob = AdvancedProblem(G, cc, point_geometry, sources, grounds, finite_grounds, get_solver(cfg))
+        voltages, curr, solver_called = advanced_kernel(prob, cfg; check_node, name = "_$(V(n))")
 
-        solver = get_solver(cfg)
-
-        advanced_data = AdvancedProblem(G, cc, nodemap, newpoly, hbmeta,
-                        sources, grounds, source_map, finite_grounds,
-                        check_node, n, gmap, solver)
-
-
-        v, curr = advanced_kernel(advanced_data, cfg)
-        res[i] = v[1]
-
+        res[i] = onetoall_resistance(voltages, solver_called, one_to_all, n, str,
+                                     unique_point_map, nodemap)
         return curr
         end
     end
@@ -179,11 +159,22 @@ function onetoall_kernel(data::RasterData{T,V}, cfg)::Matrix{T} where {T,V}
         cfg.write_max_cur_maps && (cum.max_curr .= max.(cum.max_curr, curr))
     end
 
-    if cfg.write_cur_maps || cfg.write_cum_cur_map_only
-        write_cum_maps(cum, gmap, cfg, hbmeta)
-    end
+    write_cum_maps(cum, hbmeta, cfg)
 
     hcat(points_unique, res)
+end
+
+# The effective resistance of focal node `n` from one solve: in one-to-all its
+# voltage over the injected strength, -1 if nothing was solved or the voltage
+# is zero; all-to-one only writes maps and reports 0 for a solved node.
+function onetoall_resistance(voltages::Vector{T}, solver_called, one_to_all, n, str,
+                             unique_point_map, nodemap) where T
+    solver_called || return T(-1)
+    one_to_all || return T(0)
+    cell = findfirst(isequal(n), unique_point_map)
+    node = nodemap[cell]
+    val = node == 0 ? T(0) : voltages[node] / T(str)
+    val ≈ 0 ? T(-1) : val
 end
 
 function prune_points!(points_rc, point_ids::Vector{V}) where V
