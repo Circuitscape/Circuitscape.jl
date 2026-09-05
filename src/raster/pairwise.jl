@@ -18,9 +18,7 @@ function _pt_file_no_polygons_path(rasterdata::RasterData{T,V}, cfg)::Matrix{T} 
     graphdata = @timeit CSTIMER[] "construct graph" compute_graph_data_no_polygons(rasterdata, cfg)
     r = @timeit CSTIMER[] "solve pairwise resistances" single_ground_all_pairs(graphdata, cfg)
 
-    if cfg.write_cur_maps || cfg.write_cum_cur_map_only
-        @timeit CSTIMER[] "write cumulative current maps" write_cum_maps(graphdata.cum, rasterdata.cellmap, cfg, rasterdata.hbmeta)
-    end
+    @timeit CSTIMER[] "write cumulative current maps" write_cum_maps(graphdata.cum, graphdata.geometry, cfg)
 
     r
 end
@@ -69,7 +67,7 @@ function _pt_file_polygons_path(rasterdata::RasterData{T,V}, cfg)::Matrix{T} whe
     r = hcat(P, vcat(pts', resistances))
 
     if cfg.write_cur_maps || cfg.write_cum_cur_map_only
-        write_cum_maps(cum, gmap, cfg, rasterdata.hbmeta)
+        write_cum_maps(cum, rasterdata.hbmeta, cfg)
     end
 
     # save resistances
@@ -133,8 +131,8 @@ function compute_graph_data_polygons(rasterdata::RasterData{T,V},
 
     solver = get_solver(cfg)
     
-    GraphProblem(G, cc, points, [pt1, pt2], 
-            exclude_pairs, nodemap, newpoly, hbmeta, gmap, cum, solver)
+    GraphProblem(G, cc, points, [pt1, pt2], exclude_pairs,
+            RasterGeometry(nodemap, newpoly, hbmeta, gmap), cum, solver)
 end
 
 function compute_graph_data_no_polygons(data::RasterData{T,V}, cfg)::GraphProblem{T,V} where {T,V}
@@ -178,9 +176,8 @@ function compute_graph_data_no_polygons(data::RasterData{T,V}, cfg)::GraphProble
 
     solver = get_solver(cfg)
 
-    GraphProblem(G, cc, points, points_rc[3], 
-                exclude_pairs, nodemap, polymap, 
-                hbmeta, cellmap, cum, solver)
+    GraphProblem(G, cc, points, points_rc[3], exclude_pairs,
+                RasterGeometry(nodemap, polymap, hbmeta, cellmap), cum, solver)
 
 end
 

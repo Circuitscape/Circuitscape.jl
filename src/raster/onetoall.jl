@@ -145,17 +145,18 @@ function onetoall_kernel(data::RasterData{T,V}, cfg)::Matrix{T} where {T,V}
         ind = findfirst(isequal(n), points_rc[3])
         check_node = nodemap[points_rc[1][ind], points_rc[2][ind]]
 
+        geometry = RasterGeometry(nodemap, newpoly, hbmeta, gmap)
         policy = one_to_all ? :rmvgnd : :rmvsrc
         sources, grounds, finite_grounds =
                     _get_sources_and_grounds(source_map, ground_map,
-                            cfg, G, nodemap, policy)
+                            cfg, G, geometry, policy)
 
 
         solver = get_solver(cfg)
 
-        advanced_data = AdvancedProblem(G, cc, nodemap, newpoly, hbmeta,
+        advanced_data = AdvancedProblem(G, cc, geometry,
                         sources, grounds, source_map, finite_grounds,
-                        check_node, n, gmap, solver)
+                        check_node, n, solver)
 
 
         v, curr = advanced_kernel(advanced_data, cfg)
@@ -180,7 +181,7 @@ function onetoall_kernel(data::RasterData{T,V}, cfg)::Matrix{T} where {T,V}
     end
 
     if cfg.write_cur_maps || cfg.write_cum_cur_map_only
-        write_cum_maps(cum, gmap, cfg, hbmeta)
+        write_cum_maps(cum, hbmeta, cfg)
     end
 
     hcat(points_unique, res)

@@ -244,20 +244,16 @@ function compute_omniscape_current(
     data = compute_advanced_data(rasterdata, cfg)
 
     G = data.G
-    nodemap = data.nodemap
-    polymap = data.polymap
-    hbmeta = data.hbmeta
+    geometry = data.geometry
     sources = data.sources
     grounds = data.grounds
     finitegrounds = data.finitegrounds
     cc = data.cc
     check_node = data.check_node
-    source_map = data.source_map # Need it for one to all mode
-    cellmap = data.cellmap
 
     f_local = Vector{eltype(G)}()
     voltages = Vector{eltype(G)}()
-    outcurr = alloc_map(hbmeta)
+    outcurr = alloc_map(geometry)
 
     for c in cc
         if check_node != -1 && !(check_node in c)
@@ -285,18 +281,7 @@ function compute_omniscape_current(
                                    g_local,
                                    f_local)
 
-        local_nodemap = construct_local_node_map(nodemap,
-                                                 c,
-                                                 polymap)
-
-        accum_currents!(outcurr,
-                        voltages,
-                        cfg,
-                        a_local,
-                        voltages,
-                        f_local,
-                        local_nodemap,
-                        hbmeta)
+        accum_currents!(outcurr, a_local, voltages, f_local, restrict(geometry, c))
     end
 
     return outcurr

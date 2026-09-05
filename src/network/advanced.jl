@@ -32,16 +32,15 @@ function compute_advanced_data(data::NetworkData{T,V}, cfg)::AdvancedProblem{T,V
 
     G = @timeit CSTIMER[] "construct graph laplacian" laplacian!(A)
 
-    nodemap, polymap = Matrix{V}(undef,0,0), Matrix{V}(undef,0,0)
-    cellmap = Matrix{T}(undef,0,0)
+    geometry = NetworkGeometry(collect(V, 1:size(G,1)))
 
     solver = get_solver(cfg)
 
-    sources, grounds, finite_grounds = 
-                get_sources_and_grounds(data, cfg, G, nodemap)
+    sources, grounds, finite_grounds =
+                get_sources_and_grounds(data, cfg, G, geometry)
 
     source_map = Matrix{eltype(A)}(undef,0,0)
-    AdvancedProblem(G, cc, nodemap, polymap, RasterMeta(), 
-                 sources, grounds, source_map, finite_grounds, V(-1), V(0), cellmap, solver)
+    AdvancedProblem(G, cc, geometry,
+                 sources, grounds, source_map, finite_grounds, V(-1), V(0), solver)
 
 end

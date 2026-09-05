@@ -1,16 +1,13 @@
-struct AdvancedProblem{T,V,W}
+struct AdvancedProblem{T,V,W,Geom<:Geometry}
     G::SparseMatrixCSC{T,V}
     cc::Vector{Vector{V}}
-    nodemap::Matrix{V}
-    polymap::Matrix{V}
-    hbmeta::RasterMeta
+    geometry::Geom
     sources::Vector{T}
     grounds::Vector{T}
     source_map::Matrix{T} # Needed for one to all mode
     finitegrounds::Vector{T}
     check_node::V
     src::V
-    cellmap::Matrix{T}
     solver::W
 end
 
@@ -52,61 +49,79 @@ function compute_advanced_data(data::RasterData{T,V}, cfg)::AdvancedProblem{T,V}
     # Connected Components
     cc = connected_components(G)
 
+    geometry = RasterGeometry(nodemap, polymap, hbmeta, cellmap)
+
     # Advanced mode specific stuff
     sources, grounds, finitegrounds =
-            get_sources_and_grounds(data, cfg, G, nodemap)
+            get_sources_and_grounds(data, cfg, G, geometry)
 
     solver = get_solver(cfg)
 
-    AdvancedProblem(G, cc, nodemap, polymap, hbmeta,
+    AdvancedProblem(G, cc, geometry,
                 sources, grounds, source_map,
-                finitegrounds, V(-1), V(0), cellmap, solver)
+                finitegrounds, V(-1), V(0), solver)
 
 end
 
-function get_sources_and_grounds(data, cfg, G, nodemap)
+function get_sources_and_grounds(data, cfg, G, geometry)
 
     # Data
     source_map = data.source_map
     ground_map = data.ground_map
 
-    _get_sources_and_grounds(source_map, ground_map, cfg, G, nodemap)
+    _get_sources_and_grounds(source_map, ground_map, cfg, G, geometry)
 end
 
+"""
+    _get_sources_and_grounds(source_map, ground_map, cfg, G, geometry, override_policy = :none)
+
+Source and ground vectors over the graph nodes from the user's source and
+ground inputs, with conflicts between the two resolved by `policy(cfg)` (or
+`override_policy`). For a raster the inputs are grids read through the
+nodemap; for a network they are `(node, value)` lists.
+"""
 function _get_sources_and_grounds(source_map, ground_map,
-                                  cfg, G, nodemap::Matrix{V}, override_policy = :none) where V
-    # Options
-    grnd_file_is_res = cfg.ground_file_is_resistances
+                                  cfg, G, geometry::Geometry, override_policy = :none)
     conflict_policy = override_policy == :none ? policy(cfg) : override_policy
 
     # Initialize sources and grounds
     sources = zeros(eltype(G), size(G, 1))
     grounds = zeros(eltype(G), size(G, 1))
 
-    if is_raster(cfg)
-        (i1, j1, v1) = begin _I = findall(!iszero, source_map); getindex.(_I, 1), getindex.(_I, 2), source_map[_I] end
-        (i2, j2, v2) = begin _I = findall(!iszero, ground_map); getindex.(_I, 1), getindex.(_I, 2), ground_map[_I] end
-        for i = 1:size(i1, 1)
-            v = V(nodemap[i1[i], j1[i]])
-            if v != 0
-                sources[v] += v1[i]
-            end
-        end
-        for i = 1:size(i2, 1)
-            v = V(nodemap[i2[i], j2[i]])
-            if v != 0
-                grounds[v] += v2[i]
-            end
-        end
-    else
-        if grnd_file_is_res
-            ground_map[:,2] = 1 ./ ground_map[:,2]
-        end
-        sources[V.(source_map[:,1])] = source_map[:,2]
-        grounds[V.(ground_map[:,1])] = ground_map[:,2]
-    end
+    fill_sources_and_grounds!(sources, grounds, source_map, ground_map, cfg, geometry)
+
     sources, grounds, finitegrounds =
         resolve_conflicts(sources, grounds, conflict_policy)
+end
+
+function fill_sources_and_grounds!(sources, grounds, source_map, ground_map, cfg,
+                                   geometry::RasterGeometry{T,V}) where {T,V}
+    nodemap = geometry.nodemap
+    (i1, j1, v1) = begin _I = findall(!iszero, source_map); getindex.(_I, 1), getindex.(_I, 2), source_map[_I] end
+    (i2, j2, v2) = begin _I = findall(!iszero, ground_map); getindex.(_I, 1), getindex.(_I, 2), ground_map[_I] end
+    for i = 1:size(i1, 1)
+        v = V(nodemap[i1[i], j1[i]])
+        if v != 0
+            sources[v] += v1[i]
+        end
+    end
+    for i = 1:size(i2, 1)
+        v = V(nodemap[i2[i], j2[i]])
+        if v != 0
+            grounds[v] += v2[i]
+        end
+    end
+    nothing
+end
+
+function fill_sources_and_grounds!(sources, grounds, source_map, ground_map, cfg,
+                                   ::NetworkGeometry{V}) where {V}
+    if cfg.ground_file_is_resistances
+        ground_map[:,2] = 1 ./ ground_map[:,2]
+    end
+    sources[V.(source_map[:,1])] = source_map[:,2]
+    grounds[V.(ground_map[:,1])] = ground_map[:,2]
+    nothing
 end
 
 function resolve_conflicts(sources::Vector{T},
@@ -145,9 +160,7 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, cfg)::Tuple{Matrix{T},Mat
 
     # Data
     G = prob.G
-    nodemap = prob.nodemap
-    polymap = prob.polymap
-    hbmeta = prob.hbmeta
+    geometry = prob.geometry
     sources = prob.sources
     grounds = prob.grounds
     finitegrounds = prob.finitegrounds
@@ -155,24 +168,19 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, cfg)::Tuple{Matrix{T},Mat
     src = prob.src
     check_node = prob.check_node
     source_map = prob.source_map # Need it for one to all mode
-    cellmap = prob.cellmap
-
 
     # Options
-    raster = is_raster(cfg)
     alltoone = is_alltoone(cfg)
     onetoall = is_onetoall(cfg)
     write_v_maps = cfg.write_volt_maps
     write_c_maps = cfg.write_cur_maps
     write_cum_cur_map_only = cfg.write_cum_cur_map_only
 
-    volt = zeros(eltype(G), size(nodemap))
-    ind = findall(x->x!=0,nodemap)
     f_local = Vector{eltype(G)}()
     solver_called = false
 	voltages = zeros(eltype(G), size(G, 1))
-    outvolt = alloc_map(hbmeta)
-    outcurr = alloc_map(hbmeta)
+    outvolt = alloc_map(geometry)
+    outcurr = alloc_map(geometry)
 
     for c in cc
 
@@ -195,61 +203,49 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, cfg)::Tuple{Matrix{T},Mat
         end
 
 		voltages[c] .+= multiple_solver(cfg, prob.solver, a_local, s_local, g_local, f_local)
-
-        local_nodemap = construct_local_node_map(nodemap, c, polymap)
         solver_called = true
 
-        if write_v_maps
-			raster ? accum_voltages!(outvolt, voltages[c], local_nodemap, hbmeta) :
-				accum_voltages!(outvolt, voltages, local_nodemap, hbmeta)
-        end
-        if write_c_maps
-			raster ? accum_currents!(outcurr, voltages[c], cfg, a_local, voltages[c], f_local, local_nodemap, hbmeta) :
-				accum_currents!(outcurr, voltages, cfg, G, voltages, finitegrounds, local_nodemap, hbmeta)
-        end
-
-		_is = map(i -> Int(local_nodemap[i]), 1:length(volt))
-		_isn0 = findall(!iszero, _is)
-		volt[_isn0] .= voltages[c][_is[_isn0]]
+        local_geometry = restrict(geometry, c)
+        write_v_maps && accum_voltages!(outvolt, voltages[c], local_geometry)
+        write_c_maps && accum_currents!(outcurr, a_local, voltages[c], f_local, local_geometry)
     end
 
     name = src == 0 ? "" : "_$(V(src))"
-    if write_v_maps
-        if !raster
-            write_volt_maps(name, voltages, FullGraph(G, cellmap), cfg)
-        else
-            write_grid(outvolt, name, cfg, hbmeta, cellmap, voltage = true)
-        end
-    end
+    write_v_maps && write_advanced_volt_map(name, voltages, outvolt, geometry, cfg)
 
     # Issue 342: in one-to-all / all-to-one every focal node is active on each
     # solve (one as source, the rest as grounds), so all of them are zeroed.
-    if raster && (onetoall || alltoone) && cfg.set_focal_node_currents_to_zero
+    if (onetoall || alltoone) && cfg.set_focal_node_currents_to_zero
         active = V[n for n in eachindex(sources) if sources[n] != 0 || grounds[n] != 0]
-        zero_focal_cells!(outcurr, nodemap, Set(active))
+        zero_focal_nodes!(outcurr, geometry, Set(active))
     end
 
     if write_c_maps || write_cum_cur_map_only
-        if !raster
-            write_cur_maps(name, voltages, FullGraph(G, cellmap), finitegrounds, cfg)
-        else
-            write_grid(outcurr, name, cfg, hbmeta, cellmap)
-        end
+        write_advanced_cur_map(name, voltages, outcurr, G, finitegrounds, geometry, cfg)
     end
 
-    if !raster
-        v = [collect(1:size(G, 1))  voltages]
-        return v, outcurr
-    end
+    advanced_result(voltages, outcurr, solver_called, source_map, geometry, cfg)
+end
 
-    scenario = cfg.scenario
+# The value an advanced-mode run returns. A network run returns every node's
+# voltage; a raster run returns the voltage grid, or, in one-to-all /
+# all-to-one, the effective resistance of the focal node solved.
+function advanced_result(voltages::Vector{T}, outcurr, solver_called, source_map,
+                         geometry::NetworkGeometry, cfg) where T
+    v = [geometry.nodes voltages]
+    v, outcurr
+end
+
+function advanced_result(voltages::Vector{T}, outcurr, solver_called, source_map,
+                         geometry::RasterGeometry, cfg) where T
     if !solver_called
         ret = Matrix{T}(undef,1,1)
         ret[1] = -1
         return ret, outcurr
     end
 
-    if onetoall
+    if is_onetoall(cfg)
+        volt = _create_voltage_map(voltages, geometry.nodemap, geometry.hbmeta)
         idx = findall(x->x!=0,source_map)
         val = volt[idx] ./ source_map[idx]
         if val[1] ≈ 0
@@ -261,14 +257,33 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, cfg)::Tuple{Matrix{T},Mat
             ret[:,1] = val
             return ret, outcurr
         end
-    elseif alltoone
+    elseif is_alltoone(cfg)
         ret = Matrix{T}(undef,1,1)
         ret[1] = 0
         return ret, outcurr
     end
 
-    return volt, outcurr
+    _create_voltage_map(voltages, geometry.nodemap, geometry.hbmeta), outcurr
 end
+
+# Zero the current of every cell whose node is in `nodes`; a network has no
+# current map to zero.
+zero_focal_nodes!(outcurr, geometry::RasterGeometry, nodes) =
+    zero_focal_cells!(outcurr, geometry.nodemap, nodes)
+zero_focal_nodes!(outcurr, ::NetworkGeometry, nodes) = outcurr
+
+# Advanced mode writes one voltage and one current map per run from the
+# whole-graph voltages: a grid for a raster, node (and branch) lists for a
+# network.
+write_advanced_volt_map(name, voltages, outvolt, geometry::RasterGeometry, cfg) =
+    write_grid(outvolt, name, cfg, geometry.hbmeta, geometry.cellmap, voltage = true)
+write_advanced_volt_map(name, voltages, outvolt, geometry::NetworkGeometry, cfg) =
+    write_volt_maps(geometry, name, voltages, cfg)
+
+write_advanced_cur_map(name, voltages, outcurr, G, finitegrounds, geometry::RasterGeometry, cfg) =
+    write_grid(outcurr, name, cfg, geometry.hbmeta, geometry.cellmap)
+write_advanced_cur_map(name, voltages, outcurr, G, finitegrounds, geometry::NetworkGeometry, cfg) =
+    write_cur_maps(name, voltages, ComponentData(geometry.nodes, G, geometry), finitegrounds, cfg)
 
 
 function multiple_solver(cfg, solver, a::SparseMatrixCSC{T,V}, sources, grounds, finitegrounds) where {T,V}
@@ -328,13 +343,3 @@ function multiple_solve(cfg, s::AccelerateSolver, matrix::SparseMatrixCSC{T,V}, 
     factor = construct_cholesky_factor(matrix, s)
     solve_linear_system(factor, matrix, sources; tol = residual_tolerance(cfg, T))
 end
-
-struct FullGraph{T,V}
-    matrix::SparseMatrixCSC{T,V}
-    cc::Vector{V}
-    local_nodemap::Matrix{V}
-    hbmeta::RasterMeta
-    cellmap::Matrix{T}
-end
-FullGraph(G::SparseMatrixCSC{T,V}, cellmap) where {T,V} = FullGraph(G, collect(V, 1:size(G,1)),
-                            Matrix{V}(undef,0,0), RasterMeta(), cellmap)

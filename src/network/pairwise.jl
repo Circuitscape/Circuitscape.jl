@@ -13,14 +13,7 @@ function network_pairwise(T, V, cfg)::Matrix{T}
     ret = single_ground_all_pairs(graphdata, cfg)
 
 	# Write cum maps
-	if cfg.write_cur_maps
-		cum_node_curr = graphdata.cum.cum_node_curr
-		cum_branch_curr = graphdata.cum.cum_branch_curr
-		cum_node_curr = hcat(1:length(cum_node_curr), cum_node_curr)
-		coords = graphdata.cum.coords
-		cum_branch_curr = hcat(getindex.(coords, 1), getindex.(coords, 2), cum_branch_curr)
-		write_currents(cum_node_curr, cum_branch_curr, "_cum", cfg)
-	end
+	write_cum_maps(graphdata.cum, graphdata.geometry, cfg)
 
 	ret
 end
@@ -58,15 +51,10 @@ function compute_graph_data(data::NetworkData{T,V}, cfg)::GraphProblem{T,V} wher
     end
     solver = get_solver(cfg)
 
-    nodemap = Matrix{V}(undef,0,0)
-    polymap = Matrix{V}(undef,0,0)
-    hbmeta = RasterMeta()
-    cellmap = Matrix{T}(undef,0,0)
-
 	cum = initialize_cum_vectors(data.coords, size(G,1))
 
-    GraphProblem(G, cc, fp, fp, 
-                exclude_pairs, nodemap, polymap, hbmeta, cellmap, cum, solver)
+    GraphProblem(G, cc, fp, fp, exclude_pairs,
+                NetworkGeometry(collect(V, 1:size(G,1))), cum, solver)
 
 end
 
