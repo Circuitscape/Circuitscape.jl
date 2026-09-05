@@ -13,6 +13,7 @@ clean_output()
 end
 
 runtests(solver="cg+amg", parallel=true)
+runtests(solver="cg+amg", parallel=true, precision="single")
 runtests(solver="cholmod", parallel=true)
 
 accelerate_available = try
