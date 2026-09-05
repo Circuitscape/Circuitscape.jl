@@ -34,8 +34,30 @@ include("raster/advanced.jl")
 include("network/advanced.jl")
 include("raster/onetoall.jl")
 include("run.jl")
-include("INIBuilder/INIBuilder.jl")
 
-using .INIBuilder
+"""
+    Circuitscape.start()
 
+Build an INI file interactively, step by step, and optionally run it. The
+builder lives in an extension on the REPL stdlib; calling `start()` loads
+REPL on demand, so it works from a script as well as from the prompt.
+"""
+function start(args...)
+    isempty(args) || throw(MethodError(start, args))
+    load_repl_extension()
+    Base.invokelatest(start)
+end
+
+const REPL_PKGID = Base.PkgId(Base.UUID("3fa0cd96-eef1-5676-8a61-b3b8758bbffb"), "REPL")
+
+# Load the REPL stdlib if it is not already, which activates
+# CircuitscapeREPLExt and with it the zero-argument start() method.
+function load_repl_extension()
+    ext = Base.get_extension(@__MODULE__, :CircuitscapeREPLExt)
+    ext === nothing || return ext
+    Base.require(REPL_PKGID)
+    ext = Base.get_extension(@__MODULE__, :CircuitscapeREPLExt)
+    ext === nothing && error("Loading the REPL stdlib did not activate the INI builder extension")
+    ext
+end
 end

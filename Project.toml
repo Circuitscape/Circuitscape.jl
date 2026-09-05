@@ -10,18 +10,19 @@ GZip = "92fee26a-97fe-5a0c-ad85-20a5f3185b63"
 Krylov = "ba0b0d4f-ebba-5204-a429-3ac8c609bfb7"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
-REPL = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 SuiteSparse = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 
 [weakdeps]
 AppleAccelerate = "13e28ba4-7ad8-5781-acae-3021b1ed3924"
+REPL = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 ArchGDAL = "c9ce4bd3-c3d5-55b8-8973-c0e20141b8c3"
 Pardiso = "46dd5b70-b6fb-5a00-ae2d-e8fea33afaf2"
 
 [extensions]
 CircuitscapeAppleAccelerateExt = "AppleAccelerate"
+CircuitscapeREPLExt = "REPL"
 CircuitscapeArchGDALExt = "ArchGDAL"
 CircuitscapePardisoExt = "Pardiso"
 
@@ -39,7 +40,8 @@ julia = "1.11"
 [extras]
 Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+REPL = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Graphs", "Random", "Test"]
+test = ["Graphs", "Random", "REPL", "Test"]

@@ -74,7 +74,8 @@ compute(cfg)
 \end{figure}
 ```
 
-The builder is kicked off by calling `Circuitscape.start()` from the Julia prompt. It will
+The builder is kicked off by calling `Circuitscape.start()`, from the Julia prompt or a
+script. It will
 build an INI file for you step by step, and either run the job directly or write the
 final INI file to a specified location. You can exit the builder at any time by hitting
 Ctrl+C.

@@ -64,7 +64,7 @@ You can also build INI files interactively using the built-in terminal UI:
 
 ```julia
 julia> using Circuitscape
-julia> Circuitscape.INIBuilder.start()
+julia> Circuitscape.start()
 ```
 
 Or construct a configuration programmatically:
