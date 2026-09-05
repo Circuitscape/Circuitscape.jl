@@ -46,7 +46,7 @@ function compute_graph_data(data::NetworkData{T,V}, cfg)::GraphProblem{T,V} wher
 	c = size(A,1)
 	@info("Graph has $c nodes and $(length(cc)) connected components")
 
-    G = @timeit CSTIMER "construct graph laplacian" laplacian!(A)
+    G = @timeit CSTIMER[] "construct graph laplacian" laplacian!(A)
 
     # Include/exclude pairs. In include mode focal points absent from the file
     # are dropped, mirroring the raster path (issue #341).

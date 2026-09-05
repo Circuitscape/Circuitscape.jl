@@ -165,14 +165,14 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
         # solve must be a symmetric operator. AlgebraicMultigrid's default coarse
         # solver (QR) is not, and its factorization is also not safe to share
         # across the threaded pair solves below; the pseudo-inverse is both.
-        P = @timeit CSTIMER "construct preconditioner" aspreconditioner(
+        P = @timeit CSTIMER[] "construct preconditioner" aspreconditioner(
                 smoothed_aggregation(matrix;
                                      coarse_solver = AlgebraicMultigrid.Pinv,
                                      presmoother = AlgebraicMultigrid.GaussSeidel(),
                                      postsmoother = AlgebraicMultigrid.GaussSeidel()))
 
         # Get local nodemap for CC - useful for output writing
-        local_nodemap = @timeit CSTIMER "construct local nodemap" construct_local_node_map(nodemap, comp, polymap)
+        local_nodemap = @timeit CSTIMER[] "construct local nodemap" construct_local_node_map(nodemap, comp, polymap)
 
         component_data = ComponentData(comp, matrix, local_nodemap, hbmeta, cellmap)
 
@@ -270,7 +270,7 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
             # NOTE: Work is distributed by source point, giving a triangular load:
             # task 1 solves n-1 pairs, task 2 solves n-2, ..., task n solves 0.
             # This causes significant load imbalance with many threads.
-            all_results = @timeit CSTIMER "solve and accumulate pairs" if is_parallel
+            all_results = @timeit CSTIMER[] "solve and accumulate pairs" if is_parallel
                     fetch.(map(pt -> Threads.@spawn(solve_pairs_for_point(pt, local_timers[pt])), 1:n_points))
                 else
                     map(pt -> solve_pairs_for_point(pt, local_timers[pt]), 1:n_points)
@@ -278,7 +278,7 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
 
             # Merge per-task timers
             for lt in local_timers
-                merge!(CSTIMER, lt)
+                merge!(CSTIMER[], lt)
             end
 
             # Set all resistances
@@ -381,10 +381,10 @@ function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, PardisoSolv
         # Conductance matrix corresponding to CC
         matrix = comps[cid]
 
-        factor = @timeit CSTIMER "construct cholesky factor" construct_cholesky_factor(matrix, solver)
+        factor = @timeit CSTIMER[] "construct cholesky factor" construct_cholesky_factor(matrix, solver)
 
         # Get local nodemap for CC - useful for output writing
-        local_nodemap = @timeit CSTIMER "construct local nodemap" construct_local_node_map(nodemap, comp, polymap)
+        local_nodemap = @timeit CSTIMER[] "construct local nodemap" construct_local_node_map(nodemap, comp, polymap)
 
         component_data = ComponentData(comp, matrix, local_nodemap, hbmeta, cellmap)
 
@@ -477,7 +477,7 @@ function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, PardisoSolv
             end
 
             is_parallel = cfg.parallelize
-            CSTIMER_THREADs = @timeit CSTIMER "postprocess pairs" begin
+            CSTIMER_THREADs = @timeit CSTIMER[] "postprocess pairs" begin
                 if is_parallel
                     fetch.(map(bi -> Threads.@spawn(postprocess_pair(bi, batch_range, lhs)), 1:length(batch_range)))
                 else
@@ -485,7 +485,7 @@ function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, PardisoSolv
                 end
             end
             for lt in CSTIMER_THREADs
-                merge!(CSTIMER, lt)
+                merge!(CSTIMER[], lt)
             end
 
             for (col, batch_pos) in enumerate(batch_range)

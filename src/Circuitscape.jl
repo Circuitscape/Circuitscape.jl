@@ -12,8 +12,12 @@ using Logging
 using Dates
 using SuiteSparse
 using TimerOutputs
+using Base.ScopedValues
 
-const CSTIMER = TimerOutput()
+# One timer per compute() call. A scoped value rather than a global so that
+# concurrent jobs (e.g. Omniscape solving windows in parallel) do not reset or
+# merge into each other's timings; tasks spawned inside inherit it.
+const CSTIMER = ScopedValue(TimerOutput())
 
 function __init__()
     LinearAlgebra.BLAS.set_num_threads(1)
