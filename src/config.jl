@@ -281,6 +281,26 @@ function _remove_policy_symbol(v::RemovePolicy)
     v == rp_rmvall ? :rmvall : :keepall
 end
 
+# Predicates on a CSConfig. These replace the RasterFlags / NetworkFlags /
+# OutputFlags structs that used to be rebuilt from cfg at every entry point:
+# with a single representation there is no second copy for an option to be
+# parsed into and then never read from.
+is_raster(cfg::CSConfig) = cfg.data_type == dt_raster
+is_network(cfg::CSConfig) = cfg.data_type == dt_network
+is_pairwise(cfg::CSConfig) = cfg.scenario == sc_pairwise
+is_advanced(cfg::CSConfig) = cfg.scenario == sc_advanced
+is_onetoall(cfg::CSConfig) = cfg.scenario == sc_onetoall
+is_alltoone(cfg::CSConfig) = cfg.scenario == sc_alltoone
+policy(cfg::CSConfig) = _remove_policy_symbol(cfg.remove_src_or_gnd)
+
+"""
+    CSConfig(cfg::CSConfig; field = value, ...)
+
+Copy of `cfg` with the given fields replaced.
+"""
+CSConfig(cfg::CSConfig; kwargs...) =
+    CSConfig(; (f => getfield(cfg, f) for f in fieldnames(CSConfig))..., kwargs...)
+
 function Base.Dict{String,String}(cfg::CSConfig)
     a = Dict{String,String}()
     a["version"] = cfg.version

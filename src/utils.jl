@@ -70,15 +70,6 @@ function _construct_local_nodemap(local_nodemap, polymap, idx)
 end
 
 
-function get_output_flags(cfg)
-    OutputFlags(cfg.write_volt_maps, cfg.write_cur_maps,
-                cfg.write_cum_cur_map_only, cfg.write_max_cur_maps,
-                cfg.set_null_currents_to_nodata, cfg.set_null_voltages_to_nodata,
-                cfg.compress_grids, cfg.log_transform_maps,
-                cfg.set_focal_node_currents_to_zero)
-end
-
-
 # Reads the directory with the current maps
 # and accumulates all current maps
 function accumulate_current_maps(path, f)
@@ -231,20 +222,26 @@ function compute_omniscape_current(
                             included_pairs,
                             hbmeta)
 
-    # Generate advanced data
-    o = OutputFlags(
-        false, false, false, false,
-        false, false, false, false, false
-    )
+    # Omniscape drives a raster advanced-mode solve on in-memory arrays with
+    # the sources removed at conflicts and no maps written; only the solver
+    # settings and connect_four_neighbors_only are taken from the caller.
+    cfg = CSConfig(CSConfig(cs_cfg);
+                   data_type = dt_raster,
+                   scenario = sc_advanced,
+                   ground_file_is_resistances = false,
+                   remove_src_or_gnd = rp_rmvsrc,
+                   connect_using_avg_resistances = false,
+                   write_volt_maps = false,
+                   write_cur_maps = false,
+                   write_cum_cur_map_only = false,
+                   write_max_cur_maps = false,
+                   set_null_currents_to_nodata = false,
+                   set_null_voltages_to_nodata = false,
+                   set_focal_node_currents_to_zero = false,
+                   compress_grids = false,
+                   log_transform_maps = false)
 
-    cfg = CSConfig(cs_cfg)
-
-    flags = RasterFlags(
-        true, false, true, false, false, false, Symbol("rmvsrc"),
-        cfg.connect_four_neighbors_only, false, o
-    )
-
-    data = compute_advanced_data(rasterdata, flags, cfg)
+    data = compute_advanced_data(rasterdata, cfg)
 
     G = data.G
     nodemap = data.nodemap

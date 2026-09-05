@@ -6,17 +6,14 @@ function network_pairwise(T, V, cfg)::Matrix{T}
     # Get input
     networkdata = get_network_data(T, V, cfg)
 
-    # Get compute flags
-    flags = get_network_flags(cfg)
-
-    # Compute graph data based on compute flags
+    # Compute graph data
     graphdata = compute_graph_data(networkdata, cfg)
 
     # Send to main kernel
-    ret = single_ground_all_pairs(graphdata, flags, cfg)
+    ret = single_ground_all_pairs(graphdata, cfg)
 
 	# Write cum maps
-	if flags.outputflags.write_cur_maps
+	if cfg.write_cur_maps
 		cum_node_curr = graphdata.cum.cum_node_curr
 		cum_branch_curr = graphdata.cum.cum_branch_curr
 		cum_node_curr = hcat(1:length(cum_node_curr), cum_node_curr)
@@ -71,32 +68,5 @@ function compute_graph_data(data::NetworkData{T,V}, cfg)::GraphProblem{T,V} wher
     GraphProblem(G, cc, fp, fp, 
                 exclude_pairs, nodemap, polymap, hbmeta, cellmap, cum, solver)
 
-end
-
-function get_network_flags(cfg)
-
-    # Computation flags
-    is_raster = false
-    is_advanced = cfg.scenario == sc_advanced
-    is_alltoone = false
-    is_onetoall = false
-    grnd_file_is_res = cfg.ground_file_is_resistances
-    policy = _remove_policy_symbol(cfg.remove_src_or_gnd)
-
-    # Output flags
-    o = get_output_flags(cfg)
-
-    NetworkFlags(is_raster, is_advanced, is_alltoone, is_onetoall,
-                grnd_file_is_res, policy, o)
-end
-
-struct NetworkFlags
-    is_raster::Bool
-    is_advanced::Bool
-    is_alltoone::Bool
-    is_onetoall::Bool
-    grnd_file_is_res::Bool
-    policy::Symbol
-    outputflags::OutputFlags
 end
 

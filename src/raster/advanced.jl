@@ -19,22 +19,17 @@ function raster_advanced(T, V, cfg)::Matrix{T}
     # Load raster data
     rasterdata = load_raster_data(T, V, cfg)
 
-    # Get flags
-    flags = get_raster_flags(cfg)
-
-
     # Generate advanced
-    advanced_data = compute_advanced_data(rasterdata, flags, cfg)
+    advanced_data = compute_advanced_data(rasterdata, cfg)
 
     # Send to main kernel
-    v, _ = advanced_kernel(advanced_data, flags, cfg)
+    v, _ = advanced_kernel(advanced_data, cfg)
 
     v
 end
 
 
-function compute_advanced_data(data::RasterData{T,V},
-                        flags,cfg)::AdvancedProblem{T,V} where {T,V}
+function compute_advanced_data(data::RasterData{T,V}, cfg)::AdvancedProblem{T,V} where {T,V}
 
     # Data
     cellmap = data.cellmap
@@ -45,10 +40,9 @@ function compute_advanced_data(data::RasterData{T,V},
     source_map = data.source_map
 
 
-    # Flags
-    avg_res = flags.avg_res
-    four_neighbors = flags.four_neighbors
-    policy = flags.policy
+    # Options
+    avg_res = cfg.connect_using_avg_resistances
+    four_neighbors = cfg.connect_four_neighbors_only
 
     # Nodemap and graph construction
     nodemap = construct_node_map(cellmap, polymap)
@@ -60,7 +54,7 @@ function compute_advanced_data(data::RasterData{T,V},
 
     # Advanced mode specific stuff
     sources, grounds, finitegrounds =
-            get_sources_and_grounds(data, flags, G, nodemap)
+            get_sources_and_grounds(data, cfg, G, nodemap)
 
     solver = get_solver(cfg)
 
@@ -70,27 +64,26 @@ function compute_advanced_data(data::RasterData{T,V},
 
 end
 
-function get_sources_and_grounds(data, flags, G, nodemap)
+function get_sources_and_grounds(data, cfg, G, nodemap)
 
     # Data
     source_map = data.source_map
     ground_map = data.ground_map
 
-    _get_sources_and_grounds(source_map, ground_map, flags, G, nodemap)
+    _get_sources_and_grounds(source_map, ground_map, cfg, G, nodemap)
 end
 
 function _get_sources_and_grounds(source_map, ground_map,
-                                  flags, G, nodemap::Matrix{V}, override_policy = :none) where V
-    # Flags
-    is_raster = flags.is_raster
-    grnd_file_is_res = flags.grnd_file_is_res
-    policy = override_policy == :none ? flags.policy : override_policy
+                                  cfg, G, nodemap::Matrix{V}, override_policy = :none) where V
+    # Options
+    grnd_file_is_res = cfg.ground_file_is_resistances
+    conflict_policy = override_policy == :none ? policy(cfg) : override_policy
 
     # Initialize sources and grounds
     sources = zeros(eltype(G), size(G, 1))
     grounds = zeros(eltype(G), size(G, 1))
 
-    if is_raster
+    if is_raster(cfg)
         (i1, j1, v1) = begin _I = findall(!iszero, source_map); getindex.(_I, 1), getindex.(_I, 2), source_map[_I] end
         (i2, j2, v2) = begin _I = findall(!iszero, ground_map); getindex.(_I, 1), getindex.(_I, 2), ground_map[_I] end
         for i = 1:size(i1, 1)
@@ -113,7 +106,7 @@ function _get_sources_and_grounds(source_map, ground_map,
         grounds[V.(ground_map[:,1])] = ground_map[:,2]
     end
     sources, grounds, finitegrounds =
-        resolve_conflicts(sources, grounds, policy)
+        resolve_conflicts(sources, grounds, conflict_policy)
 end
 
 function resolve_conflicts(sources::Vector{T},
@@ -148,7 +141,7 @@ function resolve_conflicts(sources::Vector{T},
     sources, grounds, finitegrounds
 end
 
-function advanced_kernel(prob::AdvancedProblem{T,V,S}, flags, cfg)::Tuple{Matrix{T},Matrix{T}} where {T,V,S}
+function advanced_kernel(prob::AdvancedProblem{T,V,S}, cfg)::Tuple{Matrix{T},Matrix{T}} where {T,V,S}
 
     # Data
     G = prob.G
@@ -165,13 +158,13 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, flags, cfg)::Tuple{Matrix
     cellmap = prob.cellmap
 
 
-    # Flags
-    is_raster = flags.is_raster
-    is_alltoone = flags.is_alltoone
-    is_onetoall = flags.is_onetoall
-    write_v_maps = flags.outputflags.write_volt_maps
-    write_c_maps = flags.outputflags.write_cur_maps
-    write_cum_cur_map_only = flags.outputflags.write_cum_cur_map_only
+    # Options
+    raster = is_raster(cfg)
+    alltoone = is_alltoone(cfg)
+    onetoall = is_onetoall(cfg)
+    write_v_maps = cfg.write_volt_maps
+    write_c_maps = cfg.write_cur_maps
+    write_cum_cur_map_only = cfg.write_cum_cur_map_only
 
     volt = zeros(eltype(G), size(nodemap))
     ind = findall(x->x!=0,nodemap)
@@ -207,11 +200,11 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, flags, cfg)::Tuple{Matrix
         solver_called = true
 
         if write_v_maps
-			is_raster ? accum_voltages!(outvolt, voltages[c], local_nodemap, hbmeta) :
+			raster ? accum_voltages!(outvolt, voltages[c], local_nodemap, hbmeta) :
 				accum_voltages!(outvolt, voltages, local_nodemap, hbmeta)
         end
         if write_c_maps
-			is_raster ? accum_currents!(outcurr, voltages[c], cfg, a_local, voltages[c], f_local, local_nodemap, hbmeta) :
+			raster ? accum_currents!(outcurr, voltages[c], cfg, a_local, voltages[c], f_local, local_nodemap, hbmeta) :
 				accum_currents!(outcurr, voltages, cfg, G, voltages, finitegrounds, local_nodemap, hbmeta)
         end
 
@@ -222,8 +215,8 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, flags, cfg)::Tuple{Matrix
 
     name = src == 0 ? "" : "_$(V(src))"
     if write_v_maps
-        if !is_raster
-            write_volt_maps(name, voltages, FullGraph(G, cellmap), flags, cfg)
+        if !raster
+            write_volt_maps(name, voltages, FullGraph(G, cellmap), cfg)
         else
             write_grid(outvolt, name, cfg, hbmeta, cellmap, voltage = true)
         end
@@ -231,21 +224,20 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, flags, cfg)::Tuple{Matrix
 
     # Issue 342: in one-to-all / all-to-one every focal node is active on each
     # solve (one as source, the rest as grounds), so all of them are zeroed.
-    if is_raster && (is_onetoall || is_alltoone) &&
-            flags.outputflags.set_focal_node_currents_to_zero
+    if raster && (onetoall || alltoone) && cfg.set_focal_node_currents_to_zero
         active = V[n for n in eachindex(sources) if sources[n] != 0 || grounds[n] != 0]
         zero_focal_cells!(outcurr, nodemap, Set(active))
     end
 
     if write_c_maps || write_cum_cur_map_only
-        if !is_raster
-            write_cur_maps(name, voltages, FullGraph(G, cellmap), finitegrounds, flags, cfg)
+        if !raster
+            write_cur_maps(name, voltages, FullGraph(G, cellmap), finitegrounds, cfg)
         else
             write_grid(outcurr, name, cfg, hbmeta, cellmap)
         end
     end
 
-    if !is_raster
+    if !raster
         v = [collect(1:size(G, 1))  voltages]
         return v, outcurr
     end
@@ -257,7 +249,7 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, flags, cfg)::Tuple{Matrix
         return ret, outcurr
     end
 
-    if is_onetoall
+    if onetoall
         idx = findall(x->x!=0,source_map)
         val = volt[idx] ./ source_map[idx]
         if val[1] ≈ 0
@@ -269,7 +261,7 @@ function advanced_kernel(prob::AdvancedProblem{T,V,S}, flags, cfg)::Tuple{Matrix
             ret[:,1] = val
             return ret, outcurr
         end
-    elseif is_alltoone
+    elseif alltoone
         ret = Matrix{T}(undef,1,1)
         ret[1] = 0
         return ret, outcurr

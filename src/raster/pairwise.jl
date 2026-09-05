@@ -1,77 +1,32 @@
-struct RasterFlags
-    is_raster::Bool
-    is_pairwise::Bool
-    is_advanced::Bool
-    is_onetoall::Bool
-    is_alltoone::Bool
-    grnd_file_is_res::Bool
-    policy::Symbol
-    four_neighbors::Bool
-    avg_res::Bool
-    outputflags::OutputFlags
-end
-
 function raster_pairwise(T, V, cfg)::Matrix{T}
 
     # Get input
     rasterdata = @timeit CSTIMER[] "load raster data" load_raster_data(T, V, cfg)
 
-    # Get compute flags
-    flags = get_raster_flags(cfg)
-
     pt_file_contains_polygons = length(rasterdata.points_rc[1]) !=
                                 length(unique(rasterdata.points_rc[3]))
 
     if pt_file_contains_polygons
-        _pt_file_polygons_path(rasterdata, flags, cfg)
+        _pt_file_polygons_path(rasterdata, cfg)
     else
-        _pt_file_no_polygons_path(rasterdata, flags, cfg)
+        _pt_file_no_polygons_path(rasterdata, cfg)
     end
 end
 
-function get_raster_flags(cfg)
+function _pt_file_no_polygons_path(rasterdata::RasterData{T,V}, cfg)::Matrix{T} where {T,V}
 
-    # Computation flags
-    is_raster = true
-    is_pairwise = cfg.scenario == sc_pairwise
-    is_advanced = cfg.scenario == sc_advanced
-    is_onetoall = cfg.scenario == sc_onetoall
-    is_alltoone = cfg.scenario == sc_alltoone
-    four_neighbors = cfg.connect_four_neighbors_only
-    avg_res = cfg.connect_using_avg_resistances
-    ground_file_is_resistances = cfg.ground_file_is_resistances
-    policy = _remove_policy_symbol(cfg.remove_src_or_gnd)
+    graphdata = @timeit CSTIMER[] "construct graph" compute_graph_data_no_polygons(rasterdata, cfg)
+    r = @timeit CSTIMER[] "solve pairwise resistances" single_ground_all_pairs(graphdata, cfg)
 
-    # Output Flags
-    o = get_output_flags(cfg)
-
-    RasterFlags(is_raster, is_pairwise, is_advanced,
-                is_onetoall, is_alltoone,
-                ground_file_is_resistances, policy,
-                four_neighbors, avg_res, o)
-end
-
-
-function _pt_file_no_polygons_path(rasterdata::RasterData{T,V}, 
-
-                    flags, cfg)::Matrix{T} where {T,V}
-
-    graphdata = @timeit CSTIMER[] "construct graph" compute_graph_data_no_polygons(rasterdata, flags, cfg)
-    r = @timeit CSTIMER[] "solve pairwise resistances" single_ground_all_pairs(graphdata, flags, cfg)
-
-    if flags.outputflags.write_cur_maps || flags.outputflags.write_cum_cur_map_only
-        @timeit CSTIMER[] "write cumulative current maps" write_cum_maps(graphdata.cum, rasterdata.cellmap, cfg, rasterdata.hbmeta,
-                        flags.outputflags.write_max_cur_maps,
-                        flags.outputflags.write_cum_cur_map_only)
+    if cfg.write_cur_maps || cfg.write_cum_cur_map_only
+        @timeit CSTIMER[] "write cumulative current maps" write_cum_maps(graphdata.cum, rasterdata.cellmap, cfg, rasterdata.hbmeta)
     end
 
     r
 end
 
 
-function _pt_file_polygons_path(rasterdata::RasterData{T,V}, 
-
-                        flags, cfg)::Matrix{T} where {T,V}
+function _pt_file_polygons_path(rasterdata::RasterData{T,V}, cfg)::Matrix{T} where {T,V}
 
     # get unique list of points
     # for every point pair do
@@ -86,14 +41,12 @@ function _pt_file_polygons_path(rasterdata::RasterData{T,V},
     gmap = rasterdata.cellmap
     polymap = rasterdata.polymap
     points_rc = rasterdata.points_rc
-    avg_res = flags.avg_res
-    four_neighbors = flags.four_neighbors
 	included_pairs = rasterdata.included_pairs
 	exclude_pairs = isempty(included_pairs) ? Vector{Tuple{V,V}}() : 
 						generate_exclude_pairs(points_rc, included_pairs)
 
     # Cumulative maps
-    cum = initialize_cum_maps(gmap, flags.outputflags.write_max_cur_maps)
+    cum = initialize_cum_maps(gmap, cfg.write_max_cur_maps)
 
     pts = unique(points_rc[3])
     resistances = -1 * ones(length(pts), length(pts))
@@ -105,8 +58,8 @@ function _pt_file_polygons_path(rasterdata::RasterData{T,V},
     for (k, (i, j)) in enumerate(pairs)
         pt1, pt2 = pts[i], pts[j]
         @info("Solving pair $k of $n")
-        graphdata = compute_graph_data_polygons(rasterdata, flags, pt1, pt2, cum, cfg)
-        pairwise_resistance = single_ground_all_pairs(graphdata, flags, cfg, false)
+        graphdata = compute_graph_data_polygons(rasterdata, pt1, pt2, cum, cfg)
+        pairwise_resistance = single_ground_all_pairs(graphdata, cfg, false)
         resistances[i,j] = resistances[j,i] = pairwise_resistance[2,3]
     end
     for i = 1:size(pts, 1)
@@ -115,10 +68,8 @@ function _pt_file_polygons_path(rasterdata::RasterData{T,V},
     P = [0, pts...]
     r = hcat(P, vcat(pts', resistances))
 
-    if flags.outputflags.write_cur_maps || flags.outputflags.write_cum_cur_map_only
-        write_cum_maps(cum, gmap, cfg, rasterdata.hbmeta,
-                       flags.outputflags.write_max_cur_maps,
-                       flags.outputflags.write_cum_cur_map_only)
+    if cfg.write_cur_maps || cfg.write_cum_cur_map_only
+        write_cum_maps(cum, gmap, cfg, rasterdata.hbmeta)
     end
 
     # save resistances
@@ -142,8 +93,8 @@ function pairs_to_solve(pts, exclude_pairs)
 end
 
 
-function compute_graph_data_polygons(rasterdata::RasterData{T,V}, 
-                            flags, pt1, pt2, cum, cfg)::GraphProblem{T,V} where {T,V}
+function compute_graph_data_polygons(rasterdata::RasterData{T,V},
+                            pt1, pt2, cum, cfg)::GraphProblem{T,V} where {T,V}
 
 
     # Data
@@ -152,9 +103,9 @@ function compute_graph_data_polygons(rasterdata::RasterData{T,V},
     points_rc = rasterdata.points_rc
     hbmeta = rasterdata.hbmeta
 
-    # Flags
-    avg_res = flags.avg_res
-    four_neighbors = flags.four_neighbors
+    # Options
+    avg_res = cfg.connect_using_avg_resistances
+    four_neighbors = cfg.connect_four_neighbors_only
 
     # Construct new polymap
     newpoly = create_new_polymap(gmap, polymap, points_rc, pt1, pt2)
@@ -186,8 +137,7 @@ function compute_graph_data_polygons(rasterdata::RasterData{T,V},
             exclude_pairs, nodemap, newpoly, hbmeta, gmap, cum, solver)
 end
 
-function compute_graph_data_no_polygons(data::RasterData{T,V}, 
-                    flags, cfg)::GraphProblem{T,V} where {T,V}
+function compute_graph_data_no_polygons(data::RasterData{T,V}, cfg)::GraphProblem{T,V} where {T,V}
 
 
     # Data
@@ -197,10 +147,10 @@ function compute_graph_data_no_polygons(data::RasterData{T,V},
     included_pairs = data.included_pairs
     hbmeta = data.hbmeta
 
-    # Flags
-    avg_res = flags.avg_res
-    four_neighbors = flags.four_neighbors
-    write_max_cur_maps = flags.outputflags.write_max_cur_maps
+    # Options
+    avg_res = cfg.connect_using_avg_resistances
+    four_neighbors = cfg.connect_four_neighbors_only
+    write_max_cur_maps = cfg.write_max_cur_maps
 
     # Nodemap and graph construction
     nodemap = construct_node_map(cellmap, polymap)

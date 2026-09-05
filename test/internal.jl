@@ -281,6 +281,18 @@ end
     # Unknown keys are ignored (with a warning), not fatal
     d = copy(good); d["max_parallel"] = "4"
     @test Circuitscape.CSConfig(d) isa Circuitscape.CSConfig
+
+    # CSConfig is the only representation past parsing: predicates read it
+    # directly and a copy-with constructor replaces selected fields.
+    cfg = Circuitscape.CSConfig(good)
+    @test Circuitscape.is_raster(cfg) && Circuitscape.is_pairwise(cfg)
+    @test !Circuitscape.is_advanced(cfg) && !Circuitscape.is_onetoall(cfg)
+    @test Circuitscape.policy(cfg) == :keepall
+    cfg2 = Circuitscape.CSConfig(cfg; scenario = Circuitscape.sc_advanced,
+                                 remove_src_or_gnd = Circuitscape.rp_rmvsrc)
+    @test Circuitscape.is_advanced(cfg2) && Circuitscape.policy(cfg2) == :rmvsrc
+    @test cfg2.habitat_file == cfg.habitat_file && cfg2.output_file == cfg.output_file
+    @test Dict{String,String}(cfg2)["scenario"] == "advanced"
 end
 
 # Issue 342: set_focal_node_currents_to_zero

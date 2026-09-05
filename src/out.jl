@@ -1,15 +1,3 @@
-struct OutputFlags
-    write_volt_maps::Bool
-    write_cur_maps::Bool
-    write_cum_cur_map_only::Bool
-    write_max_cur_maps::Bool
-    set_null_currents_to_nodata::Bool
-    set_null_voltages_to_nodata::Bool
-    compress_grids::Bool
-    log_transform_maps::Bool
-    set_focal_node_currents_to_zero::Bool
-end
-
 function compute_3col(resistances::Matrix{T}) where {T}
     fp = deleteat!(resistances[:,1], 1)
     l = length(fp)
@@ -27,26 +15,25 @@ function compute_3col(resistances::Matrix{T}) where {T}
 end
 
 
-function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
+function write_cur_maps(name, output, component_data, finitegrounds, cfg)
 
     # Get desired data
     G = component_data.matrix
-    voltages = flags.is_advanced ? output : output.voltages
+    voltages = _voltages(output)
     cc = component_data.cc
     nodemap = component_data.local_nodemap
     hbmeta = component_data.hbmeta
     cellmap = component_data.cellmap
 
-    # Flags
-    log_transform = flags.outputflags.log_transform_maps
-    set_null_currents_to_nodata =
-        flags.outputflags.set_null_currents_to_nodata
-    write_max_cur_maps = flags.outputflags.write_max_cur_maps
-    write_cum_cur_map_only = flags.outputflags.write_cum_cur_map_only
+    # Output options
+    log_transform = cfg.log_transform_maps
+    set_null_currents_to_nodata = cfg.set_null_currents_to_nodata
+    write_max_cur_maps = cfg.write_max_cur_maps
+    write_cum_cur_map_only = cfg.write_cum_cur_map_only
 
     node_currents, branch_currents = _create_current_maps(G, voltages, finitegrounds, cfg, nodemap = nodemap, hbmeta = hbmeta)
 
-    if !flags.is_raster
+    if !is_raster(cfg)
 
         # Branch currents
         branch_currents_array = _convert_to_3col(branch_currents, cc)
@@ -54,7 +41,7 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
         # Node currents
         node_currents_array = _append_name_to_node_currents(node_currents, cc)
 
-		if flags.is_advanced
+		if is_advanced(cfg)
 			write_currents(node_currents_array, branch_currents_array, name, cfg)
 			return nothing
 		end
@@ -99,7 +86,7 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
         # being solved carry no current in this pair's map, so the cumulative
         # map shows only current that flows *through* a focal region when
         # other pairs are active (Dickson et al. 2013).
-        if flags.outputflags.set_focal_node_currents_to_zero
+        if cfg.set_focal_node_currents_to_zero
             zero_focal_cells!(cmap, nodemap, output.comp_idx)
         end
 
@@ -118,7 +105,7 @@ function write_cur_maps(name, output, component_data, finitegrounds, flags, cfg)
         end
 
         # Write current maps
-        !write_cum_cur_map_only && flags.outputflags.write_cur_maps && 
+        !write_cum_cur_map_only && cfg.write_cur_maps && 
                         write_grid(cmap, name, cfg, hbmeta)
 
 		return nothing
@@ -369,11 +356,11 @@ function write_grid(cmap, name, cfg, hbmeta, cellmap = nothing;
                  file_format)
 end
 
-function write_volt_maps(name, output, component_data, flags, cfg)
+function write_volt_maps(name, output, component_data, cfg)
 
-    voltages = flags.is_advanced ? output : output.voltages
+    voltages = _voltages(output)
 
-    if !flags.is_raster
+    if !is_raster(cfg)
 
         cc = component_data.cc
         write_voltages(cfg.output_file, name, voltages, cc)
@@ -385,7 +372,7 @@ function write_volt_maps(name, output, component_data, flags, cfg)
         cc = component_data.cc
         hbmeta = component_data.hbmeta
         nodemap = component_data.local_nodemap
-        set_null_voltages_to_nodata = flags.outputflags.set_null_voltages_to_nodata
+        set_null_voltages_to_nodata = cfg.set_null_voltages_to_nodata
 
         vm = _create_voltage_map(voltages, nodemap, hbmeta)
         write_grid(vm, name, cfg, hbmeta, component_data.cellmap, voltage = true,
@@ -448,15 +435,15 @@ function save_resistances(r, cfg)
     end
 end
 
-function write_cum_maps(cum, cellmap::Matrix{T}, cfg, hbmeta, write_max, write_cum) where T
+function write_cum_maps(cum, cellmap::Matrix{T}, cfg, hbmeta) where T
 
-    if write_cum || cfg.write_cur_maps
+    if cfg.write_cum_cur_map_only || cfg.write_cur_maps
         cum_curr = cum.cum_curr
         postprocess_cum_curmap!(cum_curr)
         write_grid(cum_curr, "", cfg, hbmeta, cum = true)
     end
 
-    if write_max
+    if cfg.write_max_cur_maps
         max_curr = cum.max_curr
         postprocess_cum_curmap!(max_curr)
         write_grid(max_curr, "", cfg, hbmeta, max = true)
