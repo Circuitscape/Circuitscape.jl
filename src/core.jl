@@ -99,7 +99,10 @@ function solve(prob::GraphProblem{T,V}, ::AMGSolver, flags, cfg, log)::Matrix{T}
     a = prob.G
     cc = prob.cc
     points = prob.points
-    exclude = prob.exclude_pairs
+    # Membership is tested once per candidate pair below and again in
+    # get_num_pairs; in include mode the list holds nearly every combination
+    # in both orders, so a Vector scan is O(pairs x exclusions).
+    exclude = Set(prob.exclude_pairs)
     nodemap = prob.nodemap
     polymap = prob.polymap
     orig_pts = prob.user_points
@@ -321,7 +324,10 @@ function solve(prob::GraphProblem{T,V}, solver::Union{CholmodSolver, PardisoSolv
     a = prob.G
     cc = prob.cc
     points = prob.points
-    exclude = prob.exclude_pairs
+    # Membership is tested once per candidate pair below and again in
+    # get_num_pairs; in include mode the list holds nearly every combination
+    # in both orders, so a Vector scan is O(pairs x exclusions).
+    exclude = Set(prob.exclude_pairs)
     nodemap = prob.nodemap
     polymap = prob.polymap
     orig_pts = prob.user_points
