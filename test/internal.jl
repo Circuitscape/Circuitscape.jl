@@ -720,3 +720,96 @@ end
     # The sorted-component contract is checked, not assumed
     @test_throws ArgumentError Circuitscape.pair_jobs([10], [10, 5], points, orig_pts, exclude, false)
 end
+
+# Node currents are computed in a single sweep over the CSC structure; the
+# previous implementation (six sparse temporaries per pos/neg pair) is kept
+# here as the reference.
+@testset "get_node_currents matches sparse reference" begin
+    function ref_branch_posneg(G::SparseArrays.SparseMatrixCSC{T}, v, pos) where {T}
+        b = T[]
+        for i = 1:size(G, 1), j in SparseArrays.nzrange(G, i)
+            row = G.rowval[j]; val = G.nzval[j]
+            i > row && push!(b, pos ? abs(val) * (v[row] - v[i]) : abs(val) * (v[i] - v[row]))
+        end
+        maxcur = maximum(b)
+        for i in eachindex(b)
+            abs(b[i] / maxcur) < 1e-8 && (b[i] = 0)
+        end
+        b
+    end
+    function ref_branch(G::SparseArrays.SparseMatrixCSC{T,V}, v, pos) where {T,V}
+        b = ref_branch_posneg(G, v, pos)
+        N = size(G, 1)
+        I = V[]; J = V[]
+        for i = 1:N, j in SparseArrays.nzrange(G, i)
+            row = G.rowval[j]
+            i > row && (push!(I, row); push!(J, i))
+        end
+        SparseArrays.sparse(I, J, b, N, N)
+    end
+    function ref_posneg(G, v, finitegrounds, pos)
+        bc = ref_branch(G, v, pos)
+        bc = bc - bc'
+        for j in eachindex(bc.nzval)
+            bc.nzval[j] < 0 && (bc.nzval[j] = 0)
+        end
+        SparseArrays.dropzeros!(bc)
+        if finitegrounds[1] != -9999
+            fgc = finitegrounds .* v
+            if pos
+                map!(x -> x < 0 ? -x : 0, fgc, fgc)
+            else
+                map!(x -> x > 0 ? x : 0, fgc, fgc)
+            end
+            bc = bc + SparseArrays.spdiagm(0 => fgc)
+        end
+        vec(sum(bc, dims = 1))
+    end
+    ref_node_currents(G, v, fg) = map((x, y) -> x > y ? x : y,
+                                      ref_posneg(G, v, fg, true), ref_posneg(G, v, fg, false))
+
+    function check(G::SparseArrays.SparseMatrixCSC{T}, v, fg) where {T}
+        new = Circuitscape.get_node_currents(G, v, fg)
+        old = ref_node_currents(G, v, fg)
+        @test new isa Vector{T}
+        @test length(new) == length(old)
+        tol = T == Float64 ? 1e-12 : 1e-6
+        @test all(isapprox.(new, old, rtol = tol, atol = tol * maximum(abs, old)))
+        # Something non-trivial was computed
+        @test maximum(old) > 0
+    end
+
+    Random.seed!(11)
+    for T in (Float64, Float32)
+        # Small grid Laplacian, 8-neighbour connectivity
+        G = model_problem(T, 7)
+        n = size(G, 1)
+        v = randn(T, n)
+        check(G, v, T[-9999.])
+        fg = T.(rand(n) .< 0.3) .* rand(T, n)
+        check(G, v, fg)
+
+        # Random sparse symmetric Laplacian, including isolated nodes
+        n = 120
+        B = SparseArrays.sprand(T, n, n, 0.05)
+        A = B + B'
+        A[SparseArrays.diagind(A)] .= 0
+        SparseArrays.dropzeros!(A)
+        L = SparseArrays.spdiagm(0 => vec(sum(A, dims = 1))) - A
+        v = randn(T, n)
+        check(L, v, T[-9999.])
+        check(L, v, T.(rand(n) .< 0.5) .* rand(T, n))
+
+        # Sentinel path with a Float64 sentinel on a Float32 problem, as core.jl passes
+        check(G, randn(T, size(G, 1)), [-9999.])
+    end
+
+    # Hand-checked: a 3-node path 1 - 2 - 3 with unit conductances and
+    # voltages 1, 0.5, 0: half an ampere flows in at 1, through 2, out at 3.
+    L = SparseArrays.sparse([1, 1, 2, 2, 2, 3, 3], [1, 2, 1, 2, 3, 2, 3],
+                            [1.0, -1, -1, 2, -1, -1, 1], 3, 3)
+    @test Circuitscape.get_node_currents(L, [1.0, 0.5, 0.0], [-9999.]) ≈ [0.5, 0.5, 0.5]
+    # A finite ground at node 3 carries 2*0 = 0; at node 1 it is a source
+    # of 3*1 = 3 flowing in, which beats the 0.5 flowing out to node 2.
+    @test Circuitscape.get_node_currents(L, [1.0, 0.5, 0.0], [-3.0, 0.0, 2.0]) ≈ [3.0, 0.5, 0.5]
+end
