@@ -1,6 +1,14 @@
-# An advanced-mode problem: the graph Laplacian, its connected components,
-# the source and ground vectors over the nodes (finite grounds separated out
-# for the solver) and where each node lands in the output.
+"""
+    AdvancedProblem
+
+An advanced-mode problem: the graph Laplacian `G`, its connected components
+`cc`, the [`Geometry`](@ref) mapping nodes to output coordinates, the source
+and ground vectors over the nodes (`sources`, `grounds`, with the finite
+grounds separated out in `finitegrounds` for the solver) and the solver.
+Built by [`build_problem`](@ref) in advanced mode and, one focal node at a
+time, by the one-to-all / all-to-one driver; solved by
+[`advanced_kernel`](@ref).
+"""
 struct AdvancedProblem{T,V,W,Geom<:Geometry}
     G::SparseMatrixCSC{T,V}
     cc::Vector{Vector{V}}

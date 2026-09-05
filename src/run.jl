@@ -1,15 +1,21 @@
 export compute
 
 """
-`compute(path::String)`
+    Circuitscape.compute(path::String) -> Matrix
+    Circuitscape.compute(cfg::Dict{String,String}) -> Matrix
 
-Call the `compute` function on the configuration file.
+Run a Circuitscape job. `path` names an INI file; alternatively pass a
+dictionary of INI keys and string values, as returned by
+[`Circuitscape.init_config`](@ref), with the entries you need changed. Keys
+that are not given take their default value.
 
-Inputs:
-======
-
-* path::String - Path to configuration file
-
+The configuration is validated before any data is read (see
+[`Circuitscape.validate`](@ref)), written in INI form to `output_file`, and
+run. Output files are written next to `output_file`; the return value is the
+result matrix: pairwise resistances (first row and column hold the focal node
+IDs), one-to-all resistances per focal node, node voltages in advanced mode.
+Set `parallelize = True` and start Julia with several threads to run pair
+solves in parallel.
 """
 function compute(path::String)
     cfg = parse_config(path)

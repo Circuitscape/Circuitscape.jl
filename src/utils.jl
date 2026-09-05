@@ -181,7 +181,40 @@ function initialize_cum_vectors(coords::Tuple{Vector{V},Vector{V},Vector{T}}, nu
                pair_coords, branch_index, ReentrantLock())
 end
 
-# Function to calculate current for Omniscape moving window solves
+"""
+    compute_omniscape_current(conductance, source, ground, cs_cfg) -> Matrix{Float64}
+
+Advanced-mode solve on in-memory arrays; Omniscape's entry point for every
+moving-window solve. No files are read or written.
+
+Arguments:
+- `conductance::Matrix{T}`, `T <: Union{Float32, Float64}`: per-cell
+  conductance (not resistance). Cells with a value of `0` are dropped from the
+  graph; every other cell becomes a node connected to its eight neighbours
+  (four if `connect_four_neighbors_only = True` in `cs_cfg`) with the average
+  conductance of the two cells as edge weight.
+- `source::Matrix{T}`: current injected at each cell, in amps; `0` where there
+  is no source.
+- `ground::Matrix{T}`: conductance to ground at each cell (`Inf` for a direct
+  ground, `0` where there is no ground). Where a cell is both a source and a
+  ground the source is removed (`remove_src_or_gnd = rmvsrc`).
+- `cs_cfg::Dict{String,String}`: INI keys and values as from
+  [`init_config`](@ref) merged with [`update!`](@ref). It is parsed with the
+  same strict rules as an INI file, so `scenario` must be set and values must
+  be valid. Of it, only `solver`, `cholmod_batch_size` and
+  `residual_tolerance` (solver settings) and `connect_four_neighbors_only`
+  affect the result; `data_type`, `scenario`, `ground_file_is_resistances`,
+  `remove_src_or_gnd`, `connect_using_avg_resistances` and every map-writing
+  option are overridden. The arithmetic precision is `T`, the element type of
+  `conductance`, not `cs_cfg["precision"]`; node indices are always `Int64`.
+
+Returns a `Matrix{Float64}` of `size(conductance)`: the current through each
+cell (`max(inflow, outflow)` at its node), summed over every connected
+component that contains both a source and a ground. Cells with no node, or
+in components without a source or a ground, are `0`. The solve of each
+component is accepted only if its residual passes the gate described at
+[`residual_tolerance`](@ref).
+"""
 function compute_omniscape_current(
         conductance::Array{T, 2} where T <: Union{Float32, Float64},
         source::Array{T, 2} where T <: Union{Float32, Float64},

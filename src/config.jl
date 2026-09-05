@@ -4,6 +4,22 @@
 @enum Precision pr_single pr_double
 @enum RemovePolicy rp_keepall rp_rmvsrc rp_rmvgnd rp_rmvall
 
+"""
+    CSConfig
+
+Typed, immutable configuration for one Circuitscape run: one field per INI key,
+with the INI's string values parsed into enums, booleans and numbers. Built by
+`parse_config(path)` or `CSConfig(dict::Dict{String,String})`; every parser
+rejects values it does not recognise rather than falling back to a default.
+`Dict{String,String}(cfg)` converts back to INI strings, and
+`CSConfig(cfg; field = value, ...)` returns a copy with fields replaced.
+
+Field names match the INI keys documented in the options reference. Notable
+defaults: `data_type = dt_raster`, `solver = st_cg_amg`, `precision =
+pr_double`, `cholmod_batch_size = 1000`, `residual_tolerance = 0.0` (meaning
+automatic: `1e-4` in double, `1e-3` in single), `log_level = Logging.Info`.
+`scenario` has no usable default and must be set.
+"""
 Base.@kwdef struct CSConfig
     version::String = "unknown"
     data_type::DataType = dt_raster
@@ -352,6 +368,17 @@ function Base.Dict{String,String}(cfg::CSConfig)
     a
 end
 
+"""
+    parse_config(path::String) -> CSConfig
+
+Read a Circuitscape INI file. Section headers are ignored; every `key = value`
+line is parsed on top of the defaults from [`init_config`](@ref), so keys that
+are absent take their default value. Unrecognised values for `solver`,
+`scenario`, `data_type`, `precision`, `log_level`, `remove_src_or_gnd` and any
+boolean raise an `ArgumentError` naming the key; unknown keys produce a
+warning and are ignored. File existence is not checked here but in
+[`validate`](@ref).
+"""
 function parse_config(path::String)
     cf = init_config()
     f = open(path, "r")
@@ -368,7 +395,17 @@ function parse_config(path::String)
     CSConfig(cf)
 end
 
-# Defaults - kept for backward compatibility (returns Dict{String,String})
+"""
+    init_config() -> Dict{String,String}
+
+The default configuration as INI strings, one entry per key `compute` accepts.
+Modify the entries you need and pass the dictionary to [`compute`](@ref), or
+convert it with `CSConfig(dict)`. File paths default to INI Builder
+placeholders such as `"(Browse for a resistance file)"`, which
+[`validate`](@ref) treats as unset. A few Circuitscape 4 keys
+(`print_timings`, `print_rusages`, `screenprint_log`, `profiler_log_file`) are
+present so that old INI files load without warnings; they have no effect.
+"""
 function init_config()
     a = Dict{String, String}()
 
@@ -427,12 +464,30 @@ function init_config()
     a
 end
 
+"""
+    update!(cfg::Dict{String,String}, new) -> cfg
+
+Merge the INI keys and values in `new` (any iterable of `key => value`
+pairs, typically a `Dict{String,String}`) into the configuration dictionary
+`cfg`, overwriting existing entries. Mutates and returns `cfg`. This is how a
+caller layers its own settings on top of [`init_config`](@ref) before passing
+the result to [`compute`](@ref) or [`compute_omniscape_current`](@ref); no
+values are parsed or checked here (that happens in `CSConfig(cfg)`).
+"""
 function update!(cfg, new)
     for (key,val) in new
         cfg[key] = val
     end
 end
 
+"""
+    write_config(cfg::CSConfig)
+    write_config(cfg::Dict{String,String})
+
+Write the configuration, in Circuitscape INI form, to the file named by
+`cfg.output_file`. `compute` calls this at the start of every run so that the
+options used are recorded next to the results.
+"""
 function write_config(cfg::CSConfig)
     open(cfg.output_file, "w") do f
         write(f, """
