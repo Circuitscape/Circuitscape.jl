@@ -15,6 +15,7 @@ end
 runtests(solver="cg+amg", parallel=true)
 runtests(solver="cg+amg", parallel=true, precision="single")
 runtests(solver="cholmod", parallel=true)
+runtests(solver="cholmod", parallel=true, precision="single")
 
 accelerate_available = try
     @eval using AppleAccelerate
