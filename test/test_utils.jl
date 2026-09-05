@@ -55,6 +55,28 @@ function test_problem(str)
 end
 
 """
+    requires_gdal(ini)
+
+Whether any raster named by `ini` is a GeoTIFF (or other GDAL-only format).
+"""
+function requires_gdal(ini::String)
+    cfg = parse_config(ini)
+    any(Circuitscape.needs_gdal(p) for p in
+        (cfg.habitat_file, cfg.point_file, cfg.polygon_file, cfg.mask_file,
+         cfg.source_file, cfg.ground_file) if isfile(p))
+end
+
+# Skip a case when it needs GDAL and ArchGDAL is not loaded.
+macro gdal_or_skip(ini)
+    quote
+        if !GDAL_AVAILABLE && requires_gdal($(esc(ini)))
+            @info("skipping $($(esc(ini))): needs GDAL")
+            continue
+        end
+    end
+end
+
+"""
     runtests(; solver, precision, parallel, label)
 
 Run the full Circuitscape test suite with the given settings.
@@ -82,6 +104,7 @@ function runtests(; solver::String = "", precision::String = "",
     @testset "$label" begin
         @testset "Network Pairwise" begin
             for i = 1:3
+                @gdal_or_skip "input/network/sgNetworkVerify$(i).ini"
                 r = f("input/network/sgNetworkVerify$(i).ini")
                 x = readdlm("output_verify/sgNetworkVerify$(i)_resistances.out")
                 valx = x[2:end, 2:end]
@@ -96,6 +119,7 @@ function runtests(; solver::String = "", precision::String = "",
 
         @testset "Network Advanced" begin
             for i = 1:3
+                @gdal_or_skip "input/network/mgNetworkVerify$(i).ini"
                 r = f("input/network/mgNetworkVerify$(i).ini")
                 x = readdlm("output_verify/mgNetworkVerify$(i)_voltages.txt")
                 @. x[:,1] = x[:,1] + 1
@@ -110,6 +134,7 @@ function runtests(; solver::String = "", precision::String = "",
                     continue
                 end
 
+                @gdal_or_skip "input/raster/pairwise/$i/sgVerify$(i).ini"
                 r = f("input/raster/pairwise/$i/sgVerify$(i).ini")
                 x = readdlm("output_verify/sgVerify$(i)_resistances.out")
                 _x = readdlm("output/sgVerify$(i)_resistances.out")
@@ -121,6 +146,7 @@ function runtests(; solver::String = "", precision::String = "",
 
         @testset "Raster Advanced" begin
             for i in 1:6
+                @gdal_or_skip "input/raster/advanced/$i/mgVerify$(i).ini"
                 r = f("input/raster/advanced/$i/mgVerify$(i).ini")
                 compare_all_output("mgVerify$(i)", is_single)
             end
@@ -128,6 +154,7 @@ function runtests(; solver::String = "", precision::String = "",
 
         @testset "Raster One to All" begin
             for i in 1:13
+                @gdal_or_skip "input/raster/one_to_all/$i/oneToAllVerify$(i).ini"
                 r = f("input/raster/one_to_all/$i/oneToAllVerify$(i).ini")
                 x = readdlm("output_verify/oneToAllVerify$(i)_resistances.out")
                 @test check_resistances(x, r, tol, rtol, label="oneToAllVerify$(i)")
@@ -137,6 +164,7 @@ function runtests(; solver::String = "", precision::String = "",
 
         @testset "Raster All to One" begin
             for i in 1:12
+                @gdal_or_skip "input/raster/all_to_one/$i/allToOneVerify$(i).ini"
                 r = f("input/raster/all_to_one/$i/allToOneVerify$(i).ini")
                 x = readdlm("output_verify/allToOneVerify$(i)_resistances.out")
                 @test check_resistances(x, r, tol, rtol, label="allToOneVerify$(i)")

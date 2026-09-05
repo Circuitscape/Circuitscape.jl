@@ -1,6 +1,5 @@
 module Circuitscape
 using AlgebraicMultigrid
-using ArchGDAL
 using Graphs
 using Krylov
 using GZip

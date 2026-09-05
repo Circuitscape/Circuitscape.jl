@@ -435,17 +435,40 @@ end
     write(joinpath(dir, "bad.asc"), "ncols 3\nnrows 3\nxllcorner 0\nyllcorner 0\ncellsize 1\n1 2 3\n4 5 6\n")
     @test_throws ErrorException Circuitscape.read_raster(joinpath(dir, "bad.asc"), Float64)
 
-    # Every .asc shipped with the tests reads the same as through GDAL. GDAL's
-    # AAIGrid driver stores these values as Float32 (2.002 -> 2.0020000934);
-    # the native parser is exact, hence the Float32-level tolerance.
-    files = String[]
-    for (root, _, fs) in walkdir("input"), f in fs
-        endswith(f, ".asc") && push!(files, joinpath(root, f))
-    end
-    @test length(files) > 100
-    for f in files
-        a1, w1, t1 = Circuitscape.read_asc(f, Float64)
-        a2, w2, t2 = Circuitscape.read_raster_gdal(f, Float64)
-        @test isapprox(a1, a2; rtol = 1e-6) && t1 ≈ t2 && w1 == w2
+    # GDAL is optional; .asc never needs it, GeoTIFF does
+    @test !Circuitscape.needs_gdal(joinpath(dir, "r.asc"))
+    @test Circuitscape.needs_gdal("input/raster/pairwise/1/polygons.tif")
+    @test occursin("Pkg.add(\"ArchGDAL\")", Circuitscape.gdal_missing_message("x"))
+    @test Circuitscape.gdal_loaded() == GDAL_AVAILABLE
+
+    if GDAL_AVAILABLE
+        # Every .asc shipped with the tests reads the same as through GDAL.
+        # GDAL's AAIGrid driver stores these values as Float32
+        # (2.002 -> 2.0020000934); the native parser is exact, hence the
+        # Float32-level tolerance.
+        files = String[]
+        for (root, _, fs) in walkdir("input"), f in fs
+            endswith(f, ".asc") && push!(files, joinpath(root, f))
+        end
+        @test length(files) > 100
+        for f in files
+            a1, w1, t1 = Circuitscape.read_asc(f, Float64)
+            a2, w2, t2 = Circuitscape.read_raster_gdal(f, Float64)
+            @test isapprox(a1, a2; rtol = 1e-6) && t1 ≈ t2 && w1 == w2
+        end
+    else
+        # Without ArchGDAL, a GeoTIFF is refused before any data is read
+        d = Circuitscape.init_config()
+        d["scenario"] = "pairwise"
+        d["habitat_file"] = "input/raster/pairwise/1/cellmap.asc"
+        d["point_file"] = "input/raster/pairwise/1/points.asc"
+        d["use_polygons"] = "True"
+        d["polygon_file"] = "input/raster/pairwise/1/polygons.tif"
+        d["output_file"] = "output/gdal.out"
+        err = try Circuitscape.validate(Circuitscape.CSConfig(d)); nothing catch e; e end
+        @test err isa ArgumentError && occursin("polygon_file", err.msg) && occursin("ArchGDAL", err.msg)
+        d["use_polygons"] = "False"; d["write_as_tif"] = "True"
+        err = try Circuitscape.validate(Circuitscape.CSConfig(d)); nothing catch e; e end
+        @test err isa ArgumentError && occursin("write_as_tif", err.msg)
     end
 end

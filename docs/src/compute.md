@@ -71,6 +71,30 @@ packages:
   making it impractical for very large grids. In pairwise mode it performs
   batched solves controlled by the `cholmod_batch_size` parameter.
 
+## GeoTIFF Support
+
+Circuitscape reads and writes ESRI ASCII grids (`.asc`, optionally gzipped)
+natively and needs no extra packages for them. GeoTIFF input, and GeoTIFF
+output via `write_as_tif = True`, use GDAL through the optional
+[ArchGDAL.jl](https://github.com/yeesian/ArchGDAL.jl) package extension.
+Install it once and load it before running:
+
+```julia
+using Pkg
+Pkg.add("ArchGDAL")
+```
+
+```julia
+using ArchGDAL
+using Circuitscape
+compute("config.ini")   # may now name .tif rasters, or set write_as_tif = True
+```
+
+Keeping GDAL optional cuts the default install by a large set of binary
+dependencies (GDAL, PROJ, GEOS, HDF5, NetCDF, …) and their precompile time. A
+configuration that names a GeoTIFF without ArchGDAL loaded is refused before
+any data is read, with a message saying exactly this.
+
 ## Pardiso Solver
 
 Circuitscape supports the [Pardiso](https://github.com/JuliaSparse/Pardiso.jl)

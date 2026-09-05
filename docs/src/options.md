@@ -15,7 +15,7 @@ All Circuitscape configuration is done through an `.ini` file. Below is a comple
 
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|
-| `habitat_file` | Path | — | Path to the resistance/conductance map file (raster or network). |
+| `habitat_file` | Path | — | Path to the resistance/conductance map file (raster or network). ESRI ASCII grids (`.asc`, optionally gzipped) are read natively; GeoTIFF and other GDAL formats require `using ArchGDAL` (see *GeoTIFF Support*). |
 | `habitat_map_is_resistances` | Boolean | `True` | If `True`, habitat map values are resistances. If `False`, values are conductances. |
 
 ### Connection Scheme for Raster Habitat Data
@@ -79,7 +79,7 @@ All Circuitscape configuration is done through an `.ini` file. Below is a comple
 | `set_focal_node_currents_to_zero` | Boolean | `False` | If `True`, set current at focal nodes to zero in output maps. *Note: not yet implemented in Circuitscape 5.* |
 | `compress_grids` | Boolean | `False` | If `True`, compress output ASCII grids using gzip. |
 | `log_transform_maps` | Boolean | `False` | If `True`, log10-transform values in output current maps. Cells with zero current are set to NODATA. |
-| `write_as_tif` | Boolean | `False` | If `True`, write output rasters as GeoTIFF instead of ASCII grid format. |
+| `write_as_tif` | Boolean | `False` | If `True`, write current and voltage maps as GeoTIFF (LZW-compressed) instead of ESRI ASCII grids. Requires the optional GDAL support: `Pkg.add("ArchGDAL")`, then `using ArchGDAL` before running. |
 
 ### Calculation Options
 
