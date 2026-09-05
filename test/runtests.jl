@@ -19,6 +19,7 @@ clean_output()
 
 @testset "Unit tests" begin
     include("internal.jl")
+    include("read_point_map.jl")
 end
 
 runtests(solver="cg+amg", parallel=true, precision="double")
