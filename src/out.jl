@@ -544,32 +544,7 @@ function write_asc(fn_prefix::String, array::AbstractMatrix, wkt::String, transf
     nothing
 end
 
-# Inspired by GeoArrays.write()
-function write_raster_gdal(fn_prefix::String, array::AbstractMatrix, wkt::String, transform)
-    # Prepare data outside the lock
-    array_t = permutedims(array, [2, 1])
-    width, height = size(array_t)
-    fn = fn_prefix * ".tif"
-    options = ["COMPRESS=LZW"]
-
-    # Lock only the ArchGDAL calls (GDAL is not thread safe)
-    lock(IO_LOCK) do
-        ArchGDAL.create(fn_prefix,
-                        driver = ArchGDAL.getdriver("MEM"),
-                        width = width,
-                        height = height,
-                        nbands = 1,
-                        dtype = eltype(array_t),
-                        options = options) do dataset
-            band = ArchGDAL.getband(dataset, 1)
-            ArchGDAL.write!(band, array_t)
-            ArchGDAL.setnodatavalue!(band, -9999.0)
-            ArchGDAL.setgeotransform!(dataset, transform)
-            ArchGDAL.setproj!(dataset, wkt)
-            ArchGDAL.write(dataset, fn,
-                           driver = ArchGDAL.getdriver("GTiff"),
-                           options = options)
-        end
-    end
-    nothing
-end
+# Replaced by a more specific method in CircuitscapeArchGDALExt when ArchGDAL
+# is loaded.
+write_raster_gdal(fn_prefix, array, wkt, transform) =
+    error(gdal_missing_message("Writing GeoTIFF (write_as_tif = True)"))

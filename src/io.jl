@@ -658,41 +658,28 @@ function read_asc(path::String, ::Type{T}) where {T}
     array, wkt, transform
 end
 
-# Inspired by GeoArrays.read()
-function read_raster_gdal(path::String, T)
-    endswith(path, ".gz") && (path = "/vsigzip/$(path)")
-    ArchGDAL.read(path) do raw
-        # Extract 1st band (should only be one band anyway)
-        # to get a 2D array instead of 3D
-        band = ArchGDAL.getband(raw, 1)
+gdal_loaded() = Base.get_extension(@__MODULE__, :CircuitscapeArchGDALExt) !== nothing
 
-        # Extract the array
-        array_t = ArchGDAL.read(band)
+gdal_missing_message(what) =
+    "$what requires GDAL, which is optional. Install it once with " *
+    "`using Pkg; Pkg.add(\"ArchGDAL\")`, then `using ArchGDAL` before `using Circuitscape`. " *
+    "ESRI ASCII grids (.asc) need no extra package."
 
-        # This handles UInt tiff rasters that can still have negative NoData values
-        # Need to convert the NoData value to Int64 in these cases
-        if eltype(array_t) <: Integer
-            ras_type = Int64
-        else
-            ras_type = eltype(array_t)
-        end
+# Replaced by a more specific method in CircuitscapeArchGDALExt when ArchGDAL
+# is loaded.
+read_raster_gdal(path, T) = error(gdal_missing_message("Reading \"$path\""))
 
-        # Extract no data value, first converting it to the proper type (based on
-        # the raster). Then, need to convert to T. Weird, yes,
-        # but it's the only way I could get it to work for all raster types... -VL
-        nodata_val = convert(T, convert(ras_type, ArchGDAL.getnodatavalue(band)))
+"""
+    needs_gdal(path)
 
-        # Transpose the array -- ArchGDAL returns a x by y array, need y by x
-        array = convert(Array{T}, permutedims(array_t, [2, 1]))
-
-        array[array .== nodata_val] .= -9999.0
-
-        # Line to handle NaNs in datasets read from tifs
-        array[isnan.(array)] .= -9999.0
-
-        transform = ArchGDAL.getgeotransform(raw)
-        wkt = ArchGDAL.getproj(raw)
-        array, wkt, transform # wkt and transform are needed later for write_raster
-    end
+Whether reading `path` will go through GDAL: anything that is not an ESRI
+ASCII grid or a text list, judged by content rather than extension.
+"""
+function needs_gdal(path::String)
+    isfile(path) || return false
+    is_asc(path) && return false
+    f = _open(path)
+    kind = try _guess_file_type(path, f) finally close(f) end
+    kind in (FILE_TYPE_GEOTIFF, FILE_TYPE_NPY)
 end
 

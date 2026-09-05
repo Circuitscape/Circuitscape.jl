@@ -213,6 +213,20 @@ function validate(cfg::CSConfig)
             push!(problems, "output directory \"$outdir\" (from output_file) does not exist")
     end
 
+    # GDAL is optional: only GeoTIFF (or other non-ASCII) rasters need it.
+    if !gdal_loaded()
+        raster_paths = [("habitat_file", cfg.habitat_file), ("point_file", cfg.point_file),
+                        ("polygon_file", cfg.polygon_file), ("mask_file", cfg.mask_file),
+                        ("source_file", cfg.source_file), ("ground_file", cfg.ground_file)]
+        for (key, path) in raster_paths
+            unset(path) && continue
+            needs_gdal(path) &&
+                push!(problems, gdal_missing_message("$key = \"$path\""))
+        end
+        cfg.write_as_tif &&
+            push!(problems, gdal_missing_message("write_as_tif = True"))
+    end
+
     # Parsed for INI compatibility with Circuitscape 4 but not implemented.
     cfg.low_memory_mode &&
         push!(problems, "low_memory_mode is not implemented in Circuitscape.jl; remove it or set it to False")

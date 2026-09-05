@@ -4,6 +4,15 @@ using Logging
 
 Logging.disable_logging(Logging.Warn)
 
+# GDAL is optional: without ArchGDAL the GeoTIFF fixtures are skipped.
+const GDAL_AVAILABLE = try
+    @eval using ArchGDAL
+    true
+catch
+    false
+end
+GDAL_AVAILABLE || println("ArchGDAL not available: skipping GeoTIFF fixtures")
+
 include("test_utils.jl")
 
 clean_output()

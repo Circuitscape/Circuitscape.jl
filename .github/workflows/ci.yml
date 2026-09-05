@@ -13,8 +13,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  test-with-accelerate:
-    name: Julia ${{ matrix.version }} - ${{ matrix.os }} - CG+AMG, CHOLMOD, Accelerate - ${{ github.event_name }}
+  # Fast path: core dependencies only. CG+AMG and CHOLMOD in both precisions,
+  # native .asc I/O; GeoTIFF fixtures are skipped.
+  test:
+    name: Julia ${{ matrix.version }} - ${{ matrix.os }} - core - ${{ github.event_name }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -22,35 +24,8 @@ jobs:
         version:
           - '1'
         os:
-          - macOS-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: julia-actions/setup-julia@v3
-        with:
-          version: ${{ matrix.version }}
-      - uses: julia-actions/cache@v3
-      - run: |
-          julia --project -e '
-            using Pkg
-            Pkg.add("AppleAccelerate")
-            Pkg.test(coverage=true)'
-      - uses: julia-actions/julia-processcoverage@v1
-      - uses: codecov/codecov-action@v7
-        with:
-          file: lcov.info
-          token: ${{ secrets.CODECOV_TOKEN }}
-
-  test-with-pardiso:
-    name: Julia ${{ matrix.version }} - ${{ matrix.os }} - CG+AMG, CHOLMOD, Pardiso - ${{ github.event_name }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        version:
-          - '1'
-        os:
-          - windows-latest
           - ubuntu-latest
+          - windows-latest
         include:
           - version: 'min'
             os: ubuntu-latest
@@ -61,10 +36,38 @@ jobs:
           version: ${{ matrix.version }}
       - uses: julia-actions/cache@v3
       - uses: julia-actions/julia-buildpkg@v1
+      - uses: julia-actions/julia-runtest@v1
+      - uses: julia-actions/julia-processcoverage@v1
+      - uses: codecov/codecov-action@v7
+        with:
+          file: lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  # Extensions, each exercised once: Pardiso needs MKL (x86), Accelerate needs
+  # macOS, GDAL runs alongside both so the GeoTIFF fixtures are covered.
+  test-extensions:
+    name: Julia 1 - ${{ matrix.os }} - core + ${{ matrix.label }} - ${{ github.event_name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            packages: '"Pardiso", "ArchGDAL"'
+            label: Pardiso, GDAL
+          - os: macOS-latest
+            packages: '"AppleAccelerate", "ArchGDAL"'
+            label: Accelerate, GDAL
+    steps:
+      - uses: actions/checkout@v7
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: '1'
+      - uses: julia-actions/cache@v3
       - run: |
           julia --project -e '
             using Pkg
-            Pkg.add("Pardiso")
+            Pkg.add([${{ matrix.packages }}])
             Pkg.test(coverage=true)'
       - uses: julia-actions/julia-processcoverage@v1
       - uses: codecov/codecov-action@v7

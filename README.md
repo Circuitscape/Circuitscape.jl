@@ -38,6 +38,17 @@ Run the test suite with:
 julia> Pkg.test("Circuitscape")
 ```
 
+### Optional: GeoTIFF support
+
+ESRI ASCII grids (`.asc`) work out of the box. To read or write GeoTIFF
+rasters, add [ArchGDAL](https://github.com/yeesian/ArchGDAL.jl) and load it
+before Circuitscape:
+
+```julia
+julia> Pkg.add("ArchGDAL")
+julia> using ArchGDAL, Circuitscape
+```
+
 ## Usage
 
 Circuitscape jobs are configured via INI files. See the
