@@ -219,3 +219,64 @@ let
     compute("input/raster/pairwise/12/sgVerify12.ini")
     @test !isfile(cum_file)
 end
+
+# Configuration parsing and validation: typos and missing files must fail
+# before any data is read, naming the INI key (#246, #341, #436).
+@testset "Config validation" begin
+    base = Circuitscape.init_config()
+    base["scenario"] = "pairwise"
+
+    # Unrecognised enum values are errors, not silent defaults
+    for (k, v) in [("solver", "cholmodd"), ("scenario", "pairwsie"),
+                   ("precision", "half"), ("write_cur_maps", "Ture"),
+                   ("remove_src_or_gnd", "rmvboth"), ("log_level", "VERBOSE"),
+                   ("data_type", "vector")]
+        d = copy(base); d[k] = v
+        @test_throws ArgumentError Circuitscape.CSConfig(d)
+    end
+    d = copy(base); d["scenario"] = "not entered"
+    @test_throws ArgumentError Circuitscape.CSConfig(d)
+
+    # Placeholders from init_config count as unset
+    err = try Circuitscape.validate(Circuitscape.CSConfig(base)); nothing catch e; e end
+    @test err isa ArgumentError
+    @test occursin("habitat_file is not set", err.msg)
+    @test occursin("point_file is not set", err.msg)
+    @test occursin("output_file is not set", err.msg)
+
+    good = copy(base)
+    good["habitat_file"] = "input/raster/pairwise/1/cellmap.asc"
+    good["point_file"] = "input/raster/pairwise/1/points.asc"
+    good["output_file"] = "output/validate.out"
+    @test Circuitscape.validate(Circuitscape.CSConfig(good)) isa Circuitscape.CSConfig
+
+    d = copy(good); d["habitat_file"] = "missing.asc"
+    err = try Circuitscape.validate(Circuitscape.CSConfig(d)); nothing catch e; e end
+    @test occursin("habitat_file = \"missing.asc\" does not exist", err.msg)
+
+    d = copy(good); d["output_file"] = "no_such_dir/x.out"
+    @test_throws ArgumentError Circuitscape.validate(Circuitscape.CSConfig(d))
+
+    # Only files that the run will use are checked
+    d = copy(good); d["polygon_file"] = "missing.asc"; d["use_polygons"] = "False"
+    @test Circuitscape.validate(Circuitscape.CSConfig(d)) isa Circuitscape.CSConfig
+    d["use_polygons"] = "True"
+    @test_throws ArgumentError Circuitscape.validate(Circuitscape.CSConfig(d))
+
+    # Advanced mode needs sources and grounds, not a point file
+    d = copy(good); d["scenario"] = "advanced"; d["point_file"] = "missing.asc"
+    d["source_file"] = "input/raster/advanced/1/sources5x5.asc"
+    d["ground_file"] = "input/raster/advanced/1/grounds5x5.asc"
+    @test Circuitscape.validate(Circuitscape.CSConfig(d)) isa Circuitscape.CSConfig
+
+    # Options accepted for INI compatibility but never implemented
+    for k in ("low_memory_mode", "preemptive_memory_release")
+        d = copy(good); d[k] = "True"
+        err = try Circuitscape.validate(Circuitscape.CSConfig(d)); nothing catch e; e end
+        @test occursin("$k is not implemented", err.msg)
+    end
+
+    # Unknown keys are ignored (with a warning), not fatal
+    d = copy(good); d["max_parallel"] = "4"
+    @test Circuitscape.CSConfig(d) isa Circuitscape.CSConfig
+end

@@ -1,6 +1,7 @@
 # Various constants used to determine problem type
 
 const RASTER = ["raster", "Raster"]
+const NETWORK = ["network", "Network"]
 const PAIRWISE = ["pairwise", "Pairwise"]
 const ADVANCED = ["advanced", "Advanced"]
 const ONETOALL = ["one-to-all", "one_to_all"]
@@ -20,6 +21,7 @@ const TXTLIST = 3
 const PAIRS_AAGRID = 4
 const PAIRS_LIST = 5
 const TRUELIST = ["True", "true", "1"]
+const FALSELIST = ["False", "false", "0"]
 
 const FILE_TYPE_NPY = 1
 const FILE_TYPE_AAGRID = 2

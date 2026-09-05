@@ -25,6 +25,7 @@ end
 
 function _run(cfg)
     update_logging!(cfg)
+    validate(cfg)
     write_config(cfg)
     T = cfg.precision == pr_single ? Float32 : Float64
     if T == Float32 && cfg.solver == st_pardiso
