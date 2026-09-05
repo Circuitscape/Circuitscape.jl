@@ -557,3 +557,61 @@ end
     @test all(cum[k] ≈ pair[k] for k in keys(cum))
     @test all(v ≈ 1.0 for v in values(cum))   # unit current through every series branch
 end
+
+# The pairwise driver enumerates pairs with O(log n) lookups into the sorted
+# component and a node -> positions map. The exact list of jobs, in order, is
+# what the log numbering and the gold resistance files depend on.
+@testset "pair_jobs" begin
+    # Positions 1 and 3 of `points` (user ids 1 and 5) both map to node 10;
+    # user ids 2 and 3 (nodes 20 and 30) are an excluded pair; node 50 in the
+    # component has no focal point; node 99 is a focal point outside it.
+    points   = [10, 20, 10, 30, 40, 99]
+    orig_pts = [1, 2, 5, 3, 4, 9]
+    comp     = [5, 10, 20, 30, 40, 50]
+    exclude  = [(2, 3)]
+    csub     = Circuitscape.component_points(comp, points)
+    @test csub == [10, 20, 30, 40]
+
+    positions = Circuitscape.point_positions(points)
+    @test positions == Dict(10 => [1, 3], 20 => [2], 30 => [4], 40 => [5], 99 => [6])
+
+    tup(j) = (j.src_node, j.dst_node, j.comp_i, j.comp_j, j.src_indices, j.dst_indices)
+    groups = Circuitscape.pair_jobs(csub, comp, points, orig_pts, exclude, false)
+    @test map(g -> map(tup, g), groups) == [
+        [(10, 20, 2, 3, [1, 3], [2]),
+         (10, 30, 2, 4, [1, 3], [4]),
+         (10, 40, 2, 5, [1, 3], [5])],
+        [(20, 40, 3, 5, [2], [5])],           # (20, 30) excluded via user ids (2, 3)
+        [(30, 40, 4, 5, [4], [5])],
+        [],                                   # last source: no destinations
+    ]
+    @test eltype(groups) == Vector{Circuitscape.PairJob{Int}}
+
+    # Resistance shortcut: only the first source, still one group
+    groups = Circuitscape.pair_jobs(csub, comp, points, orig_pts, exclude, true)
+    @test length(groups) == 1
+    @test map(tup, groups[1]) == [(10, 20, 2, 3, [1, 3], [2]),
+                                  (10, 30, 2, 4, [1, 3], [4]),
+                                  (10, 40, 2, 5, [1, 3], [5])]
+
+    # A shared node keeps the pair while one index combination is not
+    # excluded: (1, 2) is, (5, 2) is not
+    groups = Circuitscape.pair_jobs([10, 20], comp, points, orig_pts, [(1, 2)], false)
+    @test map(tup, groups[1]) == [(10, 20, 2, 3, [1, 3], [2])]
+
+    # Excluding every combination drops the pair
+    groups = Circuitscape.pair_jobs([20, 30], comp, points, orig_pts, [(2, 3)], false)
+    @test groups == [Circuitscape.PairJob{Int}[], Circuitscape.PairJob{Int}[]]
+
+    # Lookups agree with the linear scans they replace, on Int32 too
+    comp32 = Int32[3, 7, 8, 12]
+    @test Circuitscape.component_index(comp32, Int32(8)) == findfirst(isequal(8), comp32)
+    @test Circuitscape.component_index(comp32, Int32(9)) === nothing
+    @test Circuitscape.component_index(comp32, Int32(13)) === nothing
+    @test Circuitscape.in_component(comp32, Int32(12)) && !Circuitscape.in_component(comp32, Int32(1))
+
+    # A focal node missing from the component is an error, as before
+    @test_throws ErrorException Circuitscape.pair_jobs([10, 99], comp, points, orig_pts, exclude, false)
+    # The sorted-component contract is checked, not assumed
+    @test_throws ArgumentError Circuitscape.pair_jobs([10], [10, 5], points, orig_pts, exclude, false)
+end

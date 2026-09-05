@@ -115,31 +115,60 @@ struct PairJob{V}
     dst_indices::Vector{Int}
 end
 
+# Components from `connected_components` list their nodes in ascending order,
+# so a node's local index and its membership are binary searches: O(log n)
+# each and allocation-free, where a linear scan or a per-component hash table
+# would be O(n) on a component of millions of nodes.
+function component_index(comp, node)
+    i = searchsortedfirst(comp, node)
+    (i <= length(comp) && comp[i] == node) ? i : nothing
+end
+
+in_component(comp, node) = component_index(comp, node) !== nothing
+
+# Distinct focal nodes of one component, in first-appearance order of `points`.
+component_points(comp, points) = unique(filter(x -> in_component(comp, x), points))
+
+# Positions in `points` that map to each node; a focal region contributes
+# several positions to one node.
+function point_positions(points::Vector{V}) where V
+    positions = Dict{V,Vector{Int}}()
+    for (i, p) in enumerate(points)
+        push!(get!(() -> Int[], positions, p), i)
+    end
+    positions
+end
+
 """
-    pair_jobs(csub, comp, points, orig_pts, exclude, first_source_only)
+    pair_jobs(csub, comp, points, orig_pts, exclude, first_source_only;
+              positions = point_positions(points))
 
 The node pairs to solve in one component, grouped by source node, in the
 order the log numbers them. A pair is skipped when every combination of its
 focal indices is excluded. With `first_source_only` (the resistance shortcut)
 only pairs anchored at `csub[1]` are produced. A group is returned for every
 source considered, even when it has no pairs, so callers can iterate sources.
+`comp` must be sorted ascending, as `connected_components` returns it.
 """
-function pair_jobs(csub::Vector{V}, comp, points, orig_pts, exclude, first_source_only) where V
+function pair_jobs(csub::Vector{V}, comp, points, orig_pts, exclude, first_source_only;
+                   positions = point_positions(points)) where V
+    issorted(comp) || throw(ArgumentError("component node list must be sorted ascending"))
+    excluded = Set(exclude)
     groups = Vector{Vector{PairJob{V}}}()
     nsrc = first_source_only ? min(1, length(csub)) : length(csub)
     for si in 1:nsrc
         src_node = csub[si]
-        comp_i = findfirst(isequal(src_node), comp)
+        comp_i = component_index(comp, src_node)
         comp_i === nothing && error("Node $src_node not found in component")
-        src_indices = findall(isequal(src_node), points)
+        src_indices = positions[src_node]
         jobs = PairJob{V}[]
         for di in si+1:length(csub)
             dst_node = csub[di]
             dst_node == src_node && continue
-            comp_j = findfirst(isequal(dst_node), comp)
+            comp_j = component_index(comp, dst_node)
             comp_j === nothing && error("Node $dst_node not found in component")
-            dst_indices = findall(isequal(dst_node), points)
-            any(((orig_pts[c_i], orig_pts[c_j]) ∉ exclude
+            dst_indices = positions[dst_node]
+            any(((orig_pts[c_i], orig_pts[c_j]) ∉ excluded
                  for c_i in src_indices, c_j in dst_indices)) || continue
             push!(jobs, PairJob{V}(src_node, dst_node, V(comp_i), V(comp_j),
                                    src_indices, dst_indices))
@@ -207,10 +236,12 @@ function solve(prob::GraphProblem{T,V}, solver::Solver, cfg, log)::Matrix{T} whe
         "Solving pair $(pair_numbers[(job.src_node, job.dst_node)]) of $num_pairs" :
         "Solving pair $(job.src_node)-$(job.dst_node)"
 
+    positions = point_positions(points)
+
     for (cid, comp) in enumerate(cc)
 
         # Subset of points relevant to CC
-        csub = filter(x -> x in comp, points) |> unique
+        csub = component_points(comp, points)
         isempty(csub) && continue
 
         # Conductance matrix corresponding to CC; the solver may regularize
@@ -223,11 +254,12 @@ function solve(prob::GraphProblem{T,V}, solver::Solver, cfg, log)::Matrix{T} whe
 
         component_data = ComponentData(comp, matrix, local_nodemap, hbmeta, cellmap)
 
-        groups = pair_jobs(csub, comp, points, orig_pts, exclude, get_shortcut_resistances)
+        groups = pair_jobs(csub, comp, points, orig_pts, exclude, get_shortcut_resistances;
+                           positions)
 
         # Focal indices that share a node have zero resistance between them
         for si in eachindex(groups)
-            smash_repeats!(resistances, findall(isequal(csub[si]), points))
+            smash_repeats!(resistances, positions[csub[si]])
         end
 
         # Store one solve's result for every non-excluded index combination
@@ -248,8 +280,7 @@ function solve(prob::GraphProblem{T,V}, solver::Solver, cfg, log)::Matrix{T} whe
         solve_pairs!(handle_pair, handle, solver, matrix, groups, cfg, log, pair_label)
 
         if get_shortcut_resistances
-            idx = findfirst(isequal(csub[1]), points)
-            idx === nothing && error("Focal point $(csub[1]) not found in points list")
+            idx = first(positions[csub[1]])
             update_shortcut_resistances!(idx, shortcut, resistances, points, comp)
         end
     end
@@ -410,7 +441,7 @@ function get_num_pairs(ccs, fp::Vector{V}, exclude_pairs, user_points::Vector{V}
     g2u = Dict(fp[i] => user_points[i] for i in 1:length(fp))
 
     for (i,cc) in enumerate(ccs)
-        sub_fp = filter(x -> x in cc, fp) |> unique
+        sub_fp = component_points(cc, fp)
         l = lastindex(sub_fp)
         for ii = 1:l
             pt1 = sub_fp[ii]
@@ -435,7 +466,7 @@ function get_num_pairs_shortcut(ccs, fp::Vector{V}, exclude_pairs, user_points::
     g2u = Dict(fp[i] => user_points[i] for i in 1:length(fp))
 
     for (i,cc) in enumerate(ccs)
-        sub_fp = filter(x -> x in cc, fp) |> unique
+        sub_fp = component_points(cc, fp)
         l = lastindex(sub_fp)
         l == 0 && continue
         for ii = 1:1
@@ -619,7 +650,7 @@ function update_voltmatrix!(shortcut, output, component_data)
     j = output.col
 
     for i = 2:size(c, 1)
-        ind = findfirst(isequal(c[i]), cc)
+        ind = component_index(cc, c[i])
         if ind !== nothing
             voltageAtPoint = voltages[ind]
             voltageAtPoint = 1 - (voltageAtPoint/r)
@@ -635,7 +666,7 @@ function update_shortcut_resistances!(anchor, sc, resistances, points, comp)
     voltmatrix = sc.voltmatrix
     shortcut = sc.shortcut_res
 
-    check = map(x -> x in comp, points)
+    check = map(x -> in_component(comp, x), points)
     l = size(resistances, 1)
     for pointx = 1:l
         if check[pointx]
