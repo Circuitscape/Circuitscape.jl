@@ -295,7 +295,7 @@ function multiple_solver(cfg, solver, a::SparseMatrixCSC{T,V}, sources, grounds,
     deleteat!(r, dst_del)
     asolve = asolve[r, r]
 
-    volt = multiple_solve(solver, asolve, sources)
+    volt = multiple_solve(cfg, solver, asolve, sources)
 
     # Replace the inf with 0
     voltages = zeros(eltype(a), length(volt) + length(infgrounds))
@@ -312,37 +312,29 @@ function multiple_solver(cfg, solver, a::SparseMatrixCSC{T,V}, sources, grounds,
     voltages
 end
 
-function multiple_solve(s::AMGSolver, matrix::SparseMatrixCSC{T,V}, sources::Vector{T}) where {T,V}
+function multiple_solve(cfg, s::AMGSolver, matrix::SparseMatrixCSC{T,V}, sources::Vector{T}) where {T,V}
     # Pin the coarse solver and smoothers for the same reason as in core.jl:
     # CG needs a symmetric positive definite preconditioner.
     M = aspreconditioner(smoothed_aggregation(matrix;
                                               coarse_solver = AlgebraicMultigrid.Pinv,
                                               presmoother = AlgebraicMultigrid.GaussSeidel(),
                                               postsmoother = AlgebraicMultigrid.GaussSeidel()))
-    volt = solve_linear_system(matrix, sources, M)
-    @assert (norm(matrix*volt .- sources) / norm(sources)) < 1e-4
-    volt
+    solve_linear_system(matrix, sources, M; tol = residual_tolerance(cfg, T))
 end
 
-function multiple_solve(s::CholmodSolver, matrix::SparseMatrixCSC{T,V}, sources::Vector{T}) where {T,V}
+function multiple_solve(cfg, s::CholmodSolver, matrix::SparseMatrixCSC{T,V}, sources::Vector{T}) where {T,V}
     factor = construct_cholesky_factor(matrix, s)
-    volt = solve_linear_system(factor, matrix, sources)
-    @assert (norm(matrix*volt .- sources) / norm(sources)) < 1e-4
-    volt
+    solve_linear_system(factor, matrix, sources; tol = residual_tolerance(cfg, T))
 end
 
-function multiple_solve(s::PardisoSolver, matrix::SparseMatrixCSC{T,V}, sources::Vector{T}) where {T,V}
+function multiple_solve(cfg, s::PardisoSolver, matrix::SparseMatrixCSC{T,V}, sources::Vector{T}) where {T,V}
     factor = construct_cholesky_factor(matrix, s)
-    volt = solve_linear_system(factor, matrix, sources)
-    @assert (norm(matrix*volt .- sources) / norm(sources)) < 1e-4
-    volt
+    solve_linear_system(factor, matrix, sources; tol = residual_tolerance(cfg, T))
 end
 
-function multiple_solve(s::AccelerateSolver, matrix::SparseMatrixCSC{T,V}, sources::Vector{T}) where {T,V}
+function multiple_solve(cfg, s::AccelerateSolver, matrix::SparseMatrixCSC{T,V}, sources::Vector{T}) where {T,V}
     factor = construct_cholesky_factor(matrix, s)
-    volt = solve_linear_system(factor, matrix, sources)
-    @assert (norm(matrix*volt .- sources) / norm(sources)) < 1e-4
-    volt
+    solve_linear_system(factor, matrix, sources; tol = residual_tolerance(cfg, T))
 end
 
 struct FullGraph{T,V}

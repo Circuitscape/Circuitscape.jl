@@ -89,6 +89,7 @@ All Circuitscape configuration is done through an `.ini` file. Below is a comple
 | `precision` | String | `Double` | Floating-point precision. Values: `Double`, `Single`. CHOLMOD and Pardiso require double precision. |
 | `use_64bit_indexing` | Boolean | `True` | If `True`, use 64-bit integer indexing. Required for very large grids. |
 | `cholmod_batch_size` | Integer | `1000` | Number of pairs to solve simultaneously when using CHOLMOD in pairwise mode. |
+| `residual_tolerance` | Float | `auto` | Every linear solve is accepted only if its true relative residual `‖Gv − b‖ / ‖b‖` is below this. `auto` means `1e-4` in double precision and `1e-3` in single. With `cg+amg`, a solve that stops short is retried with tighter Krylov tolerances before the run is aborted. |
 | `parallelize` | Boolean | `False` | If `True`, run iterations in parallel using Julia threads. Start Julia with `julia -t N` for N threads. |
 
 | `low_memory_mode` | Boolean | `False` | Circuitscape 4 option, not implemented in Circuitscape.jl. Setting it to `True` is an error so that it cannot be relied on silently. |
