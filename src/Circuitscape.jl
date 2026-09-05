@@ -35,6 +35,5 @@ include("run.jl")
 include("INIBuilder/INIBuilder.jl")
 
 using .INIBuilder
-export start
 
 end
