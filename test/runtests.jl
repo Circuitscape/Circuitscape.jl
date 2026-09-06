@@ -22,10 +22,17 @@ clean_output()
     include("read_point_map.jl")
 end
 
-runtests(solver="cg+amg", parallel=true, precision="double")
-runtests(solver="cg+amg", parallel=true, precision="single")
-runtests(solver="cholmod", parallel=true, precision="double")
-runtests(solver="cholmod", parallel=true, precision="single")
+# CIRCUITSCAPE_TEST_CORE_SOLVERS=false skips the CG+AMG and CHOLMOD suites so a
+# CI job that exists to exercise an extension does not repeat what the core
+# jobs already ran. Unit tests and the extension suites still run.
+if get(ENV, "CIRCUITSCAPE_TEST_CORE_SOLVERS", "true") == "true"
+    runtests(solver="cg+amg", parallel=true, precision="double")
+    runtests(solver="cg+amg", parallel=true, precision="single")
+    runtests(solver="cholmod", parallel=true, precision="double")
+    runtests(solver="cholmod", parallel=true, precision="single")
+else
+    println("Skipping CG+AMG and CHOLMOD suites (CIRCUITSCAPE_TEST_CORE_SOLVERS=false)")
+end
 
 accelerate_available = try
     @eval using AppleAccelerate

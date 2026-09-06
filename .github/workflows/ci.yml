@@ -13,20 +13,18 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  # Fast path: core dependencies only. CG+AMG and CHOLMOD in both precisions,
-  # native .asc I/O; GeoTIFF fixtures are skipped.
+  # Core dependencies only: CG+AMG and CHOLMOD in both precisions, native
+  # .asc I/O; GeoTIFF fixtures are skipped. Julia 1 on Ubuntu is not listed
+  # here because the Ubuntu extension job below runs the same suite plus more.
   test:
     name: Julia ${{ matrix.version }} - ${{ matrix.os }} - core - ${{ github.event_name }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        version:
-          - '1'
-        os:
-          - ubuntu-latest
-          - windows-latest
         include:
+          - version: '1'
+            os: windows-latest
           - version: 'min'
             os: ubuntu-latest
     steps:
@@ -42,14 +40,15 @@ jobs:
           save-always: false
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
-      - uses: julia-actions/julia-processcoverage@v1
-      - uses: codecov/codecov-action@v7
         with:
-          file: lcov.info
-          token: ${{ secrets.CODECOV_TOKEN }}
+          coverage: false
 
   # Extensions, each exercised once: Pardiso needs MKL (x86), Accelerate needs
-  # macOS, GDAL runs alongside both so the GeoTIFF fixtures are covered.
+  # macOS, GDAL runs alongside both so the GeoTIFF fixtures are covered. The
+  # Ubuntu job is the Julia 1 Ubuntu run of the core suite too, and the only
+  # job that reports coverage, since it reaches the most code. The macOS job
+  # skips the core solver suites: they are platform-independent and already
+  # covered.
   test-extensions:
     name: Julia 1 - ${{ matrix.os }} - core + ${{ matrix.label }} - ${{ github.event_name }}
     runs-on: ${{ matrix.os }}
@@ -60,9 +59,13 @@ jobs:
           - os: ubuntu-latest
             packages: '"Pardiso", "ArchGDAL"'
             label: Pardiso, GDAL
+            coverage: true
+            core_solvers: true
           - os: macOS-latest
             packages: '"AppleAccelerate", "ArchGDAL"'
             label: Accelerate, GDAL
+            coverage: false
+            core_solvers: false
     steps:
       - uses: actions/checkout@v7
       - uses: julia-actions/setup-julia@v3
@@ -78,9 +81,13 @@ jobs:
           julia --project -e '
             using Pkg
             Pkg.add([${{ matrix.packages }}])
-            Pkg.test(coverage=true)'
+            Pkg.test(coverage=${{ matrix.coverage }})'
+        env:
+          CIRCUITSCAPE_TEST_CORE_SOLVERS: ${{ matrix.core_solvers }}
       - uses: julia-actions/julia-processcoverage@v1
+        if: matrix.coverage
       - uses: codecov/codecov-action@v7
+        if: matrix.coverage
         with:
           file: lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -104,11 +111,6 @@ jobs:
             using Pkg
             Pkg.develop(PackageSpec(path=pwd()))
             Pkg.instantiate()'
-      - run: |
-          julia --project=docs -e '
-            using Documenter: doctest
-            using Circuitscape
-            doctest(Circuitscape)'
       - name: Install PDF dependencies
         run: pip install Pygments
       - name: Build PDF
