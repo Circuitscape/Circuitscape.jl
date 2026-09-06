@@ -271,9 +271,12 @@ function compute_omniscape_current(
                    log_transform_maps = false)
 
     # The kernel accumulates the current map for us even though no map is
-    # written; that map is Omniscape's result.
-    prob = advanced_problem(rasterdata, cfg)
-    _, outcurr, _ = advanced_kernel(prob, cfg; accumulate_currents = true)
-
-    return outcurr
+    # written; that map is Omniscape's result. Omniscape calls this from many
+    # tasks at once, and a TimerOutput is not safe to share between them, so
+    # each call times into a private timer instead of the default CSTIMER.
+    with(CSTIMER => TimerOutput()) do
+        prob = advanced_problem(rasterdata, cfg)
+        _, outcurr, _ = advanced_kernel(prob, cfg; accumulate_currents = true)
+        outcurr
+    end
 end

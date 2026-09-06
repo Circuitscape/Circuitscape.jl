@@ -42,7 +42,18 @@ let
                 ground,
                 cs_cfg
         )
-        
+
+        # Omniscape calls compute_omniscape_current from many tasks at once.
+        # Concurrent calls must neither error (the default CSTIMER is shared
+        # and not thread-safe) nor perturb each other's results.
+        cs_cfg["solver"] = "cg+amg"
+        serial = compute_omniscape_current(conductance, source, ground, cs_cfg)
+        results = Vector{Matrix{Float64}}(undef, 64)
+        @sync for i in eachindex(results)
+                Threads.@spawn results[i] = compute_omniscape_current(
+                        conductance, source, ground, cs_cfg)
+        end
+        @test all(r -> r ≈ serial, results)
 end
 # Construct nodemap tests
 let
