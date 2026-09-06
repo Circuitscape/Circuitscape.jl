@@ -13,9 +13,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  # Core dependencies only: CG+AMG and CHOLMOD in both precisions, native
-  # .asc I/O; GeoTIFF fixtures are skipped. Julia 1 on Ubuntu is not listed
-  # here because the Ubuntu extension job below runs the same suite plus more.
+  # Minimum supported Julia with core dependencies only: CG+AMG and CHOLMOD
+  # in both precisions, native .asc I/O; GeoTIFF fixtures are skipped. Julia 1
+  # is covered on every platform by the extension jobs below, which run the
+  # same suite plus more.
   test:
     name: Julia ${{ matrix.version }} - ${{ matrix.os }} - core - ${{ github.event_name }}
     runs-on: ${{ matrix.os }}
@@ -23,8 +24,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - version: '1'
-            os: windows-latest
           - version: 'min'
             os: ubuntu-latest
     steps:
@@ -43,12 +42,10 @@ jobs:
         with:
           coverage: false
 
-  # Extensions, each exercised once: Pardiso needs MKL (x86), Accelerate needs
-  # macOS, GDAL runs alongside both so the GeoTIFF fixtures are covered. The
-  # Ubuntu job is the Julia 1 Ubuntu run of the core suite too, and the only
-  # job that reports coverage, since it reaches the most code. The macOS job
-  # skips the core solver suites: they are platform-independent and already
-  # covered.
+  # Core suite plus every extension available on the platform: Pardiso needs
+  # MKL (x86), Accelerate needs macOS, GDAL runs everywhere so the GeoTIFF
+  # fixtures are covered. The Ubuntu job is the only one that reports
+  # coverage.
   test-extensions:
     name: Julia 1 - ${{ matrix.os }} - core + ${{ matrix.label }} - ${{ github.event_name }}
     runs-on: ${{ matrix.os }}
@@ -60,12 +57,14 @@ jobs:
             packages: '"Pardiso", "ArchGDAL"'
             label: Pardiso, GDAL
             coverage: true
-            core_solvers: true
+          - os: windows-latest
+            packages: '"Pardiso", "ArchGDAL"'
+            label: Pardiso, GDAL
+            coverage: false
           - os: macOS-latest
             packages: '"AppleAccelerate", "ArchGDAL"'
             label: Accelerate, GDAL
             coverage: false
-            core_solvers: false
     steps:
       - uses: actions/checkout@v7
       - uses: julia-actions/setup-julia@v3
@@ -82,8 +81,6 @@ jobs:
             using Pkg
             Pkg.add([${{ matrix.packages }}])
             Pkg.test(coverage=${{ matrix.coverage }})'
-        env:
-          CIRCUITSCAPE_TEST_CORE_SOLVERS: ${{ matrix.core_solvers }}
       - uses: julia-actions/julia-processcoverage@v1
         if: matrix.coverage
       - uses: codecov/codecov-action@v7
