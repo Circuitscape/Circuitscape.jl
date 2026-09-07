@@ -32,8 +32,8 @@ function focal_nodes(data::RasterData{T,V}, geometry::RasterGeometry) where {T,V
     points, points_rc[3], exclude_pairs
 end
 
-initialize_cum(data::RasterData, cfg, num_nodes) =
-    initialize_cum_maps(data.cellmap, cfg.write_max_cur_maps)
+initialize_cum(data::RasterData{T,V}, cfg, num_nodes) where {T,V} =
+    initialize_cum_maps(V, data.cellmap, cfg.write_max_cur_maps)
 
 # A point file that names one id in several cells describes focal regions.
 has_focal_regions(data::RasterData) =
@@ -66,7 +66,7 @@ function pairwise_regions(rasterdata::RasterData{T,V}, cfg)::Matrix{T} where {T,
 						generate_exclude_pairs(points_rc, included_pairs)
 
     # Cumulative maps
-    cum = initialize_cum_maps(gmap, cfg.write_max_cur_maps)
+    cum = initialize_cum_maps(V, gmap, cfg.write_max_cur_maps)
 
     pts = unique(points_rc[3])
     resistances = -1 * ones(length(pts), length(pts))

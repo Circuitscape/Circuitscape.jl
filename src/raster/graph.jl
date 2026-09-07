@@ -211,8 +211,11 @@ function create_new_polymap(gmap, polymap::Matrix{V}, points_rc,
         newpoly = zeros(V, size(gmap)...)
         id1 = findall(x -> x == pt1, points_rc[3])
         id2 = findall(x -> x == pt2, points_rc[3])
-        map(x -> newpoly[f(x)...] = pt1, id1)
-        map(x -> newpoly[f(x)...] = pt2, id2)
+        # Plain loops rather than `map` over closures: `newpoly` is assigned
+        # on several branches, and a captured variable that is reassigned is
+        # boxed, which made the return type `Any` for every caller.
+        for x in id1; newpoly[f(x)...] = pt1; end
+        for x in id2; newpoly[f(x)...] = pt2; end
         return newpoly
     else
         newpoly = deepcopy(polymap)
@@ -226,12 +229,12 @@ function create_new_polymap(gmap, polymap::Matrix{V}, points_rc,
             end
             allzero = mapreduce(x -> polymap[f(x)...] == 0, &, idx)
             if allzero
-                map(x -> newpoly[f(x)...] = k + 1, idx)
+                for x in idx; newpoly[f(x)...] = k + 1; end
                 k += 1
             else
                 nz = filter(x -> polymap[f(x)...]!= 0, idx)
                 if length(nz) == 1
-                    map(x -> newpoly[f(x)...] = polymap[overlap[1]], idx)
+                    for x in idx; newpoly[f(x)...] = polymap[overlap[1]]; end
                 else
                     coords = map(x -> f(x), nz)
                     vals = map(x -> polymap[x...], coords)

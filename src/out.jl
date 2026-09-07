@@ -45,7 +45,8 @@ end
 # kernel keeps cumulative node and branch currents.
 accumulate_currents!(::AbstractVector, node_currents_array, branch_currents_array) = nothing
 
-function accumulate_currents!(output::Output, node_currents_array, branch_currents_array)
+function accumulate_currents!(output::Output{T,V}, node_currents_array,
+                              branch_currents_array) where {T,V}
     cum_branch_curr = output.cum.cum_branch_curr
     cum_node_curr = output.cum.cum_node_curr
 
@@ -53,7 +54,6 @@ function accumulate_currents!(output::Output, node_currents_array, branch_curren
     # critical section is just the adds.
     bca = branch_currents_array
     bidx = output.cum.branch_index
-    V = keytype(bidx).parameters[1]
     slots = [bidx[(V(bca[i,1]), V(bca[i,2]))] for i in 1:size(bca, 1)]
 
     lock(output.cum.lock) do
@@ -521,14 +521,22 @@ function write_raster(fn_prefix::String,
     end
 end
 
-function write_asc(fn_prefix::String, array::AbstractMatrix, wkt::String, transform)
-    nrows, ncols = size(array)
+# Lower-left corner and cell size of an `nrows`-row grid from a GDAL-style
+# geotransform; unit cells at the origin without one. A helper so that the
+# values are bound once before `write_asc` captures them (a captured
+# variable assigned on two branches is boxed).
+function _asc_origin(transform, nrows)
     if length(transform) >= 6
         xll, dx, dy = transform[1], transform[2], -transform[6]
         yll = transform[4] - nrows * dy
-    else
-        xll, yll, dx, dy = 0.0, 0.0, 1.0, 1.0
+        return xll, yll, dx, dy
     end
+    0.0, 0.0, 1.0, 1.0
+end
+
+function write_asc(fn_prefix::String, array::AbstractMatrix, wkt::String, transform)
+    nrows, ncols = size(array)
+    xll, yll, dx, dy = _asc_origin(transform, nrows)
     open(fn_prefix * ".asc", "w") do io
         println(io, "ncols         ", ncols)
         println(io, "nrows         ", nrows)
