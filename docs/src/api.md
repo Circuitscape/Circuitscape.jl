@@ -93,6 +93,7 @@ Circuitscape.PairJob
 Circuitscape.pair_jobs
 Circuitscape.get_num_pairs
 Circuitscape.solve
+Circuitscape.component_matrix
 Circuitscape.prepare!
 Circuitscape.solve_pairs!
 ```

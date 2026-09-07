@@ -29,7 +29,8 @@ the focal nodes as graph indices (`points`) with the user's ids alongside
 [`Geometry`](@ref) that maps nodes back to output coordinates, the
 [`Cumulative`](@ref) accumulators and the solver. Raster and network runs
 differ only in `geometry`. Built by [`build_problem`](@ref) and consumed by
-[`solve`](@ref).
+[`solve`](@ref), which may regularize `G` in place (see
+[`component_matrix`](@ref)); a problem is solved once.
 """
 struct GraphProblem{T,V,W,Geom<:Geometry}
     G::SparseMatrixCSC{T,V}
@@ -285,9 +286,6 @@ function solve(prob::GraphProblem{T,V}, solver::Solver, cfg, log)::Matrix{T} whe
     voltmatrix = zeros(T, size(resistances))
     shortcut_res = -1 * ones(T, size(resistances))
 
-    # Get a vector of connected components
-    comps = getindex.([a], cc, cc)
-
     get_shortcut_resistances = false
     if is_raster(geometry) && !write_volt_maps && !write_cur_maps &&
             !write_cum_cur_map_only && !write_max_cur_maps &&
@@ -305,15 +303,18 @@ function solve(prob::GraphProblem{T,V}, solver::Solver, cfg, log)::Matrix{T} whe
 
     positions = point_positions(points)
 
-    for (cid, comp) in enumerate(cc)
+    for comp in cc
 
         # Subset of points relevant to CC
         csub = component_points(comp, points)
         isempty(csub) && continue
 
-        # Conductance matrix corresponding to CC; the solver may regularize
-        # it in place before it is captured for output writing.
-        matrix = comps[cid]
+        # Conductance matrix corresponding to CC, extracted only now so that
+        # a single component's submatrix is live at a time (extracting every
+        # component up front held a second copy of the whole graph for the
+        # duration of the run). The solver may regularize it in place before
+        # it is captured for output writing.
+        matrix = component_matrix(a, comp)
         handle = prepare!(solver, matrix)
 
         # Geometry of this CC in local numbering - for output writing
@@ -368,6 +369,18 @@ function solve(prob::GraphProblem{T,V}, solver::Solver, cfg, log)::Matrix{T} whe
 
     r
 end
+
+"""
+    component_matrix(G, comp)
+
+The Laplacian restricted to the nodes of `comp` (sorted ascending, as
+`connected_components` returns them). When the component is the whole graph
+`G` itself is returned rather than a copy: `prepare!` then regularizes
+`prob.G` in place for the AMG solver, which is safe because nothing reads
+`prob.G` after [`solve`](@ref) and every `GraphProblem` is solved once.
+"""
+component_matrix(G::SparseMatrixCSC, comp) =
+    length(comp) == size(G, 1) ? G : G[comp, comp]
 
 """
     prepare!(solver, matrix)
@@ -490,8 +503,11 @@ end
 # So can we make this consistent?
 function construct_cholesky_factor(matrix, ::CholmodSolver)
     T = eltype(matrix)
-    factor = cholesky(matrix + sparse(T(10)*eps(T)*I,size(matrix)...))
-    factor
+    # `shift` hands the diagonal shift to CHOLMOD (it factorizes
+    # `matrix + shift*I`) instead of materializing that sum as a second sparse
+    # matrix; the factor is bit-identical. `refine_columns!` keeps measuring
+    # the residual against the unshifted `matrix`, as before.
+    cholesky(matrix; shift = T(10) * eps(T))
 end
 
 
