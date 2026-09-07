@@ -868,8 +868,12 @@ end
     cfg =Circuitscape.parse_config("input/raster/one_to_all/11/oneToAllVerify11.ini")
     cfg64 = Circuitscape.CSConfig(cfg; use_64bit_indexing = true)
     @test Circuitscape.index_type(cfg, 10, 10) == Int32
-    @test Circuitscape.index_type(cfg, Circuitscape.INT32_MAX_NODES - 1, typemax(Int32) - 1) == Int32
-    @test Circuitscape.index_type(cfg, Circuitscape.INT32_MAX_NODES, 10) == Int64
+    @test Circuitscape.index_type(cfg, Circuitscape.INT32_MAX_NODES_ITERATIVE - 1, typemax(Int32) - 1) == Int32
+    @test Circuitscape.index_type(cfg, Circuitscape.INT32_MAX_NODES_ITERATIVE, 10) == Int64
+    cfgch = Circuitscape.CSConfig(cfg; solver = Circuitscape.st_cholmod)
+    @test Circuitscape.index_type(cfgch, Circuitscape.INT32_MAX_NODES_DIRECT - 1, 10) == Int32
+    @test Circuitscape.index_type(cfgch, Circuitscape.INT32_MAX_NODES_DIRECT, 10) == Int64
+    @test Circuitscape.index_type(cfgch, Circuitscape.INT32_MAX_NODES_ITERATIVE - 1, 10) == Int64
     @test Circuitscape.index_type(cfg, 10, typemax(Int32)) == Int64
     @test Circuitscape.index_type(cfg64, 10, 10) == Int64
     @test Circuitscape.raster_nnz_bound(1_000_000) > nnz(model_problem(1000)) 

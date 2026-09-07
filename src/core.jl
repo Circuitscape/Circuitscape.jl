@@ -544,7 +544,20 @@ function construct_cholesky_factor(matrix, ::CholmodSolver)
     # `matrix + shift*I`) instead of materializing that sum as a second sparse
     # matrix; the factor is bit-identical. `refine_columns!` keeps measuring
     # the residual against the unshifted `matrix`, as before.
-    cholesky(matrix; shift = T(10) * eps(T))
+    try
+        cholesky(matrix; shift = T(10) * eps(T))
+    catch e
+        # CHOLMOD's 32-bit variant refuses a factor whose index arrays
+        # exceed 2^31 entries ("problem too large"). The index type was
+        # chosen from the node count before the fill was known, so say
+        # what to do rather than surface CHOLMOD's message.
+        if e isa SparseArrays.CHOLMOD.CHOLMODException && eltype(rowvals(matrix)) === Int32
+            error("CHOLMOD could not factorize a component of $(size(matrix, 1)) nodes " *
+                  "with 32-bit indices ($(e.msg)): the Cholesky factor is too large for " *
+                  "them. Set use_64bit_indexing = true, or use the cg+amg solver.")
+        end
+        rethrow()
+    end
 end
 
 
