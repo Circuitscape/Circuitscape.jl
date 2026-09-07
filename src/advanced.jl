@@ -65,9 +65,27 @@ function fill_sources_and_grounds!(sources, grounds, source_map, ground_map, cfg
     if cfg.ground_file_is_resistances
         ground_map[:,2] = 1 ./ ground_map[:,2]
     end
-    sources[V.(source_map[:,1])] = source_map[:,2]
-    grounds[V.(ground_map[:,1])] = ground_map[:,2]
+    assign_network_nodes!(sources, source_map, "source", V)
+    assign_network_nodes!(grounds, ground_map, "ground", V)
     nothing
+end
+
+# Set `values[node] = value` for each `(node, value)` row. A node id that is
+# not in the graph is skipped with a warning, as Circuitscape 4 matches the
+# ids against the graph's node names and silently ignores the rest
+# (compute.py, advanced_module).
+function assign_network_nodes!(values, list, what, ::Type{V}) where {V}
+    n = length(values)
+    for r in axes(list, 1)
+        node = list[r, 1]
+        if 1 <= node <= n && isinteger(node)
+            values[V(node)] = list[r, 2]
+        else
+            id = isinteger(node) ? Int(node) : node
+            @warn("Ignoring $what at node $id: not a node of the graph (nodes are 1 to $n)")
+        end
+    end
+    values
 end
 
 function resolve_conflicts(sources::Vector{T},
