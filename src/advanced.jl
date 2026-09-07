@@ -213,9 +213,9 @@ write_advanced_cur_map(name, voltages, outcurr, G, finitegrounds, geometry::Netw
 
 function multiple_solver(cfg, solver, a::SparseMatrixCSC{T,V}, sources, grounds, finitegrounds) where {T,V}
 
-    asolve = deepcopy(a)
+    # No copy of `a` here: `asolve[r, r]` below copies, and `a` is left as is.
+    asolve = a
     if finitegrounds[1] != -9999
-        # asolve = a + spdiagm(finitegrounds, 0, size(a, 1), size(a, 1))
         asolve = a + spdiagm(0 => finitegrounds)
     end
 
