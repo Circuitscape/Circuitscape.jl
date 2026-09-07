@@ -8,7 +8,6 @@ using SparseArrays
 using DelimitedFiles
 using Logging
 using Dates
-using SuiteSparse
 using TimerOutputs
 using Base.ScopedValues
 
