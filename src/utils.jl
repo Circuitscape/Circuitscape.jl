@@ -278,7 +278,9 @@ function compute_omniscape_current(
     # tasks at once, and a TimerOutput is not safe to share between them, so
     # each call times into a private timer instead of the default CSTIMER.
     with(CSTIMER => TimerOutput()) do
-        prob = advanced_problem(rasterdata, cfg)
+        # Omniscape's contract is that a window with nothing to solve is a
+        # zero map, not an error, so the per-component conflict check is off.
+        prob = advanced_problem(rasterdata, cfg; check_conflicts = false)
         _, outcurr, _ = advanced_kernel(prob, cfg; accumulate_currents = true)
         outcurr
     end

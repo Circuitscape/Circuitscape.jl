@@ -33,10 +33,11 @@ function graph_problem(data::Data, cfg)
     GraphProblem(G, cc, points, user_points, exclude_pairs, geometry, cum, get_solver(cfg))
 end
 
-function advanced_problem(data::Data, cfg)
+function advanced_problem(data::Data, cfg; check_conflicts = true)
     G, cc, geometry = @timeit CSTIMER[] "construct graph" build_graph(data, cfg)
     sources, grounds, finitegrounds =
-        sources_and_grounds(geometry, data.source_map, data.ground_map, G, cfg)
+        sources_and_grounds(geometry, data.source_map, data.ground_map, G, cfg;
+                            cc = check_conflicts ? cc : nothing)
     AdvancedProblem(G, cc, geometry, sources, grounds, finitegrounds, get_solver(cfg))
 end
 
