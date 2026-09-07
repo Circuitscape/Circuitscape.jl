@@ -340,6 +340,24 @@ function read_source_and_ground_maps(T, V, source_file, ground_file, habitatmeta
 		ground_map[findall(!iszero, ground_map)] .= Inf
 	end
 
+    # As Python (csio.read_source_and_ground_maps), apply remove_src_or_gnd to
+    # the cell maps as they are read, before the node-level pass in
+    # `resolve_conflicts`: rmvsrc and rmvall drop the conflicting sources,
+    # rmvgnd and rmvall the conflicting grounds, and a map that is left empty
+    # is an error rather than a run with nothing to solve.
+    conflict_policy = policy(cfg)
+    conflicts = map((s, g) -> !iszero(s) && !iszero(g), source_map, ground_map)
+    if conflict_policy == :rmvsrc || conflict_policy == :rmvall
+        source_map[conflicts] .= 0
+    end
+    if conflict_policy == :rmvgnd || conflict_policy == :rmvall
+        ground_map[conflicts] .= 0
+    end
+    any(!iszero, source_map) ||
+        throw(ErrorException("No valid sources detected. Please check source file"))
+    any(!iszero, ground_map) ||
+        throw(ErrorException("No valid grounds detected. Please check ground file"))
+
     source_map, ground_map
 end
 
