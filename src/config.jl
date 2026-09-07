@@ -41,7 +41,7 @@ Base.@kwdef struct CSConfig
     solver::SolverType = st_cg_amg
     parallelize::Bool = false
     precision::Precision = pr_double
-    use_64bit_indexing::Bool = true
+    use_64bit_indexing::Bool = false   # false = 32-bit indices when the problem fits
     cholmod_batch_size::Int = 32
     residual_tolerance::Float64 = 0.0   # 0 = automatic: 1e-4 double, 1e-3 single
     low_memory_mode::Bool = false
@@ -157,7 +157,7 @@ function CSConfig(dict::Dict{String,String})
         solver = _parse_solver(get(dict, "solver", "cg+amg")),
         parallelize = _parse_bool(dict, "parallelize"),
         precision = _parse_precision(get(dict, "precision", "Double")),
-        use_64bit_indexing = _parse_bool(dict, "use_64bit_indexing", "true"),
+        use_64bit_indexing = _parse_bool(dict, "use_64bit_indexing", "false"),
         cholmod_batch_size = parse(Int, get(dict, "cholmod_batch_size", "32")),
         residual_tolerance = _parse_tolerance(get(dict, "residual_tolerance", "auto")),
         low_memory_mode = _parse_bool(dict, "low_memory_mode"),
@@ -458,7 +458,7 @@ function init_config()
     a["log_level"] = "INFO"
     a["cholmod_batch_size"] = "32"
     a["residual_tolerance"] = "auto"
-    a["use_64bit_indexing"] = "true"
+    a["use_64bit_indexing"] = "false"
     a["write_as_tif"] = "false"
     a["suppress_messages"] = "false"
     a

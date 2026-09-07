@@ -216,7 +216,11 @@ function multiple_solver(cfg, solver, a::SparseMatrixCSC{T,V}, sources, grounds,
     # No copy of `a` here: `asolve[r, r]` below copies, and `a` is left as is.
     asolve = a
     if finitegrounds[1] != -9999
-        asolve = a + spdiagm(0 => finitegrounds)
+        # Diagonal built with the index type of `a`: `spdiagm` is always
+        # `Int` indexed and would promote a 32-bit matrix to 64-bit indices.
+        n = size(a, 1)
+        r = V(1):V(n)
+        asolve = a + sparse(r, r, finitegrounds, n, n)
     end
 
     infgrounds = findall(x -> x == Inf, grounds)

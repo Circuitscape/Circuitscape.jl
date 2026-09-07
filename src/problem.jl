@@ -1,24 +1,28 @@
 """
+    load_data(T, cfg)
     load_data(T, V, cfg)
 
-Read the inputs named in `cfg`: a `RasterData` or a `NetworkData`. This and
-the geometry construction in `build_graph` are the only steps that know
-which of the two it is; everything downstream works on one representation.
+Read the inputs named in `cfg`: a `RasterData` or a `NetworkData` with
+values of type `T` and node numbers of type `V`. `V` is chosen by
+[`index_type`](@ref) from the size of the input unless given. This and the
+geometry construction in `build_graph` are the only steps that know which of
+the two it is; everything downstream works on one representation.
 """
+load_data(T, cfg) = is_raster(cfg) ? load_raster_data(T, cfg) : get_network_data(T, cfg)
 load_data(T, V, cfg) = is_raster(cfg) ? load_raster_data(T, V, cfg) :
                                         get_network_data(T, V, cfg)
 
 """
     build_problem(data, cfg)
-    build_problem(T, V, cfg)
+    build_problem(T, cfg)
 
-The problem `cfg` describes over the loaded (or, given `T, V`, freshly read)
+The problem `cfg` describes over the loaded (or, given `T`, freshly read)
 data: a `GraphProblem` in pairwise mode, an `AdvancedProblem` in advanced
 mode. Both are built the same way for rasters and networks; `build_graph`,
 `focal_nodes` and `initialize_cum` dispatch on the data type to construct the
 graph and its output geometry.
 """
-build_problem(T, V, cfg) = build_problem(load_data(T, V, cfg), cfg)
+build_problem(T, cfg) = build_problem(load_data(T, cfg), cfg)
 build_problem(data::Data, cfg) = is_advanced(cfg) ? advanced_problem(data, cfg) :
                                                     graph_problem(data, cfg)
 

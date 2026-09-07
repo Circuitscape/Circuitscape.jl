@@ -521,6 +521,21 @@ function solve_pairs!(handle_pair, factor, solver::DirectSolver, matrix::SparseM
     nothing
 end
 
+"""
+    regularize(matrix)
+
+`matrix + 10ε I`: the diagonal shift that makes a component's singular
+Laplacian positive definite for the direct solvers. The identity is built
+with the index type of `matrix`; `sparse(c * I, n, n)` is always `Int`
+indexed, and adding it silently promoted a 32-bit matrix, and the factor
+built from it, back to 64-bit indices.
+"""
+function regularize(matrix::SparseMatrixCSC{T,V}) where {T,V}
+    n = size(matrix, 1)
+    r = V(1):V(n)
+    matrix + sparse(r, r, T(10) * eps(T), n, n)
+end
+
 # TODO: In the pardiso case, we're not really constructing the factor
 # So can we make this consistent?
 function construct_cholesky_factor(matrix, ::CholmodSolver)
@@ -529,7 +544,20 @@ function construct_cholesky_factor(matrix, ::CholmodSolver)
     # `matrix + shift*I`) instead of materializing that sum as a second sparse
     # matrix; the factor is bit-identical. `refine_columns!` keeps measuring
     # the residual against the unshifted `matrix`, as before.
-    cholesky(matrix; shift = T(10) * eps(T))
+    try
+        cholesky(matrix; shift = T(10) * eps(T))
+    catch e
+        # CHOLMOD's 32-bit variant refuses a factor whose index arrays
+        # exceed 2^31 entries ("problem too large"). The index type was
+        # chosen from the node count before the fill was known, so say
+        # what to do rather than surface CHOLMOD's message.
+        if e isa SparseArrays.CHOLMOD.CHOLMODException && eltype(rowvals(matrix)) === Int32
+            error("CHOLMOD could not factorize a component of $(size(matrix, 1)) nodes " *
+                  "with 32-bit indices ($(e.msg)): the Cholesky factor is too large for " *
+                  "them. Set use_64bit_indexing = true, or use the cg+amg solver.")
+        end
+        rethrow()
+    end
 end
 
 
