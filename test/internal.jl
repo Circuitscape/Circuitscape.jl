@@ -954,3 +954,170 @@ end
     r64 = Circuitscape.run_onetoall(Circuitscape.load_data(Float64, Int64, cfg), cfg)
     @test r32 == r64
 end
+
+# Output files, as Circuitscape 4 writes them: the prefix is output_file
+# without its extension, the INI copy goes to <prefix>.ini, one-to-all writes
+# a resistances file, and the map output options are applied to every grid
+# as it is written rather than before accumulation.
+@testset "output files" begin
+    # The prefix helper: splitext, so a directory containing ".out" is safe
+    @test Circuitscape.output_prefix("a/b.out") == "a/b"
+    @test Circuitscape.output_prefix("a.out/b.out") == "a.out/b"
+    @test Circuitscape.output_prefix("a.out/b") == "a.out/b"
+    @test Circuitscape.output_prefix("run") == "run"
+    @test Circuitscape.output_prefix("out/res.txt") == "out/res"
+
+    root = mktempdir()
+    dir = joinpath(root, "job.out")          # a directory named with ".out"
+    mkpath(dir)
+    hdr = "ncols 5\nnrows 5\nxllcorner 0\nyllcorner 0\ncellsize 1\nNODATA_value -9999\n"
+    grid(f) = hdr * join([join([string(f(i, j)) for j in 1:5], " ") for i in 1:5], "\n") * "\n"
+    write(joinpath(dir, "cell.asc"), grid((i, j) -> (i, j) == (3, 3) ? -9999 : 1))
+    write(joinpath(dir, "pts.asc"), grid((i, j) -> get(Dict((1,1) => 1, (5,5) => 2, (1,5) => 3), (i, j), 0)))
+    read_map(name) = readdlm(joinpath(dir, name), skipstart = 6)
+    files(prefix) = filter(f -> startswith(f, prefix), readdir(dir))
+
+    d = Circuitscape.init_config()
+    d["data_type"] = "raster"; d["scenario"] = "pairwise"
+    d["habitat_file"] = joinpath(dir, "cell.asc"); d["point_file"] = joinpath(dir, "pts.asc")
+    d["connect_four_neighbors_only"] = "True"
+    d["write_cur_maps"] = "True"; d["write_max_cur_maps"] = "True"; d["write_volt_maps"] = "True"
+
+    # Raw maps: every output lands in the ".out" directory under the prefix
+    d["output_file"] = joinpath(dir, "raw.out")
+    r_raw = compute(d)
+    @test Set(files("raw")) == Set(["raw.ini", "raw_resistances.out", "raw_resistances_3columns.out",
+        "raw_cum_curmap.asc", "raw_max_curmap.asc",
+        "raw_curmap_1_2.asc", "raw_curmap_1_3.asc", "raw_curmap_2_3.asc",
+        "raw_voltmap_1_2.asc", "raw_voltmap_1_3.asc", "raw_voltmap_2_3.asc"])
+    @test !isfile(joinpath(dir, "raw.out"))
+    ini = read(joinpath(dir, "raw.ini"), String)
+    @test occursin("[Circuitscape Mode]", ini) && occursin("scenario = pairwise", ini)
+    @test occursin("output_file = $(joinpath(dir, "raw.out"))", ini)
+    @test readdlm(joinpath(dir, "raw_resistances.out")) ≈ r_raw
+    raw_cum = read_map("raw_cum_curmap.asc")
+    raw_max = read_map("raw_max_curmap.asc")
+    raw_pair = read_map("raw_curmap_1_2.asc")
+    raw_volt = read_map("raw_voltmap_1_2.asc")
+    @test raw_cum ≈ raw_pair + read_map("raw_curmap_1_3.asc") + read_map("raw_curmap_2_3.asc")
+    @test raw_max ≈ max.(raw_pair, read_map("raw_curmap_1_3.asc"), read_map("raw_curmap_2_3.asc"))
+    @test raw_cum[3, 3] == 0 && raw_volt[3, 3] == 0
+
+    # log_transform_maps: log10 of the sum, not the sum of the logs, and
+    # cells with no current in a single pair are nodata only in that pair
+    logt(m) = map(x -> x > 0 ? log10(x) : -9999.0, m)
+    d["output_file"] = joinpath(dir, "log.out"); d["log_transform_maps"] = "True"
+    @test compute(d) ≈ r_raw
+    @test read_map("log_cum_curmap.asc") ≈ logt(raw_cum)
+    @test read_map("log_max_curmap.asc") ≈ logt(raw_max)
+    @test read_map("log_curmap_1_2.asc") ≈ logt(raw_pair)
+    @test read_map("log_voltmap_1_2.asc") ≈ raw_volt      # voltages are never transformed
+    d["log_transform_maps"] = "False"
+
+    # set_null_*_to_nodata: only the NODATA cell (no node) becomes -9999,
+    # in every written grid; a dry cell with a node stays 0
+    nulls(m) = (n = copy(m); n[3, 3] = -9999.0; n)
+    d["output_file"] = joinpath(dir, "null.out")
+    d["set_null_currents_to_nodata"] = "True"; d["set_null_voltages_to_nodata"] = "True"
+    @test compute(d) ≈ r_raw
+    @test read_map("null_cum_curmap.asc") == nulls(raw_cum)
+    @test read_map("null_max_curmap.asc") == nulls(raw_max)
+    @test read_map("null_curmap_1_2.asc") == nulls(raw_pair)
+    @test read_map("null_voltmap_1_2.asc") == nulls(raw_volt)
+
+    # write_cum_cur_map_only: no per-pair current files, cumulative still there
+    d["output_file"] = joinpath(dir, "cumonly.out"); d["write_cum_cur_map_only"] = "True"
+    compute(d)
+    @test !any(f -> occursin("_curmap_", f), files("cumonly"))
+    @test read_map("cumonly_cum_curmap.asc") == nulls(raw_cum)
+    d["write_cum_cur_map_only"] = "False"
+
+    # One-to-all: a two-column resistances file, the same options applied
+    # to the per-node and cumulative grids, and no per-node current maps
+    # under write_cum_cur_map_only
+    d["scenario"] = "one-to-all"
+    d["set_null_currents_to_nodata"] = "False"; d["set_null_voltages_to_nodata"] = "False"
+    d["output_file"] = joinpath(dir, "ota.out")
+    r_ota = compute(d)
+    @test size(r_ota) == (3, 2) && r_ota[:, 1] == [1, 2, 3]
+    @test readdlm(joinpath(dir, "ota_resistances.out")) ≈ r_ota
+    @test isfile(joinpath(dir, "ota.ini"))
+    ota_cum = read_map("ota_cum_curmap.asc")
+    ota_1 = read_map("ota_curmap_1.asc")
+    @test ota_cum ≈ ota_1 + read_map("ota_curmap_2.asc") + read_map("ota_curmap_3.asc")
+    d["output_file"] = joinpath(dir, "otalog.out")
+    d["log_transform_maps"] = "True"; d["set_null_currents_to_nodata"] = "True"
+    d["set_null_voltages_to_nodata"] = "True"
+    @test compute(d) ≈ r_ota
+    @test read_map("otalog_cum_curmap.asc") ≈ nulls(logt(ota_cum))
+    @test read_map("otalog_curmap_1.asc") ≈ nulls(logt(ota_1))
+    @test read_map("otalog_voltmap_1.asc") == nulls(read_map("ota_voltmap_1.asc"))
+    d["output_file"] = joinpath(dir, "otacum.out"); d["write_cum_cur_map_only"] = "True"
+    @test compute(d) ≈ r_ota
+    @test !any(f -> occursin("_curmap_", f), files("otacum"))
+    @test read_map("otacum_cum_curmap.asc") ≈ nulls(logt(ota_cum))
+    # ... and the cumulative map is still accumulated without write_cur_maps
+    d["output_file"] = joinpath(dir, "otacum2.out"); d["write_cur_maps"] = "False"
+    compute(d)
+    @test read_map("otacum2_cum_curmap.asc") ≈ nulls(logt(ota_cum))
+
+    # Advanced mode: the options apply to its one voltage and current grid,
+    # and write_cum_cur_map_only alone writes nothing
+    write(joinpath(dir, "src.asc"), grid((i, j) -> (i, j) == (1, 1) ? 1 : 0))
+    write(joinpath(dir, "gnd.asc"), grid((i, j) -> (i, j) == (5, 5) ? 1 : -9999))
+    a = Circuitscape.init_config()
+    a["data_type"] = "raster"; a["scenario"] = "advanced"
+    a["habitat_file"] = joinpath(dir, "cell.asc"); a["connect_four_neighbors_only"] = "True"
+    a["source_file"] = joinpath(dir, "src.asc"); a["ground_file"] = joinpath(dir, "gnd.asc")
+    a["ground_file_is_resistances"] = "False"
+    a["write_cur_maps"] = "True"; a["write_volt_maps"] = "True"
+    a["output_file"] = joinpath(dir, "adv.out")
+    v_adv = compute(a)
+    adv_cur = read_map("adv_curmap.asc"); adv_volt = read_map("adv_voltmap.asc")
+    @test adv_volt ≈ v_adv
+    @test isapprox(adv_cur[1, 1], 1, atol = 1e-6) && adv_cur[3, 3] == 0
+    a["output_file"] = joinpath(dir, "advlog.out")
+    a["log_transform_maps"] = "True"; a["set_null_currents_to_nodata"] = "True"
+    a["set_null_voltages_to_nodata"] = "True"
+    @test compute(a) ≈ v_adv
+    @test read_map("advlog_curmap.asc") ≈ nulls(logt(adv_cur))
+    @test read_map("advlog_voltmap.asc") == nulls(adv_volt)
+    a["output_file"] = joinpath(dir, "advcum.out")
+    a["write_cur_maps"] = "False"; a["write_cum_cur_map_only"] = "True"
+    compute(a)
+    @test !any(f -> occursin("curmap", f), files("advcum"))
+
+    # Network pairwise: per-pair current files only with write_cur_maps and
+    # without write_cum_cur_map_only; the prefix helper is used there too
+    write(joinpath(dir, "g.txt"), "1\t2\t1.0\n2\t3\t1.0\n3\t4\t1.0\n")
+    write(joinpath(dir, "fp.txt"), "1\n4\n")
+    n = Circuitscape.init_config()
+    n["data_type"] = "network"; n["scenario"] = "pairwise"
+    n["habitat_file"] = joinpath(dir, "g.txt"); n["point_file"] = joinpath(dir, "fp.txt")
+    n["write_cur_maps"] = "True"; n["write_volt_maps"] = "True"
+    n["output_file"] = joinpath(dir, "net.out")
+    compute(n)
+    @test Set(files("net")) == Set(["net.ini", "net_resistances.out", "net_resistances_3columns.out",
+        "net_node_currents_1_4.txt", "net_branch_currents_1_4.txt",
+        "net_node_currents_cum.txt", "net_branch_currents_cum.txt", "net_voltages_1_4.txt"])
+    n["output_file"] = joinpath(dir, "netcum.out"); n["write_cum_cur_map_only"] = "True"
+    compute(n)
+    @test Set(files("netcum")) == Set(["netcum.ini", "netcum_resistances.out",
+        "netcum_resistances_3columns.out", "netcum_node_currents_cum.txt",
+        "netcum_branch_currents_cum.txt", "netcum_voltages_1_4.txt"])
+end
+
+# A text-list focal node exactly on the lower-left corner of the habitat map
+# maps to column 0, which is outside a 1-based grid: it must be reported as
+# such, not fail later with a BoundsError.
+@testset "text-list focal node bounds" begin
+    dir = mktempdir()
+    meta = Circuitscape.RasterMeta(5, 5, 0.0, 0.0, 1.0, -9999.0, [0.0], "")
+    write(joinpath(dir, "corner.txt"), "1 0.0 0.0\n2 4.5 4.5\n")
+    @test_throws "At least one focal node location falls outside of habitat map" begin
+        Circuitscape.read_point_map(Int, joinpath(dir, "corner.txt"), meta)
+    end
+    write(joinpath(dir, "inside.txt"), "1 0.5 0.5\n2 4.5 4.5\n")
+    i, j, v = Circuitscape.read_point_map(Int, joinpath(dir, "inside.txt"), meta)
+    @test v == [1, 2] && i == [5, 1] && j == [1, 5]
+end

@@ -174,9 +174,12 @@ function advanced_kernel(prob::AdvancedProblem{T,V}, cfg;
         zero_focal_nodes!(outcurr, geometry, Set(active))
     end
 
-    if write_c_maps || write_cum_cur_map_only
-        write_advanced_cur_map(name, voltages, outcurr, G, finitegrounds, geometry, cfg)
-    end
+    # Per-solve current files as in Circuitscape 4: advanced mode writes its
+    # one map with `write_cur_maps`; one-to-all / all-to-one write a map per
+    # focal node with `write_cur_maps` unless `write_cum_cur_map_only`.
+    per_solve = write_c_maps &&
+        !((is_onetoall(cfg) || is_alltoone(cfg)) && write_cum_cur_map_only)
+    per_solve && write_advanced_cur_map(name, voltages, outcurr, G, finitegrounds, geometry, cfg)
 
     voltages, outcurr, solver_called
 end
@@ -199,14 +202,16 @@ zero_focal_nodes!(outcurr, ::NetworkGeometry, nodes) = outcurr
 
 # Advanced mode writes one voltage and one current map per run from the
 # whole-graph voltages: a grid for a raster, node (and branch) lists for a
-# network.
+# network. The output options (log transform, null cells to nodata) are
+# applied by the grid writers; the current grid is copied first because the
+# raw `outcurr` is also returned, and one-to-all accumulates it.
 write_advanced_volt_map(name, voltages, outvolt, geometry::RasterGeometry, cfg) =
-    write_grid(outvolt, name, cfg, geometry.hbmeta, geometry.cellmap, voltage = true)
+    write_voltage_grid(outvolt, name, cfg, geometry)
 write_advanced_volt_map(name, voltages, outvolt, geometry::NetworkGeometry, cfg) =
     write_volt_maps(geometry, name, voltages, cfg)
 
 write_advanced_cur_map(name, voltages, outcurr, G, finitegrounds, geometry::RasterGeometry, cfg) =
-    write_grid(outcurr, name, cfg, geometry.hbmeta, geometry.cellmap)
+    write_current_grid(copy(outcurr), name, cfg, geometry)
 write_advanced_cur_map(name, voltages, outcurr, G, finitegrounds, geometry::NetworkGeometry, cfg) =
     write_cur_maps(name, voltages, ComponentData(geometry.nodes, G, geometry), finitegrounds, cfg)
 

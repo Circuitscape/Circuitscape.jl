@@ -9,8 +9,9 @@ dictionary of INI keys and string values, as returned by
 that are not given take their default value.
 
 The configuration is validated before any data is read (see
-[`Circuitscape.validate`](@ref)), written in INI form to `output_file`, and
-run. Output files are written next to `output_file`; the return value is the
+[`Circuitscape.validate`](@ref)), written in INI form to `<prefix>.ini`
+(`output_file` without its extension), and run. Output files are written
+next to `output_file` with that prefix; the return value is the
 result matrix: pairwise resistances (first row and column hold the focal node
 IDs), one-to-all resistances per focal node, node voltages in advanced mode.
 Set `parallelize = True` and start Julia with several threads to run pair

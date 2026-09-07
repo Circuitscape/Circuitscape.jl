@@ -90,9 +90,11 @@ function run_onetoall(data::RasterData{T,V}, cfg)::Matrix{T} where {T,V}
         cfg.write_max_cur_maps && (cum.max_curr .= max.(cum.max_curr, curr))
     end
 
-    write_cum_maps(cum, hbmeta, cfg)
+    write_cum_maps(cum, hbmeta, gmap, cfg)
 
-    hcat(points_unique, res)
+    r = hcat(points_unique, res)
+    save_onetoall_resistances(r, cfg)
+    r
 end
 
 # One focal point of `run_onetoall`: build its source and ground maps (and,
@@ -180,7 +182,10 @@ function solve_onetoall_point(i, data::RasterData{T,V}, cfg, G, cc, nodemap, new
                 sources_and_grounds(point_geometry, source_map, ground_map, G, cfg, policy)
 
     prob = AdvancedProblem(G, cc, point_geometry, sources, grounds, finite_grounds, get_solver(cfg))
-    voltages, curr, solver_called = advanced_kernel(prob, cfg; check_node, name = "_$(V(n))")
+    # The current map feeds the cumulative map too, which
+    # `write_cum_cur_map_only` asks for without `write_cur_maps`.
+    voltages, curr, solver_called = advanced_kernel(prob, cfg; check_node, name = "_$(V(n))",
+        accumulate_currents = cfg.write_cur_maps || cfg.write_cum_cur_map_only)
 
     res[i] = onetoall_resistance(voltages, solver_called, one_to_all, n, str,
                                  unique_point_map, nodemap)
