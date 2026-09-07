@@ -227,22 +227,20 @@ function create_new_polymap(gmap, polymap::Matrix{V}, points_rc,
             if length(idx) == 1
                 continue
             end
-            allzero = mapreduce(x -> polymap[f(x)...] == 0, &, idx)
-            if allzero
-                for x in idx; newpoly[f(x)...] = k + 1; end
-                k += 1
-            else
-                nz = filter(x -> polymap[f(x)...]!= 0, idx)
-                if length(nz) == 1
-                    for x in idx; newpoly[f(x)...] = polymap[overlap[1]]; end
-                else
-                    coords = map(x -> f(x), nz)
-                    vals = map(x -> polymap[x...], coords)
-                    overlap = findall(in(vals), polymap)
-                    newpoly[overlap] .= k + 1
-                    k += 1
+            # A focal region becomes one node together with every polygon
+            # it overlaps, as in Circuitscape 4's get_overlap_polymap: the
+            # overlapped polygons and the region's own cells all get a new
+            # id. Detecting the overlap on `newpoly` rather than `polymap`
+            # means the second region merges with the first if they share
+            # a polygon, again as in the original.
+            k += 1
+            vals = unique(newpoly[f(x)...] for x in idx if newpoly[f(x)...] != 0)
+            if !isempty(vals)
+                for i in eachindex(newpoly)
+                    newpoly[i] in vals && (newpoly[i] = k)
                 end
             end
+            for x in idx; newpoly[f(x)...] = k; end
         end
         return newpoly
     end

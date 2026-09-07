@@ -141,6 +141,50 @@ let
                  1.0  0.0  0.0  0.0  2.0 ]
 end
 
+@testset "create_new_polymap: focal regions over polygons" begin
+    # Rows, columns and ids of the focal cells, as in RasterData.points_rc.
+    prc(cells, ids) = (first.(cells), last.(cells), ids)
+    poly = [1 1 0 0
+            0 0 0 0
+            0 0 2 2
+            0 0 0 0]
+    gmap = ones(4, 4)
+
+    # Region 5 touches no polygon: its cells get a new id, polygons untouched.
+    r = Circuitscape.create_new_polymap(gmap, poly,
+            prc([(2,1), (2,2), (4,4)], [5, 5, 6]), 5, 6)
+    @test r == [1 1 0 0
+                3 3 0 0
+                0 0 2 2
+                0 0 0 0]
+
+    # Region 5 overlaps polygon 1 in one cell: the polygon and every cell
+    # of the region become one node (this branch used to throw).
+    r = Circuitscape.create_new_polymap(gmap, poly,
+            prc([(1,2), (2,2), (4,4)], [5, 5, 6]), 5, 6)
+    @test r == [3 3 0 0
+                0 3 0 0
+                0 0 2 2
+                0 0 0 0]
+
+    # Region 5 overlaps polygons 1 and 2: both polygons and all of the
+    # region's cells, including (2,3) which lies on no polygon, merge.
+    r = Circuitscape.create_new_polymap(gmap, poly,
+            prc([(1,2), (2,2), (2,3), (3,3), (4,4)], [5, 5, 5, 5, 6]), 5, 6)
+    @test r == [3 3 0 0
+                0 3 3 0
+                0 0 3 3
+                0 0 0 0]
+
+    # Both regions touch polygon 1: they collapse into one node.
+    r = Circuitscape.create_new_polymap(gmap, poly,
+            prc([(1,2), (2,2), (1,1), (4,1)], [5, 5, 6, 6]), 5, 6)
+    @test r == [4 4 0 0
+                0 4 0 0
+                0 0 2 2
+                4 0 0 0]
+end
+
 import Circuitscape: resolve_conflicts
 
 @test resolve_conflicts([1.,0.,0.], [1.,0.,0.], :rmvgnd) == ([1, 0, 0], [0, 0, 0], [1, 0, 0])
