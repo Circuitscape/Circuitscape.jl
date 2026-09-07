@@ -954,3 +954,123 @@ end
     r64 = Circuitscape.run_onetoall(Circuitscape.load_data(Float64, Int64, cfg), cfg)
     @test r32 == r64
 end
+
+# Variable source strengths are matched to focal points by id, as in Python
+# (`get_strengths_rc`): the order of the rows in the file does not matter and
+# an id the file leaves out gets strength 1. Focal ids are taken as written,
+# never shifted as network node ids are.
+@testset "Variable source strengths by id" begin
+    fixture = joinpath(@__DIR__, "input", "raster", "one_to_all", "12")
+    dir = mktempdir()
+    function job(scenario, strengths_file; write_cur_maps = false)
+        d = Dict{String,String}(parse_config(joinpath(fixture, "oneToAllVerify12.ini")))
+        for k in ("habitat_file", "point_file", "polygon_file", "mask_file", "included_pairs_file")
+            d[k] = joinpath(@__DIR__, d[k])
+        end
+        d["scenario"] = scenario
+        d["variable_source_file"] = strengths_file
+        d["output_file"] = joinpath(dir, scenario, "out.out")
+        d["write_cur_maps"] = write_cur_maps ? "True" : "False"
+        d["solver"] = "cholmod"
+        d["parallelize"] = "false"
+        mkpath(joinpath(dir, scenario))
+        compute(d)
+    end
+    ref = readdlm(joinpath(@__DIR__, "output_verify", "oneToAllVerify12_resistances.out"))
+    rows = readdlm(joinpath(fixture, "variable_source_list.txt"))
+
+    # Same rows in another order: identical result (id 3 has strength 0 and
+    # must stay -1; by row position that zero would land on id 1)
+    shuffled = joinpath(dir, "shuffled.txt")
+    writedlm(shuffled, rows[[3, 1, 2, 5, 4, 6, 7, 9, 8, 10, 11], :])
+    r = job("one-to-all", shuffled)
+    @test check_resistances(ref, r, 1e-6, label = "shuffled strengths")
+
+    # An id missing from the file has strength 1: one-to-all resistances
+    # (voltage over strength) are unchanged rather than an error
+    missing5 = joinpath(dir, "missing5.txt")
+    writedlm(missing5, rows[rows[:, 1] .!= 5, :])
+    @test check_resistances(ref, job("one-to-all", missing5), 1e-6, label = "id 5 missing")
+
+    # All-to-one: the current maps depend on which strength each source gets
+    cum_map() = readdlm(joinpath(dir, "all-to-one", "out_cum_curmap.asc"), skipstart = 6)
+    job("all-to-one", shuffled; write_cur_maps = true)
+    cum_ref = readdlm(joinpath(@__DIR__, "output_verify", "allToOneVerify12_cum_curmap.asc"), skipstart = 6)
+    @test sum(abs2, cum_map() - cum_ref) < 1e-6
+    # ... and a missing id sources 1, the same as listing it with strength 1
+    job("all-to-one", missing5; write_cur_maps = true)
+    cum_missing = cum_map()
+    @test sum(abs2, cum_missing - cum_ref) > 1e-3
+    unit5 = joinpath(dir, "unit5.txt")
+    writedlm(unit5, vcat(rows[rows[:, 1] .!= 5, :], [5 1.0]))
+    job("all-to-one", unit5; write_cur_maps = true)
+    @test sum(abs2, cum_map() - cum_missing) < 1e-10
+
+    # A focal id of 0 in the file must not shift the other ids (only network
+    # node lists are 0-based)
+    with0 = joinpath(dir, "with0.txt")
+    writedlm(with0, vcat([0 7.0], rows))
+    @test Circuitscape.read_variable_strengths(Float64, with0)[:, 1] == vcat(0, rows[:, 1])
+    @test check_resistances(ref, job("one-to-all", with0), 1e-6, label = "id 0 row")
+    write(joinpath(dir, "bad.txt"), "1 2 3\n")
+    @test_throws ArgumentError Circuitscape.read_variable_strengths(Float64, joinpath(dir, "bad.txt"))
+end
+
+# All-to-one with an include file and unit strengths: a focal point the file
+# excludes for the current ground is not a source (Python zeroes it out of
+# `unique_point_map` before building the source map).
+@testset "All-to-one excluded points carry no source" begin
+    n = 7
+    hdr = "ncols $n\nnrows $n\nxllcorner 0\nyllcorner 0\ncellsize 1\nNODATA_value -9999\n"
+    grid(f) = join([join([string(f(i, j)) for j in 1:n], " ") for i in 1:n], "\n") * "\n"
+    function run(dir, pts, include)
+        write(joinpath(dir, "cell.asc"), hdr * grid((i, j) -> 1))
+        write(joinpath(dir, "pts.asc"), hdr * grid((i, j) -> get(pts, (i, j), 0)))
+        d = Circuitscape.init_config()
+        d["data_type"] = "raster"; d["scenario"] = "all-to-one"
+        d["habitat_file"] = joinpath(dir, "cell.asc")
+        d["habitat_map_is_resistances"] = "True"
+        d["point_file"] = joinpath(dir, "pts.asc")
+        d["connect_four_neighbors_only"] = "True"
+        d["output_file"] = joinpath(dir, "out.out")
+        d["write_cur_maps"] = "True"
+        d["solver"] = "cholmod"
+        if include !== nothing
+            write(joinpath(dir, "inc.txt"), include)
+            d["use_included_pairs"] = "True"
+            d["included_pairs_file"] = joinpath(dir, "inc.txt")
+        end
+        compute(d)
+        readdlm(joinpath(dir, "out_curmap_1.asc"), skipstart = 6)
+    end
+    pts = Dict((1,1) => 1, (7,7) => 2, (1,7) => 3)
+    # Pairs (1,2) and (2,3) included: with 1 as the ground, 3 is excluded
+    c_inc = run(mktempdir(), pts, "mode\tinclude\n1\t2\n2\t3\n")
+    # Reference: point 3 absent from the point file altogether
+    c_ref = run(mktempdir(), filter(kv -> kv[2] != 3, pts), nothing)
+    @test c_inc ≈ c_ref atol = 1e-8
+    # Whereas with pair (1,3) included as well, point 3 does source current
+    c_all = run(mktempdir(), pts, "mode\tinclude\n1\t2\n2\t3\n1\t3\n")
+    @test c_all[1, 7] > c_ref[1, 7] + 0.5
+    @test c_all[1, 1] ≈ 2 atol = 1e-8       # two unit sources into ground 1
+    @test c_ref[1, 1] ≈ 1 atol = 1e-8
+
+    # A multi-cell focal region left on its own by the include file: nothing
+    # to solve, reported as -1 rather than attempted
+    pts_region = Dict((1,1) => 1, (1,2) => 1, (7,7) => 2)
+    dir = mktempdir()
+    write(joinpath(dir, "cell.asc"), hdr * grid((i, j) -> 1))
+    write(joinpath(dir, "pts.asc"), hdr * grid((i, j) -> get(pts_region, (i, j), 0)))
+    write(joinpath(dir, "inc.txt"), "mode\texclude\n1\t2\n")
+    d = Circuitscape.init_config()
+    d["data_type"] = "raster"; d["scenario"] = "one-to-all"
+    d["habitat_file"] = joinpath(dir, "cell.asc")
+    d["habitat_map_is_resistances"] = "True"
+    d["point_file"] = joinpath(dir, "pts.asc")
+    d["connect_four_neighbors_only"] = "True"
+    d["output_file"] = joinpath(dir, "out.out")
+    d["use_included_pairs"] = "True"
+    d["included_pairs_file"] = joinpath(dir, "inc.txt")
+    d["solver"] = "cholmod"
+    @test compute(d) == [1 -1; 2 -1]
+end
