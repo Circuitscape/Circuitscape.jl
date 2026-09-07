@@ -33,7 +33,7 @@ let
         cs_cfg["suppress_messages"] = "True"
         cs_cfg["connect_four_neighbors_only"] = "False"
         cs_cfg["solver"] = "cholmod"
-        cs_cfg["cholmod_batch_size"] = "1000"
+        cs_cfg["cholmod_batch_size"] = "32"
         cs_cfg["data_type"] = "raster"
 
         current = compute_omniscape_current(

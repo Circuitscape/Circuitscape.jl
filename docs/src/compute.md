@@ -162,9 +162,12 @@ copies of the graph from that path:
   connected component once and then solve `cholmod_batch_size` right-hand
   sides at a time, so with many focal pairs on a small or medium grid they are
   usually faster. Their memory is dominated by fill-in in the factor, which
-  grows faster than the grid. The batch size trades memory for fewer solver
-  calls: the right-hand-side and solution arrays are `n × batch` dense
-  matrices, so on a large grid a smaller batch may be necessary.
+  grows faster than the grid. The right-hand-side, solution and residual
+  buffers are `n × batch` dense matrices allocated once per component and
+  reused across batches. Multi-column triangular solves are memory-bandwidth
+  bound and saturate at a few dozen columns, so the default batch of 32
+  costs nothing in throughput over a larger one while keeping those buffers
+  small.
 
 ### Single precision
 

@@ -467,18 +467,40 @@ function solve_pairs!(handle_pair, factor, solver::DirectSolver, matrix::SparseM
                       groups, cfg, log, pair_label) where T
 
     jobs = collect(Iterators.flatten(groups))
+    isempty(jobs) && return nothing
     n = size(matrix, 1)
+    bs = min(solver.bs, length(jobs))
 
-    for batch in Iterators.partition(jobs, solver.bs)
-        rhs = zeros(T, n, length(batch))
+    # One set of n × bs buffers per component, reused by every batch: the
+    # right-hand sides, the solutions and the residual workspace of
+    # refine_columns!. Allocating them per batch, as `zeros(T, n, batch)`
+    # once did, costs three dense n × batch matrices per batch; with the old
+    # default batch of 1000 at 1M cells that was 8 GB each in double.
+    rhs_buf = zeros(T, n, bs)
+    lhs_buf = Matrix{T}(undef, n, bs)
+    resid_buf = Matrix{T}(undef, n, bs)
+    tol = residual_tolerance(cfg, T)
+
+    for batch in Iterators.partition(jobs, bs)
+        m = length(batch)
+        rhs = m == bs ? rhs_buf : view(rhs_buf, :, 1:m)
+        lhs = m == bs ? lhs_buf : view(lhs_buf, :, 1:m)
+        resid = m == bs ? resid_buf : view(resid_buf, :, 1:m)
         for (col, job) in enumerate(batch)
             rhs[job.comp_i, col] = -1
             rhs[job.comp_j, col] = 1
         end
 
-        log && @debug("Solving a batch of $(length(batch)) pairs: " * pair_label(first(batch)) *
+        log && @debug("Solving a batch of $m pairs: " * pair_label(first(batch)) *
                       " to " * pair_label(last(batch)))
-        lhs = solve_linear_system(factor, matrix, rhs; tol = residual_tolerance(cfg, T))
+        solve_linear_system!(lhs, factor, matrix, rhs; tol, resid)
+
+        # Clear the ±1 entries so the buffer is all zeros for the next batch,
+        # which is cheaper than zeroing the n × bs buffer again.
+        for (col, job) in enumerate(batch)
+            rhs[job.comp_i, col] = 0
+            rhs[job.comp_j, col] = 0
+        end
 
         function post(col)
             timer = TimerOutput()
@@ -490,9 +512,9 @@ function solve_pairs!(handle_pair, factor, solver::DirectSolver, matrix::SparseM
         end
 
         timers = @timeit CSTIMER[] "postprocess pairs" if cfg.parallelize
-            fetch.(map(col -> Threads.@spawn(post(col)), 1:length(batch)))
+            fetch.(map(col -> Threads.@spawn(post(col)), 1:m))
         else
-            map(post, 1:length(batch))
+            map(post, 1:m)
         end
         foreach(t -> merge!(CSTIMER[], t), timers)
     end
@@ -666,21 +688,29 @@ function solve_linear_system(
 end
 
 """
-    refine_columns!(lhs, factor, matrix, rhs, tol, name)
+    refine_columns!(lhs, factor, matrix, rhs, tol, name; resid = similar(lhs))
 
 Check every column of a direct solve against `tol`, applying iterative
 refinement with the existing factor where needed. In single precision a
 Cholesky solve of an ill-conditioned Laplacian lands at 1e-3..1e-2, well short
 of what CG reaches with its 1e-5 rtol; each step costs one triangular solve
 and recovers several digits. Double precision residuals are far below the
-target and take no steps. Shared by the CHOLMOD and Accelerate backends.
+target and take no steps. Shared by the CHOLMOD, Pardiso and Accelerate
+backends.
+
+The residuals of the whole batch come from one sparse-times-dense product
+`matrix * lhs` written into `resid`, which callers with a preallocated
+workspace pass in; only columns that fail the check enter the per-column
+refinement loop.
 """
-function refine_columns!(lhs, factor, matrix, rhs, tol, name)
+function refine_columns!(lhs, factor, matrix, rhs, tol, name; resid = similar(lhs))
     target = min(tol, 1e-5)
+    mul!(resid, matrix, lhs)
     for col = 1:size(rhs, 2)
-        x = view(lhs, :, col)
         b = view(rhs, :, col)
-        residual = norm(matrix*x .- b) / norm(b)
+        residual = column_residual(view(resid, :, col), b)
+        residual < target && continue
+        x = view(lhs, :, col)
         steps = 0
         while residual >= target && steps < 2
             x .+= factor \ (b .- matrix*x)
@@ -692,8 +722,38 @@ function refine_columns!(lhs, factor, matrix, rhs, tol, name)
     lhs
 end
 
+# ‖Ax − b‖ / ‖b‖ given the product `Ax` and `b`, without a temporary.
+function column_residual(Ax, b)
+    num = zero(real(eltype(b)))
+    den = zero(real(eltype(b)))
+    @inbounds for i in eachindex(Ax, b)
+        num += abs2(Ax[i] - b[i])
+        den += abs2(b[i])
+    end
+    sqrt(num) / sqrt(den)
+end
+
+"""
+    solve_linear_system!(lhs, factor, matrix, rhs; tol, resid = similar(lhs))
+
+Solve `matrix * lhs = rhs` with a direct-solver factorization into the
+preallocated `lhs`, checking and refining the result as
+[`refine_columns!`](@ref) does; `resid` is the workspace for that check.
+CHOLMOD solves in place with `ldiv!`. Backends without an in-place method
+fall back to their allocating `solve_linear_system` and copy the result.
+"""
+function solve_linear_system!(lhs, factor, matrix, rhs; tol = TOL_DOUBLE, resid = nothing)
+    copyto!(lhs, solve_linear_system(factor, matrix, rhs; tol))
+end
+
+function solve_linear_system!(lhs, factor::SuiteSparse.CHOLMOD.Factor, matrix, rhs;
+                              tol = TOL_DOUBLE, resid = similar(lhs))
+    ldiv!(lhs, factor, rhs)
+    refine_columns!(lhs, factor, matrix, rhs, tol, "CHOLMOD"; resid)
+end
+
 function solve_linear_system(factor::SuiteSparse.CHOLMOD.Factor, matrix, rhs; tol = TOL_DOUBLE)
-    refine_columns!(factor \ rhs, factor, matrix, rhs, tol, "CHOLMOD")
+    solve_linear_system!(similar(rhs), factor, matrix, rhs; tol)
 end
 
 function postprocess(output, component_data, shortcut, cfg)

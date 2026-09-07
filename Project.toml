@@ -1,6 +1,6 @@
 name = "Circuitscape"
 uuid = "2b7a1792-8151-5239-925d-e2b8fdfa3201"
-version = "6.0.0"
+version = "6.1.0"
 
 [deps]
 AlgebraicMultigrid = "2169fc97-5a83-5252-b627-83903c6c433c"
@@ -35,7 +35,7 @@ GZip = "0.7"
 Krylov = "0.10"
 Pardiso = "1.1"
 TimerOutputs = "1"
-julia = "1.11"
+julia = "1.12"
 
 [extras]
 Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"

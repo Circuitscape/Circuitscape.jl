@@ -16,7 +16,7 @@ rejects values it does not recognise rather than falling back to a default.
 
 Field names match the INI keys documented in the options reference. Notable
 defaults: `data_type = dt_raster`, `solver = st_cg_amg`, `precision =
-pr_double`, `cholmod_batch_size = 1000`, `residual_tolerance = 0.0` (meaning
+pr_double`, `cholmod_batch_size = 32`, `residual_tolerance = 0.0` (meaning
 automatic: `1e-4` in double, `1e-3` in single), `log_level = Logging.Info`.
 `scenario` has no usable default and must be set.
 """
@@ -42,7 +42,7 @@ Base.@kwdef struct CSConfig
     parallelize::Bool = false
     precision::Precision = pr_double
     use_64bit_indexing::Bool = true
-    cholmod_batch_size::Int = 1000
+    cholmod_batch_size::Int = 32
     residual_tolerance::Float64 = 0.0   # 0 = automatic: 1e-4 double, 1e-3 single
     low_memory_mode::Bool = false
     preemptive_memory_release::Bool = false
@@ -158,7 +158,7 @@ function CSConfig(dict::Dict{String,String})
         parallelize = _parse_bool(dict, "parallelize"),
         precision = _parse_precision(get(dict, "precision", "Double")),
         use_64bit_indexing = _parse_bool(dict, "use_64bit_indexing", "true"),
-        cholmod_batch_size = parse(Int, get(dict, "cholmod_batch_size", "1000")),
+        cholmod_batch_size = parse(Int, get(dict, "cholmod_batch_size", "32")),
         residual_tolerance = _parse_tolerance(get(dict, "residual_tolerance", "auto")),
         low_memory_mode = _parse_bool(dict, "low_memory_mode"),
         preemptive_memory_release = _parse_bool(dict, "preemptive_memory_release"),
@@ -456,7 +456,7 @@ function init_config()
     a["precision"] = "Double"
     a["log_file"] = "None"
     a["log_level"] = "INFO"
-    a["cholmod_batch_size"] = "1000"
+    a["cholmod_batch_size"] = "32"
     a["residual_tolerance"] = "auto"
     a["use_64bit_indexing"] = "true"
     a["write_as_tif"] = "false"
