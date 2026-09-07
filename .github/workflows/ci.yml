@@ -104,6 +104,10 @@ jobs:
       - uses: actions/checkout@v7
         with:
           repository: Circuitscape/Omniscape.jl
+          # Omniscape main still pins Circuitscape 5.15 and Julia ~1.11;
+          # the Circuitscape 6 / Julia 1.12 migration is
+          # Circuitscape/Omniscape.jl#171. Switch to `main` once it merges.
+          ref: cs/circuitscape-6-julia-1.12
           path: downstream/Omniscape
       - uses: julia-actions/setup-julia@v3
         with:
