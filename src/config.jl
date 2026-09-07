@@ -496,15 +496,28 @@ function update!(cfg, new)
 end
 
 """
+    output_prefix(cfg::CSConfig) -> String
+    output_prefix(output_file::AbstractString) -> String
+
+The prefix every output file name starts with: `output_file` without its
+extension (`splitext`), so `output/run.out` gives `output/run` and
+`out/run` stays `out/run`. Splitting on the substring `".out"` (as was done
+before) truncated any path whose *directory* contained `.out`.
+"""
+output_prefix(cfg::CSConfig) = output_prefix(cfg.output_file)
+output_prefix(output_file::AbstractString) = first(splitext(String(output_file)))
+
+"""
     write_config(cfg::CSConfig)
     write_config(cfg::Dict{String,String})
 
-Write the configuration, in Circuitscape INI form, to the file named by
-`cfg.output_file`. `compute` calls this at the start of every run so that the
-options used are recorded next to the results.
+Write the configuration, in Circuitscape INI form, to `<prefix>.ini`, where
+`<prefix>` is [`output_prefix`](@ref) of `cfg.output_file` (as Circuitscape
+4 did). `compute` calls this at the start of every run so that the options
+used are recorded next to the results.
 """
 function write_config(cfg::CSConfig)
-    open(cfg.output_file, "w") do f
+    open(output_prefix(cfg) * ".ini", "w") do f
         write(f, """
         [Circuitscape Mode]
         data_type = $(_data_type_str(cfg.data_type))

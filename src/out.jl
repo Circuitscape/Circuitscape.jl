@@ -37,13 +37,21 @@ function write_cur_maps(geometry::NetworkGeometry, name, output, component_data,
 
     accumulate_currents!(output, node_currents_array, branch_currents_array)
 
-    write_currents(node_currents_array, branch_currents_array, name, cfg)
+    write_per_solve_currents(output, cfg) &&
+        write_currents(node_currents_array, branch_currents_array, name, cfg)
     nothing
 end
 
 # Advanced mode writes each solve's currents as they are; only the pairwise
 # kernel keeps cumulative node and branch currents.
 accumulate_currents!(::AbstractVector, node_currents_array, branch_currents_array) = nothing
+
+# Whether the node and branch currents of one solve get their own files. In
+# pairwise mode (an `Output`) only with `write_cur_maps` and without
+# `write_cum_cur_map_only`, as in Circuitscape 4; the advanced kernel (a
+# plain voltage vector) decides that itself before calling.
+write_per_solve_currents(::AbstractVector, cfg) = true
+write_per_solve_currents(::Output, cfg) = cfg.write_cur_maps && !cfg.write_cum_cur_map_only
 
 function accumulate_currents!(output::Output{T,V}, node_currents_array,
                               branch_currents_array) where {T,V}
@@ -79,8 +87,6 @@ function write_cur_maps(geometry::RasterGeometry, name, output::Output, componen
     hbmeta = geometry.hbmeta
 
     # Output options
-    log_transform = cfg.log_transform_maps
-    set_null_currents_to_nodata = cfg.set_null_currents_to_nodata
     write_max_cur_maps = cfg.write_max_cur_maps
     write_cum_cur_map_only = cfg.write_cum_cur_map_only
 
@@ -96,11 +102,10 @@ function write_cur_maps(geometry::RasterGeometry, name, output::Output, componen
         zero_focal_cells!(cmap, nodemap, output.comp_idx)
     end
 
-    # Process the current map
-    process_grid!(cmap, geometry.cellmap, hbmeta, log_transform = log_transform,
-                        set_null_to_nodata = set_null_currents_to_nodata)
-
-    # Accumulate by default
+    # Accumulate the raw currents: the log transform and the null-to-nodata
+    # substitution are output transforms and belong to each written grid
+    # (`write_grid`), not to the sums. Applying them before accumulating gave
+    # a cumulative map of summed logarithms, and sent every cell to nodata.
     lock(output.cum.lock) do
         cum_curr .+= cmap
 
@@ -112,7 +117,7 @@ function write_cur_maps(geometry::RasterGeometry, name, output::Output, componen
 
     # Write current maps
     !write_cum_cur_map_only && cfg.write_cur_maps &&
-                    write_grid(cmap, name, cfg, hbmeta)
+                    write_current_grid(cmap, name, cfg, geometry)
 
     nothing
 end
@@ -127,7 +132,7 @@ function zero_focal_cells!(cmap, nodemap, nodes)
 end
 
 function write_currents(node_curr_arr, branch_curr_arr, name, cfg)
-    pref = split(cfg.output_file, ".out")[1]
+    pref = output_prefix(cfg)
     # 1e-6 because we guarantee only 6 digits of precision on solve
     idx = findall(x -> !isapprox(x, 0.0, atol = 1e-6), branch_curr_arr[:,3])
     branch_curr_arr = branch_curr_arr[idx, :]
@@ -367,6 +372,15 @@ function process_grid!(cmap, cellmap, hbmeta; log_transform = false,
 
 end
 
+"""
+    write_grid(cmap, name, cfg, hbmeta, cellmap = nothing; voltage, cum, max,
+               log_transform, set_null_to_nodata)
+
+Write the grid `cmap` as `<prefix>_<kind><name>` in the configured raster
+format. With a `cellmap`, `log_transform` and `set_null_to_nodata` are
+applied to `cmap` in place first. Prefer [`write_current_grid`](@ref) and
+[`write_voltage_grid`](@ref), which take those options from `cfg`.
+"""
 function write_grid(cmap, name, cfg, hbmeta, cellmap = nothing;
                         voltage = false, cum = false, max = false,
                         log_transform = false, set_null_to_nodata = false)
@@ -385,7 +399,7 @@ function write_grid(cmap, name, cfg, hbmeta, cellmap = nothing;
         str = "voltmap"
     end
 
-    pref = split(cfg.output_file, ".out")[1]
+    pref = output_prefix(cfg)
     filename = "$(pref)_$(str)$(name)"
 
     cfg.write_as_tif ? (file_format = "tif") :
@@ -398,25 +412,45 @@ function write_grid(cmap, name, cfg, hbmeta, cellmap = nothing;
                  file_format)
 end
 
+"""
+    write_current_grid(cmap, name, cfg, geometry; cum = false, max = false)
+
+Write a current grid with the current-map output options of `cfg`
+(`log_transform_maps`, `set_null_currents_to_nodata`) applied, as
+Circuitscape 4 does for every current grid it writes (per pair, per focal
+node, advanced, cumulative and maximum). `cmap` is modified in place.
+"""
+write_current_grid(cmap, name, cfg, geometry::RasterGeometry; cum = false, max = false) =
+    write_grid(cmap, name, cfg, geometry.hbmeta, geometry.cellmap; cum, max,
+               log_transform = cfg.log_transform_maps,
+               set_null_to_nodata = cfg.set_null_currents_to_nodata)
+
+"""
+    write_voltage_grid(vmap, name, cfg, geometry)
+
+Write a voltage grid with `set_null_voltages_to_nodata` applied, in place.
+"""
+write_voltage_grid(vmap, name, cfg, geometry::RasterGeometry) =
+    write_grid(vmap, name, cfg, geometry.hbmeta, geometry.cellmap, voltage = true,
+               set_null_to_nodata = cfg.set_null_voltages_to_nodata)
+
 write_volt_maps(name, output, component_data, cfg) =
     write_volt_maps(component_data.geometry, name, _voltages(output), cfg)
 
 write_volt_maps(geometry::NetworkGeometry, name, voltages, cfg) =
-    write_voltages(cfg.output_file, name, voltages, geometry.nodes)
+    write_voltages(cfg, name, voltages, geometry.nodes)
 
 function write_volt_maps(geometry::RasterGeometry, name, voltages, cfg)
-    hbmeta = geometry.hbmeta
-    vm = _create_voltage_map(voltages, geometry.nodemap, hbmeta)
-    write_grid(vm, name, cfg, hbmeta, geometry.cellmap, voltage = true,
-                    set_null_to_nodata = cfg.set_null_voltages_to_nodata)
+    vm = _create_voltage_map(voltages, geometry.nodemap, geometry.hbmeta)
+    write_voltage_grid(vm, name, cfg, geometry)
 end
 
-function write_voltages(output, name, voltages::Vector{T}, cc) where {T}
+function write_voltages(cfg, name, voltages::Vector{T}, cc) where {T}
     volt_arr = zeros(T, size(voltages, 1), 2)
     volt_arr[:,1] = cc
     volt_arr[:,2] = voltages
 
-    pref = split(output, ".out")[1]
+    pref = output_prefix(cfg)
     writedlm("$(pref)_voltages$(name).txt", volt_arr)
 end
 
@@ -454,16 +488,33 @@ function accum_currents!(base, G, voltages, finitegrounds, geometry::RasterGeome
 end
 accum_currents!(base, G, voltages, finitegrounds, ::NetworkGeometry) = nothing
 
+"""
+    save_resistances(r, cfg)
+
+Write the pairwise resistance matrix `r` (focal ids in the first row and
+column) to `<prefix>_resistances.out` and its three-column form to
+`<prefix>_resistances_3columns.out`.
+"""
 function save_resistances(r, cfg)
-    pref = split(cfg.output_file, ".out")[1]
-    filename = "$(pref)_resistances.out"
-    filename_3col = "$(pref)_resistances_3columns.out"
+    pref = output_prefix(cfg)
     rcol = compute_3col(r)
-    open(filename, "w") do f
+    open("$(pref)_resistances.out", "w") do f
         writedlm(f, r, ' ')
     end
-    open(filename_3col, "w") do f
+    open("$(pref)_resistances_3columns.out", "w") do f
         writedlm(f, rcol, ' ')
+    end
+end
+
+"""
+    save_onetoall_resistances(r, cfg)
+
+Write the one-to-all / all-to-one result `r` (one row per focal node: id,
+effective resistance) to `<prefix>_resistances.out`, as Circuitscape 4 does.
+"""
+function save_onetoall_resistances(r, cfg)
+    open("$(output_prefix(cfg))_resistances.out", "w") do f
+        writedlm(f, r, ' ')
     end
 end
 
@@ -473,7 +524,8 @@ end
 Write the cumulative (and maximum) current maps accumulated over a pairwise
 run, in whatever form the geometry calls for.
 """
-write_cum_maps(cum, geometry::RasterGeometry, cfg) = write_cum_maps(cum, geometry.hbmeta, cfg)
+write_cum_maps(cum, geometry::RasterGeometry, cfg) =
+    write_cum_maps(cum, geometry.hbmeta, geometry.cellmap, cfg)
 
 function write_cum_maps(cum, geometry::NetworkGeometry, cfg)
     cfg.write_cur_maps || return nothing
@@ -486,20 +538,18 @@ function write_cum_maps(cum, geometry::NetworkGeometry, cfg)
 end
 
 # Grid form, shared with the paths that keep a cumulative map of their own
-# (focal regions, one-to-all).
-function write_cum_maps(cum, hbmeta::RasterMeta, cfg)
+# (focal regions, one-to-all). The maps hold raw sums / maxima; the output
+# options (log transform, null cells to nodata) are applied here, on writing.
+function write_cum_maps(cum, hbmeta::RasterMeta, cellmap::Matrix, cfg)
     (cfg.write_cur_maps || cfg.write_cum_cur_map_only) || return nothing
 
-    cum_curr = cum.cum_curr
-    postprocess_cum_curmap!(cum_curr)
-    write_grid(cum_curr, "", cfg, hbmeta, cum = true)
+    geometry = RasterGeometry(zeros(Int, 0, 0), zeros(Int, 0, 0), hbmeta, cellmap)
+    write_current_grid(cum.cum_curr, "", cfg, geometry, cum = true)
 
     if cfg.write_max_cur_maps
-        max_curr = cum.max_curr
-        postprocess_cum_curmap!(max_curr)
-        write_grid(max_curr, "", cfg, hbmeta, max = true)
+        write_current_grid(cum.max_curr, "", cfg, geometry, max = true)
     end
-
+    nothing
 end
 
 """
