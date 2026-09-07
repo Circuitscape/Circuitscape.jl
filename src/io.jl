@@ -426,13 +426,24 @@ end
 
 Integer type for node numbers and sparse matrix indices of a problem with
 node numbers up to `nnodes` and at most `nnz` stored matrix entries: `Int32`
-when both fit, which halves the index memory of the graph, its connected
-components, the AMG hierarchy and the CHOLMOD factor's index arrays, and
-`Int64` otherwise or when `cfg.use_64bit_indexing` is set. Every downstream
-step is generic in the type.
+when `nnodes` is below `INT32_MAX_NODES` and `nnz` fits, which halves
+the index memory of the graph, its connected components, the AMG hierarchy
+and the CHOLMOD factor's index arrays, and `Int64` otherwise or when
+`cfg.use_64bit_indexing` is set. Every downstream step is generic in the type.
 """
 index_type(cfg, nnodes, nnz) =
-    (!cfg.use_64bit_indexing && max(nnodes, nnz) < typemax(Int32)) ? Int32 : Int64
+    (!cfg.use_64bit_indexing && nnodes < INT32_MAX_NODES && nnz < typemax(Int32)) ?
+        Int32 : Int64
+
+"""
+    INT32_MAX_NODES
+
+Largest node count solved with 32-bit indices, 100 million. The Laplacian
+itself fits 32-bit indices up to about 238 million cells, but the CHOLMOD
+factor's index arrays must fit too and its fill is not known until the
+symbolic analysis, so a margin is kept.
+"""
+const INT32_MAX_NODES = 100_000_000
 
 # Stored entries of a raster Laplacian: at most 4 undirected edges per cell
 # (8 neighbours), both orientations stored, plus the diagonal.
