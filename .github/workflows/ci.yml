@@ -89,6 +89,42 @@ jobs:
           file: lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
 
+  # Downstream: Omniscape.jl drives Circuitscape's moving-window kernel and
+  # compares against its own reference outputs, so a change that alters
+  # results in a path it uses fails here. Runs Omniscape's test suite with
+  # this checkout developed into the environment. Not required for merging
+  # yet: a failure here on a Circuitscape change that is intended may mean
+  # Omniscape's fixtures need updating instead.
+  downstream-omniscape:
+    name: Downstream - Omniscape.jl - ${{ github.event_name }}
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7
+        with:
+          repository: Circuitscape/Omniscape.jl
+          # Omniscape main still pins Circuitscape 5.15 and Julia ~1.11;
+          # the Circuitscape 6 / Julia 1.12 migration is
+          # Circuitscape/Omniscape.jl#171. Switch to `main` once it merges.
+          ref: cs/circuitscape-6-julia-1.12
+          path: downstream/Omniscape
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: '1'
+      - uses: julia-actions/cache@v3
+        with:
+          # A job that fails partway through can leave the depot with a
+          # package resolved but not installed; saving that depot poisons
+          # every later run on the same ref (seen on #508, Windows).
+          save-always: false
+      - run: |
+          julia --project=downstream -e '
+            using Pkg
+            Pkg.develop(PackageSpec(path=pwd()))
+            Pkg.develop(PackageSpec(path="downstream/Omniscape"))
+            Pkg.test("Omniscape")'
+
   docs:
     name: Documentation
     runs-on: ubuntu-latest
