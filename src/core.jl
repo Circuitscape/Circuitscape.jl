@@ -774,13 +774,13 @@ function solve_linear_system!(lhs, factor, matrix, rhs; tol = TOL_DOUBLE, resid 
     copyto!(lhs, solve_linear_system(factor, matrix, rhs; tol))
 end
 
-function solve_linear_system!(lhs, factor::SuiteSparse.CHOLMOD.Factor, matrix, rhs;
+function solve_linear_system!(lhs, factor::SparseArrays.CHOLMOD.Factor, matrix, rhs;
                               tol = TOL_DOUBLE, resid = similar(lhs))
     ldiv!(lhs, factor, rhs)
     refine_columns!(lhs, factor, matrix, rhs, tol, "CHOLMOD"; resid)
 end
 
-function solve_linear_system(factor::SuiteSparse.CHOLMOD.Factor, matrix, rhs; tol = TOL_DOUBLE)
+function solve_linear_system(factor::SparseArrays.CHOLMOD.Factor, matrix, rhs; tol = TOL_DOUBLE)
     solve_linear_system!(similar(rhs), factor, matrix, rhs; tol)
 end
 
