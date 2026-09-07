@@ -13,7 +13,7 @@ More detail about the implementation can be found in the
 [JuliaCon paper](https://proceedings.juliacon.org/papers/10.21105/jcon.00058).
 
 > [!NOTE]
-> Circuitscape.jl requires [Julia v1.11](https://julialang.org/downloads/) or later.
+> Circuitscape.jl requires [Julia v1.12](https://julialang.org/downloads/) or later.
 
 ## Installation
 
