@@ -177,7 +177,8 @@ function solve_onetoall_point(i, data::RasterData{T,V}, cfg, G, cc, nodemap, new
     point_geometry = RasterGeometry(nodemap, newpoly, hbmeta, gmap)
     policy = one_to_all ? :rmvgnd : :rmvsrc
     sources, grounds, finite_grounds =
-                sources_and_grounds(point_geometry, source_map, ground_map, G, cfg, policy)
+                sources_and_grounds(point_geometry, source_map, ground_map, G, cfg, policy;
+                                    cc, check_node)
 
     prob = AdvancedProblem(G, cc, point_geometry, sources, grounds, finite_grounds, get_solver(cfg))
     voltages, curr, solver_called = advanced_kernel(prob, cfg; check_node, name = "_$(V(n))")

@@ -20,24 +20,50 @@ struct AdvancedProblem{T,V,W,Geom<:Geometry}
 end
 
 """
-    sources_and_grounds(geometry, source_map, ground_map, G, cfg, conflict_policy = policy(cfg))
+    sources_and_grounds(geometry, source_map, ground_map, G, cfg, conflict_policy = policy(cfg);
+                        cc = nothing, check_node = -1)
 
 Source and ground vectors over the graph nodes from the user's source and
 ground inputs, with conflicts between the two resolved by `conflict_policy`.
 For a raster the inputs are grids read through the nodemap; for a network
-they are `(node, value)` lists.
+they are `(node, value)` lists. Given the connected components `cc`, a
+component that had sources and grounds but keeps none of one after the
+conflicts are resolved is an error, as in Python (`compute.resolve_conflicts`
+is run per component there); with `check_node` only its component is checked.
 """
 function sources_and_grounds(geometry::Geometry, source_map, ground_map, G, cfg,
-                             conflict_policy = policy(cfg))
+                             conflict_policy = policy(cfg); cc = nothing, check_node = -1)
 
     # Initialize sources and grounds
     sources = zeros(eltype(G), size(G, 1))
     grounds = zeros(eltype(G), size(G, 1))
 
     fill_sources_and_grounds!(sources, grounds, source_map, ground_map, cfg, geometry)
+    had_sources = map(!iszero, sources)
+    had_grounds = map(!iszero, grounds)
 
     sources, grounds, finitegrounds =
         resolve_conflicts(sources, grounds, conflict_policy)
+
+    cc === nothing ||
+        check_conflicts_resolved(cc, had_sources, had_grounds, sources, grounds, check_node)
+
+    sources, grounds, finitegrounds
+end
+
+# Python resolves conflicts per component and raises when a component that
+# had both sources and grounds is left without one of them; a component that
+# never had both is skipped by the kernel instead.
+function check_conflicts_resolved(cc, had_sources, had_grounds, sources, grounds, check_node)
+    for c in cc
+        check_node != -1 && !(check_node in c) && continue
+        any(had_sources[c]) && any(had_grounds[c]) || continue
+        any(!iszero, sources[c]) || throw(ErrorException(
+            "All sources conflicted with grounds and were removed. There is nothing to solve."))
+        any(!iszero, grounds[c]) || throw(ErrorException(
+            "All grounds conflicted with sources and were removed. There is nothing to solve."))
+    end
+    nothing
 end
 
 function fill_sources_and_grounds!(sources, grounds, source_map, ground_map, cfg,
@@ -62,11 +88,11 @@ end
 
 function fill_sources_and_grounds!(sources, grounds, source_map, ground_map, cfg,
                                    ::NetworkGeometry{V}) where {V}
-    if cfg.ground_file_is_resistances
-        ground_map[:,2] = 1 ./ ground_map[:,2]
-    end
+    # Invert into a copy: `ground_map` is the caller's data and may be used
+    # to build the problem again.
+    ground_values = cfg.ground_file_is_resistances ? 1 ./ ground_map[:,2] : ground_map[:,2]
     sources[V.(source_map[:,1])] = source_map[:,2]
-    grounds[V.(ground_map[:,1])] = ground_map[:,2]
+    grounds[V.(ground_map[:,1])] = ground_values
     nothing
 end
 
@@ -147,7 +173,9 @@ function advanced_kernel(prob::AdvancedProblem{T,V}, cfg;
         s_local = sources[c]
         g_local = grounds[c]
 
-        if sum(s_local) == 0 || sum(g_local) == 0
+        # A component is solved when it has a source and a ground; count
+        # them as Python does, so sources of +1 and -1 are not skipped.
+        if !any(!iszero, s_local) || !any(!iszero, g_local)
             continue
         end
 
