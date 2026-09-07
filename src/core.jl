@@ -70,6 +70,24 @@ end
 _voltages(output::Output) = output.voltages
 _voltages(voltages::AbstractVector) = voltages
 
+"""
+    PairHandler
+
+What one worker task of `solve_pairs!` does with its solved pairs. Calling it
+as `handler(job, voltages)` stores the pair's resistance and postprocesses
+its maps into the worker's own scratch buffers; `finish!(handler)` merges
+those buffers into the shared accumulators under the lock. `solve` hands
+`solve_pairs!` a `new_handler()` factory, and each task creates one handler,
+so scratch memory is bounded by the number of tasks and the lock is taken
+once per task (per batch) rather than once per pair.
+"""
+struct PairHandler{F,G}
+    handle_pair::F
+    finish::G
+end
+(h::PairHandler)(job, voltages) = h.handle_pair(job, voltages)
+finish!(h::PairHandler) = h.finish()
+
 struct Shortcut{T}
     get_shortcut_resistances::Bool
     voltmatrix::Matrix{T}
@@ -332,20 +350,26 @@ function solve(prob::GraphProblem{T,V}, solver::Solver, cfg, log)::Matrix{T} whe
 
         # Store one solve's result for every non-excluded index combination
         # and postprocess its maps. Runs on worker threads; each (c_i, c_j)
-        # is owned by exactly one job, so the writes never overlap.
-        function handle_pair(job, voltages)
-            resistance = voltages[job.comp_j] - voltages[job.comp_i]
-            for c_i in job.src_indices, c_j in job.dst_indices
-                (orig_pts[c_i], orig_pts[c_j]) in exclude && continue
-                resistances[c_i, c_j] = resistance
-                resistances[c_j, c_i] = resistance
-                output = Output(points, voltages, (orig_pts[c_i], orig_pts[c_j]),
-                                (job.comp_i, job.comp_j), resistance, V(c_j), cum)
-                postprocess(output, component_data, shortcut, cfg)
+        # is owned by exactly one job, so the writes never overlap. Each
+        # task gets its own handler, with the scratch buffers its pairs
+        # accumulate into until `finish!`.
+        function new_handler()
+            scratch = postprocess_scratch(component_data, cfg)
+            function handle_pair(job, voltages)
+                resistance = voltages[job.comp_j] - voltages[job.comp_i]
+                for c_i in job.src_indices, c_j in job.dst_indices
+                    (orig_pts[c_i], orig_pts[c_j]) in exclude && continue
+                    resistances[c_i, c_j] = resistance
+                    resistances[c_j, c_i] = resistance
+                    output = Output(points, voltages, (orig_pts[c_i], orig_pts[c_j]),
+                                    (job.comp_i, job.comp_j), resistance, V(c_j), cum)
+                    postprocess(output, component_data, shortcut, cfg, scratch)
+                end
             end
+            PairHandler(handle_pair, () -> flush_currents!(scratch, cum, local_geometry))
         end
 
-        solve_pairs!(handle_pair, handle, solver, matrix, groups, cfg, log, pair_label)
+        solve_pairs!(new_handler, handle, solver, matrix, groups, cfg, log, pair_label)
 
         if get_shortcut_resistances
             idx = first(positions[csub[1]])
@@ -410,60 +434,80 @@ prepare!(solver::DirectSolver, matrix) =
     @timeit CSTIMER[] "construct cholesky factor" construct_cholesky_factor(matrix, solver)
 
 """
-    solve_pairs!(handle_pair, handle, solver, matrix, groups, cfg, log, pair_label)
+    foreach_worker(worker, n, parallel) -> results
 
-Solve every job in `groups` and call `handle_pair(job, voltages)` with the
-voltages referenced to the source node. The iterative path solves one pair at
-a time in equal-sized chunks of pairs, each task with its own preconditioner
-workspace; the direct path factorizes once and solves batches
-of right-hand sides, parallelizing the postprocessing of each batch.
+Run `worker(next)` on `min(n, Threads.nthreads())` tasks when `parallel`
+(one otherwise), where `next()` hands out the indices `1:n` one at a time
+and returns `nothing` once they are exhausted. Returns what each worker
+returned. Every pair of a component costs about the same, so dealing pairs
+out one at a time balances the load without oversubscribing: the number of
+live tasks, and with it the scratch memory of their [`PairHandler`](@ref)s,
+never exceeds the thread count.
 """
-function solve_pairs!(handle_pair, P, ::AMGSolver, matrix::SparseMatrixCSC{T},
+function foreach_worker(worker, n, parallel)
+    counter = Threads.Atomic{Int}(1)
+    function next()
+        i = Threads.atomic_add!(counter, 1)
+        i <= n ? i : nothing
+    end
+    nworkers = parallel ? min(n, Threads.nthreads()) : 1
+    if nworkers <= 1
+        [worker(next)]
+    else
+        fetch.([Threads.@spawn(worker(next)) for _ in 1:nworkers])
+    end
+end
+
+"""
+    solve_pairs!(new_handler, handle, solver, matrix, groups, cfg, log, pair_label)
+
+Solve every job in `groups` and call `handler(job, voltages)`, with `handler`
+created per task by `new_handler()` (a [`PairHandler`](@ref)) and the
+voltages referenced to the source node; `finish!(handler)` is called when a
+task is done with its pairs. The iterative path solves one pair at a time
+on a bounded number of tasks, each with its own preconditioner workspace;
+the direct path factorizes once and solves batches of right-hand sides,
+parallelizing the postprocessing of each batch the same way.
+"""
+function solve_pairs!(new_handler, P, ::AMGSolver, matrix::SparseMatrixCSC{T},
                       groups, cfg, log, pair_label) where T
 
-    function task(jobs, timer)
+    jobs = collect(Iterators.flatten(groups))
+    isempty(jobs) && return nothing
+
+    function worker(next)
+        timer = TimerOutput()
         @timeit timer "task" begin
         # Each task needs its own workspace (scratch vectors are mutable)
         ml = P.ml
         local_P = aspreconditioner(AlgebraicMultigrid.MultiLevel(
             ml.levels, ml.final_A, ml.coarse_solver,
             ml.presmoother, ml.postsmoother, deepcopy(ml.workspace)))
+        handler = new_handler()
+        current = zeros(T, size(matrix, 1))
 
-        for job in jobs
-            current = zeros(T, size(matrix, 1))
+        while (i = next()) !== nothing
+            job = jobs[i]
+            fill!(current, 0)
             current[job.comp_i] = -1
             current[job.comp_j] = 1
 
             log && @debug(pair_label(job))
             voltages = @timeit timer "solve linear system" solve_linear_system(matrix, current, local_P; tol = residual_tolerance(cfg, T))
             voltages .-= voltages[job.comp_i]
-            @timeit timer "postprocess" handle_pair(job, voltages)
+            @timeit timer "postprocess" handler(job, voltages)
         end
+        @timeit timer "postprocess" finish!(handler)
         end # @timeit task
         timer
     end
 
-    # Every pair costs about the same (same matrix, same preconditioner), so
-    # equal-count chunks are equal-work chunks. Splitting by source node gave
-    # a triangular load: task 1 solved n-1 pairs, task n none, so the wall
-    # time was bounded by the first source rather than pairs/threads. A few
-    # chunks per thread leaves the scheduler slack for stragglers while still
-    # amortizing the workspace copy each task makes.
-    jobs = collect(Iterators.flatten(groups))
-    isempty(jobs) && return nothing
-    nchunks = cfg.parallelize ? min(length(jobs), 4 * Threads.nthreads()) : 1
-    chunks = collect(Iterators.partition(jobs, cld(length(jobs), nchunks)))
-    timers = [TimerOutput() for _ in chunks]
-    @timeit CSTIMER[] "solve and accumulate pairs" if cfg.parallelize
-        fetch.(map(i -> Threads.@spawn(task(chunks[i], timers[i])), eachindex(chunks)))
-    else
-        foreach(i -> task(chunks[i], timers[i]), eachindex(chunks))
-    end
+    timers = @timeit CSTIMER[] "solve and accumulate pairs" foreach_worker(worker, length(jobs), cfg.parallelize)
     foreach(t -> merge!(CSTIMER[], t), timers)
     nothing
 end
 
-function solve_pairs!(handle_pair, factor, solver::DirectSolver, matrix::SparseMatrixCSC{T},
+function solve_pairs!(new_handler, factor, solver::DirectSolver, matrix::SparseMatrixCSC{T},
                       groups, cfg, log, pair_label) where T
 
     jobs = collect(Iterators.flatten(groups))
@@ -502,20 +546,25 @@ function solve_pairs!(handle_pair, factor, solver::DirectSolver, matrix::SparseM
             rhs[job.comp_j, col] = 0
         end
 
-        function post(col)
+        # Postprocess the batch on bounded workers, each with one handler
+        # and one voltage vector for all its columns: a task per column
+        # kept a full current map live per column, gigabytes at a million
+        # cells and a thousand columns.
+        function worker(next)
             timer = TimerOutput()
-            job = batch[col]
-            voltages = lhs[:, col]
-            voltages .-= voltages[job.comp_i]
-            @timeit timer "postprocess" handle_pair(job, voltages)
+            handler = new_handler()
+            voltages = Vector{T}(undef, n)
+            while (col = next()) !== nothing
+                job = batch[col]
+                copyto!(voltages, view(lhs, :, col))
+                voltages .-= voltages[job.comp_i]
+                @timeit timer "postprocess" handler(job, voltages)
+            end
+            @timeit timer "postprocess" finish!(handler)
             timer
         end
 
-        timers = @timeit CSTIMER[] "postprocess pairs" if cfg.parallelize
-            fetch.(map(col -> Threads.@spawn(post(col)), 1:m))
-        else
-            map(post, 1:m)
-        end
+        timers = @timeit CSTIMER[] "postprocess pairs" foreach_worker(worker, m, cfg.parallelize)
         foreach(t -> merge!(CSTIMER[], t), timers)
     end
     nothing
@@ -756,7 +805,7 @@ function solve_linear_system(factor::SuiteSparse.CHOLMOD.Factor, matrix, rhs; to
     solve_linear_system!(similar(rhs), factor, matrix, rhs; tol)
 end
 
-function postprocess(output, component_data, shortcut, cfg)
+function postprocess(output, component_data, shortcut, cfg, scratch)
 
 
     orig_pts = output.orig_pts
@@ -779,12 +828,12 @@ function postprocess(output, component_data, shortcut, cfg)
     name = "_$(orig_pts[1])_$(orig_pts[2])"
 
     if cfg.write_volt_maps
-        write_volt_maps(name, output, component_data, cfg)
+        write_volt_maps(name, output, component_data, cfg, scratch)
     end
 
     # TODO: Even though this function is called write_cur_maps
     # actually writing the calculated maps depends on some options.
-    write_cur_maps(name, output, component_data, [-9999.], cfg)
+    write_cur_maps(name, output, component_data, [-9999.], cfg, scratch)
     nothing
 end
 

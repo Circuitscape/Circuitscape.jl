@@ -82,8 +82,9 @@ The pairwise driver is shared by every solver. `solve` iterates the connected
 components of a `GraphProblem`, calling `prepare!` once per component (an AMG
 preconditioner or a factorization), `pair_jobs` to enumerate the `PairJob`s
 of that component, and `solve_pairs!` to run them, which hands every solved
-pair to `handle_pair` to store the resistance and to `postprocess` to
-accumulate and write maps through the `Cumulative` accumulators. Only
+pair to a `PairHandler` (one per worker task, created by `new_handler()`) to
+store the resistance and to `postprocess` to accumulate maps in the worker's
+scratch, merged into the `Cumulative` accumulators by `finish!`. Only
 `prepare!` and `solve_pairs!` differ between the iterative and direct paths.
 
 ```@docs
@@ -96,6 +97,8 @@ Circuitscape.solve
 Circuitscape.component_matrix
 Circuitscape.prepare!
 Circuitscape.solve_pairs!
+Circuitscape.PairHandler
+Circuitscape.foreach_worker
 ```
 
 ### Solvers and convergence

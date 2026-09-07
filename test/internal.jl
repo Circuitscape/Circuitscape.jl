@@ -857,3 +857,73 @@ end
     @test rn[2, 3] ≈ 3.0
     @test !any(f -> startswith(f, "net") && occursin("currents", f), readdir(dir))
 end
+
+# get_node_currents! writes into a preallocated vector and is what the
+# pairwise kernel uses per pair; it must agree with the allocating form.
+@testset "get_node_currents! in place" begin
+    G = model_problem(Float64, 6)
+    v = randn(Random.MersenneTwister(5), size(G, 1))
+    expected = Circuitscape.get_node_currents(G, v, [-9999.])
+    buf = fill(NaN, size(G, 1))
+    @test Circuitscape.get_node_currents!(buf, G, v, [-9999.]) === buf
+    @test buf == expected
+    @test_throws DimensionMismatch Circuitscape.get_node_currents!(zeros(3), G, v, [-9999.])
+end
+
+# Pairwise current maps are accumulated per worker task and merged once,
+# through node vectors when the map is linear in the currents and through
+# per-pair grids under log_transform_maps / set_null_currents_to_nodata. In
+# every case the cumulative map must be the sum, and the max map the
+# elementwise maximum, of the per-pair maps written, whether or not the
+# per-pair maps themselves are written.
+@testset "cumulative maps equal sum and max of per-pair maps" begin
+    dir = mktempdir()
+    n = 9
+    hdr = "ncols $n\nnrows $n\nxllcorner 0\nyllcorner 0\ncellsize 1\nNODATA_value -9999\n"
+    cell = fill(2, n, n); cell[:, 5] .= -9999; cell[2, 2] = -9999   # two components, a null cell
+    pts = zeros(Int, n, n)
+    cells = Dict(1 => (1, 1), 2 => (9, 3), 3 => (5, 2),            # component 1
+                 4 => (1, 9), 5 => (9, 7), 6 => (5, 8))            # component 2
+    for (id, (i, j)) in cells; pts[i, j] = id; end
+    grid(io, m) = (print(io, hdr); for i in 1:n; println(io, join(m[i, :], " ")); end)
+    open(io -> grid(io, cell), joinpath(dir, "cell.asc"), "w")
+    open(io -> grid(io, pts), joinpath(dir, "pts.asc"), "w")
+    read_map(f) = readdlm(f, skipstart = 6)
+    clamp_cum(m) = max.(m, -9999.0)   # postprocess_cum_curmap!
+
+    for solver in ("cholmod", "cg+amg"), (log, null, focal) in ((false, false, false), (true, false, true), (false, true, false))
+        d = Circuitscape.init_config()
+        d["data_type"] = "raster"; d["scenario"] = "pairwise"; d["solver"] = solver
+        d["parallelize"] = "True"
+        d["habitat_file"] = joinpath(dir, "cell.asc"); d["point_file"] = joinpath(dir, "pts.asc")
+        d["write_cur_maps"] = "True"; d["write_max_cur_maps"] = "True"
+        d["log_transform_maps"] = string(log); d["set_null_currents_to_nodata"] = string(null)
+        d["set_focal_node_currents_to_zero"] = string(focal)
+        tag = "$(solver)_$(log)_$(null)_$(focal)"
+        d["output_file"] = joinpath(dir, "pairs_$tag.out")
+        compute(d)
+        pair_files = filter(f -> startswith(f, "pairs_$(tag)_curmap_"), readdir(dir))
+        @test length(pair_files) == 6      # 3 pairs in each component
+        maps = [read_map(joinpath(dir, f)) for f in pair_files]
+        cum = read_map(joinpath(dir, "pairs_$(tag)_cum_curmap.asc"))
+        mx = read_map(joinpath(dir, "pairs_$(tag)_max_curmap.asc"))
+        @test cum ≈ clamp_cum(sum(maps)) rtol = 1e-10
+        @test mx ≈ clamp_cum(reduce((a, b) -> max.(a, b), maps)) rtol = 1e-10
+        # Focal cells carry no current in their own pairs (NODATA once log-transformed)
+        if focal
+            for (f, m) in zip(pair_files, maps)
+                i, j = parse.(Int, split(splitext(f)[1], "_")[end-1:end])
+                z = log ? -9999.0 : 0.0
+                @test m[cells[i]...] == z && m[cells[j]...] == z
+            end
+        end
+        # Nothing but the cumulative maps, through the node-vector or
+        # per-worker grid path, gives the same maps.
+        d["write_cum_cur_map_only"] = "True"
+        d["output_file"] = joinpath(dir, "cum_$tag.out")
+        compute(d)
+        @test !any(f -> startswith(f, "cum_$(tag)_curmap_"), readdir(dir))
+        @test read_map(joinpath(dir, "cum_$(tag)_cum_curmap.asc")) ≈ cum rtol = 1e-10
+        @test read_map(joinpath(dir, "cum_$(tag)_max_curmap.asc")) ≈ mx rtol = 1e-10
+    end
+end

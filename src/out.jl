@@ -23,10 +23,11 @@ cumulative maps when `output` is a pairwise `Output` and written per solve
 when the options ask for it. Where the currents go is decided by the
 component's geometry: a grid for rasters, node and branch lists for networks.
 """
-write_cur_maps(name, output, component_data, finitegrounds, cfg) =
-    write_cur_maps(component_data.geometry, name, output, component_data, finitegrounds, cfg)
+write_cur_maps(name, output, component_data, finitegrounds, cfg, scratch = nothing) =
+    write_cur_maps(component_data.geometry, name, output, component_data, finitegrounds, cfg, scratch)
 
-function write_cur_maps(geometry::NetworkGeometry, name, output, component_data, finitegrounds, cfg)
+function write_cur_maps(geometry::NetworkGeometry, name, output, component_data, finitegrounds, cfg,
+                        scratch = nothing)
 
     node_currents, branch_currents = _create_current_maps(component_data.matrix,
                                             _voltages(output), finitegrounds, geometry)
@@ -73,47 +74,148 @@ function accumulate_currents!(output::Output, node_currents_array, branch_curren
     nothing
 end
 
-function write_cur_maps(geometry::RasterGeometry, name, output::Output, component_data, finitegrounds, cfg)
+"""
+    CurrentScratch(component_data, cfg)
+
+Buffers one worker task reuses across the pair solves of a raster component,
+so postprocessing allocates nothing per pair and the pairs a worker handles
+are merged into the shared [`Cumulative`](@ref) once, by
+[`flush_currents!`](@ref), instead of under the lock for every pair.
+
+`node_currents` receives each pair's node currents. Without `log_transform_maps`
+and `set_null_currents_to_nodata` a pair's map is just those currents spread
+onto the grid, so they are summed (and maxed) per node in `cum_nodes` /
+`max_nodes` and spread onto the cumulative grids once per flush. Either of
+those options makes the map a nonlinear function of the currents, so the
+per-pair map is built in `grid`, transformed as before and accumulated into
+the worker's own `cum_grid` / `max_grid`. `grid` is also the buffer for a
+per-pair current or voltage map that is written to a file. Every buffer not
+needed is empty.
+"""
+mutable struct CurrentScratch{T}
+    node_currents::Vector{T}
+    cum_nodes::Vector{T}
+    max_nodes::Vector{T}
+    grid::Matrix{T}
+    cum_grid::Matrix{T}
+    max_grid::Matrix{T}
+    # Pairs accumulated since the last flush
+    npairs::Int
+end
+
+function CurrentScratch(component_data::ComponentData{T}, cfg) where T
+    geometry = component_data.geometry
+    n = size(component_data.matrix, 1)
+    nrows, ncols = size(geometry.nodemap)
+    nonlinear = cfg.log_transform_maps || cfg.set_null_currents_to_nodata
+    accumulate = cfg.write_cur_maps || cfg.write_cum_cur_map_only
+    per_pair_file = cfg.write_cur_maps && !cfg.write_cum_cur_map_only
+    use_max = accumulate && cfg.write_max_cur_maps
+    # Node-vector accumulation unless the transform forces a per-pair grid
+    nodes = accumulate && !nonlinear
+    grids = accumulate && nonlinear
+    grid = (per_pair_file || grids || cfg.write_volt_maps) ? zeros(T, nrows, ncols) : zeros(T, 0, 0)
+    CurrentScratch{T}(zeros(T, n),
+                      zeros(T, nodes ? n : 0), fill(typemin(T), nodes && use_max ? n : 0),
+                      grid,
+                      zeros(T, grids ? nrows : 0, grids ? ncols : 0),
+                      fill(typemin(T), grids && use_max ? nrows : 0, grids && use_max ? ncols : 0),
+                      0)
+end
+
+# Networks accumulate per pair (see `accumulate_currents!`); no scratch.
+postprocess_scratch(component_data::ComponentData, cfg) =
+    postprocess_scratch(component_data.geometry, component_data, cfg)
+postprocess_scratch(::RasterGeometry, component_data, cfg) = CurrentScratch(component_data, cfg)
+postprocess_scratch(::NetworkGeometry, component_data, cfg) = nothing
+
+function write_cur_maps(geometry::RasterGeometry, name, output::Output, component_data, finitegrounds, cfg,
+                        scratch::CurrentScratch)
 
     nodemap = geometry.nodemap
     hbmeta = geometry.hbmeta
 
-    # Output options
-    log_transform = cfg.log_transform_maps
-    set_null_currents_to_nodata = cfg.set_null_currents_to_nodata
-    write_max_cur_maps = cfg.write_max_cur_maps
-    write_cum_cur_map_only = cfg.write_cum_cur_map_only
+    # Nothing to do unless a cumulative map is going to be written
+    # (`write_cum_maps`) or a per-pair map is asked for.
+    (cfg.write_cur_maps || cfg.write_cum_cur_map_only) || return nothing
 
-    cmap, _ = _create_current_maps(component_data.matrix, output.voltages, finitegrounds, geometry)
-    cum_curr = output.cum.cum_curr
-    max_curr = output.cum.max_curr
+    node_currents = get_node_currents!(scratch.node_currents, component_data.matrix,
+                                       output.voltages, finitegrounds)
 
     # Issue 342: with set_focal_node_currents_to_zero the two focal nodes
     # being solved carry no current in this pair's map, so the cumulative
     # map shows only current that flows *through* a focal region when
-    # other pairs are active (Dickson et al. 2013).
+    # other pairs are active (Dickson et al. 2013). A focal region is one
+    # node, so zeroing its current clears every cell of the region.
     if cfg.set_focal_node_currents_to_zero
-        zero_focal_cells!(cmap, nodemap, output.comp_idx)
+        node_currents[output.comp_idx[1]] = 0
+        node_currents[output.comp_idx[2]] = 0
     end
 
-    # Process the current map
-    process_grid!(cmap, geometry.cellmap, hbmeta, log_transform = log_transform,
-                        set_null_to_nodata = set_null_currents_to_nodata)
+    if !isempty(scratch.cum_nodes)
+        scratch.cum_nodes .+= node_currents
+        isempty(scratch.max_nodes) || (scratch.max_nodes .= max.(scratch.max_nodes, node_currents))
+    end
 
-    # Accumulate by default
-    lock(output.cum.lock) do
-        cum_curr .+= cmap
+    per_pair_file = cfg.write_cur_maps && !cfg.write_cum_cur_map_only
+    if per_pair_file || !isempty(scratch.cum_grid)
+        cmap = scatter_nodes!(scratch.grid, node_currents, nodemap)
 
-        # Max current if user asks for it
-        if write_max_cur_maps
-            max_curr .= max.(max_curr, cmap)
+        # Process the current map
+        process_grid!(cmap, geometry.cellmap, hbmeta, log_transform = cfg.log_transform_maps,
+                            set_null_to_nodata = cfg.set_null_currents_to_nodata)
+
+        if !isempty(scratch.cum_grid)
+            scratch.cum_grid .+= cmap
+            isempty(scratch.max_grid) || (scratch.max_grid .= max.(scratch.max_grid, cmap))
+        end
+
+        per_pair_file && write_grid(cmap, name, cfg, hbmeta)
+    end
+    scratch.npairs += 1
+
+    nothing
+end
+
+"""
+    flush_currents!(scratch, cum, geometry)
+
+Merge the pairs accumulated in a worker's [`CurrentScratch`](@ref) into the
+shared cumulative (and maximum) grids under the lock, and empty the scratch.
+Cells outside the component contribute nothing to the sum and zero to the
+maximum, as the per-pair grids used to.
+"""
+flush_currents!(::Nothing, cum, geometry) = nothing
+
+function flush_currents!(scratch::CurrentScratch{T}, cum::Cumulative, geometry::RasterGeometry) where T
+    scratch.npairs == 0 && return nothing
+    cum_curr = cum.cum_curr
+    max_curr = cum.max_curr
+    nodemap = geometry.nodemap
+    lock(cum.lock) do
+        if !isempty(scratch.cum_grid)
+            cum_curr .+= scratch.cum_grid
+            isempty(max_curr) || (max_curr .= max.(max_curr, scratch.max_grid))
+        elseif !isempty(scratch.cum_nodes)
+            cum_nodes = scratch.cum_nodes
+            @inbounds for k in eachindex(nodemap)
+                idx = nodemap[k]
+                idx == 0 || (cum_curr[k] += cum_nodes[idx])
+            end
+            if !isempty(max_curr)
+                max_nodes = scratch.max_nodes
+                @inbounds for k in eachindex(nodemap)
+                    idx = nodemap[k]
+                    max_curr[k] = max(max_curr[k], idx == 0 ? zero(T) : max_nodes[idx])
+                end
+            end
         end
     end
-
-    # Write current maps
-    !write_cum_cur_map_only && cfg.write_cur_maps &&
-                    write_grid(cmap, name, cfg, hbmeta)
-
+    fill!(scratch.cum_nodes, 0)
+    fill!(scratch.max_nodes, typemin(T))
+    fill!(scratch.cum_grid, 0)
+    fill!(scratch.max_grid, typemin(T))
+    scratch.npairs = 0
     nothing
 end
 
@@ -171,22 +273,25 @@ end
 
 function _create_current_maps(G, voltages, finitegrounds, geometry::RasterGeometry)
     node_currents = get_node_currents(G, voltages, finitegrounds)
-    nodemap = geometry.nodemap
     hbmeta = geometry.hbmeta
-
-    current_map = zeros(eltype(G), hbmeta.nrows, hbmeta.ncols)
-    for j = 1:size(nodemap, 2)
-        for i = 1:size(nodemap, 1)
-            idx = nodemap[i,j]
-            if idx == 0
-                continue
-            else
-                current_map[i,j] = node_currents[idx]
-            end
-        end
-    end
-
+    current_map = scatter_nodes!(zeros(eltype(G), hbmeta.nrows, hbmeta.ncols),
+                                 node_currents, geometry.nodemap)
     current_map, nothing
+end
+
+"""
+    scatter_nodes!(grid, values, nodemap)
+
+Spread per-node `values` onto `grid`: cell `k` gets `values[nodemap[k]]`,
+or zero where `nodemap[k] == 0` (outside the component). Overwrites every
+cell, so `grid` may hold anything on entry.
+"""
+function scatter_nodes!(grid, values, nodemap)
+    @inbounds for k in eachindex(nodemap, grid)
+        idx = nodemap[k]
+        grid[k] = idx == 0 ? zero(eltype(grid)) : values[idx]
+    end
+    grid
 end
 
 """
@@ -210,9 +315,19 @@ recovered first (a pass that touches only `nzval`/`voltages`) and applied
 in the accumulation pass to reproduce the previous results exactly.
 `finitegrounds[1] != -9999` is the sentinel meaning "no finite grounds".
 """
-function get_node_currents(G::SparseMatrixCSC{T}, voltages::AbstractVector,
-                           finitegrounds) where {T}
+get_node_currents(G::SparseMatrixCSC{T}, voltages::AbstractVector, finitegrounds) where {T} =
+    get_node_currents!(Vector{T}(undef, size(G, 1)), G, voltages, finitegrounds)
+
+"""
+    get_node_currents!(node_currents, G, voltages, finitegrounds)
+
+[`get_node_currents`](@ref) written into the preallocated `node_currents`.
+"""
+function get_node_currents!(node_currents::AbstractVector{T}, G::SparseMatrixCSC{T},
+                            voltages::AbstractVector, finitegrounds) where {T}
     n = size(G, 1)
+    length(node_currents) == n ||
+        throw(DimensionMismatch("node_currents has length $(length(node_currents)), need $n"))
     v = voltages
     rowval = rowvals(G)
     nzval = nonzeros(G)
@@ -238,7 +353,6 @@ function get_node_currents(G::SparseMatrixCSC{T}, voltages::AbstractVector,
     end
 
     # Pass 2: accumulate inflow and outflow per node and keep the larger.
-    node_currents = Vector{T}(undef, n)
     has_finitegrounds = finitegrounds[1] != -9999
     @inbounds for col = 1:n
         vc = v[col]
@@ -398,15 +512,18 @@ function write_grid(cmap, name, cfg, hbmeta, cellmap = nothing;
                  file_format)
 end
 
-write_volt_maps(name, output, component_data, cfg) =
-    write_volt_maps(component_data.geometry, name, _voltages(output), cfg)
+write_volt_maps(name, output, component_data, cfg, scratch = nothing) =
+    write_volt_maps(component_data.geometry, name, _voltages(output), cfg, scratch)
 
-write_volt_maps(geometry::NetworkGeometry, name, voltages, cfg) =
+write_volt_maps(geometry::NetworkGeometry, name, voltages, cfg, scratch = nothing) =
     write_voltages(cfg.output_file, name, voltages, geometry.nodes)
 
-function write_volt_maps(geometry::RasterGeometry, name, voltages, cfg)
+# The pairwise kernel passes its worker's `CurrentScratch`, whose grid buffer
+# is free at this point; otherwise a grid is allocated.
+function write_volt_maps(geometry::RasterGeometry, name, voltages, cfg, scratch = nothing)
     hbmeta = geometry.hbmeta
-    vm = _create_voltage_map(voltages, geometry.nodemap, hbmeta)
+    grid = scratch === nothing ? zeros(eltype(voltages), hbmeta.nrows, hbmeta.ncols) : scratch.grid
+    vm = scatter_nodes!(grid, voltages, geometry.nodemap)
     write_grid(vm, name, cfg, hbmeta, geometry.cellmap, voltage = true,
                     set_null_to_nodata = cfg.set_null_voltages_to_nodata)
 end
@@ -420,20 +537,8 @@ function write_voltages(output, name, voltages::Vector{T}, cc) where {T}
     writedlm("$(pref)_voltages$(name).txt", volt_arr)
 end
 
-function _create_voltage_map(voltages::Vector{T}, nodemap, hbmeta) where {T}
-    voltmap = zeros(T, hbmeta.nrows, hbmeta.ncols)
-    for j = 1:size(nodemap, 2)
-        for i = 1:size(nodemap, 1)
-            idx = nodemap[i,j]
-            if idx == 0
-                continue
-            else
-                voltmap[i,j] = voltages[idx]
-            end
-        end
-    end
-    voltmap
-end
+_create_voltage_map(voltages::Vector{T}, nodemap, hbmeta) where {T} =
+    scatter_nodes!(zeros(T, hbmeta.nrows, hbmeta.ncols), voltages, nodemap)
 
 # Advanced mode solves every component into one map: each component's
 # voltages / currents are spread onto the grid through its local geometry and
