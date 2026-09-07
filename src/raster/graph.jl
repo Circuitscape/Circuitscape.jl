@@ -71,7 +71,7 @@ function construct_graph(gmap, nodemap::Matrix{S}, avg_res, four_neighbors) wher
     size(nodemap) == (nrows, ncols) ||
         throw(DimensionMismatch("gmap is $(size(gmap)) but nodemap is $(size(nodemap))"))
 
-    nedges = count_graph_edges(nodemap, four_neighbors)
+    nedges = count_graph_edges(gmap, nodemap, four_neighbors)
 
     I = Vector{S}(undef, 2nedges)
     J = Vector{S}(undef, 2nedges)
@@ -83,24 +83,29 @@ function construct_graph(gmap, nodemap::Matrix{S}, avg_res, four_neighbors) wher
             n = nodemap[i,j]
             n == 0 && continue
             g = gmap[i,j]
+            # A cell that belongs to a polygon has a node id even when it is
+            # nodata (conductance 0). Like Circuitscape 4's _neighbors_*, only
+            # connect two cells when both have nonzero conductance; otherwise
+            # a polygon straddling nodata would reach across it.
+            g == 0 && continue
 
             # Horizontal neighbour
-            if j != ncols && nodemap[i,j+1] != 0
+            if j != ncols && nodemap[i,j+1] != 0 && gmap[i,j+1] != 0
                 k = _emit_edge!(I, J, V, k, n, nodemap[i,j+1], f1(g, gmap[i,j+1]))
             end
 
             # Vertical neighbour
-            if i != nrows && nodemap[i+1,j] != 0
+            if i != nrows && nodemap[i+1,j] != 0 && gmap[i+1,j] != 0
                 k = _emit_edge!(I, J, V, k, n, nodemap[i+1,j], f1(g, gmap[i+1,j]))
             end
 
             if !four_neighbors
                 # Diagonal neighbours
-                if i != nrows && j != ncols && nodemap[i+1,j+1] != 0
+                if i != nrows && j != ncols && nodemap[i+1,j+1] != 0 && gmap[i+1,j+1] != 0
                     k = _emit_edge!(I, J, V, k, n, nodemap[i+1,j+1], f2(g, gmap[i+1,j+1]))
                 end
 
-                if i != 1 && j != ncols && nodemap[i-1,j+1] != 0
+                if i != 1 && j != ncols && nodemap[i-1,j+1] != 0 && gmap[i-1,j+1] != 0
                     k = _emit_edge!(I, J, V, k, n, nodemap[i-1,j+1], f2(g, gmap[i-1,j+1]))
                 end
             end
@@ -135,28 +140,29 @@ end
 end
 
 """
-    count_graph_edges(nodemap, four_neighbors)
+    count_graph_edges(gmap, nodemap, four_neighbors)
 
-Number of undirected edges `construct_graph` will emit for `nodemap`, using the
-same neighbour rules, so that its output buffers can be sized exactly.
+Number of undirected edges `construct_graph` will emit for `gmap` and
+`nodemap`, using the same neighbour rules (both cells must be nodes with
+nonzero conductance), so that its output buffers can be sized exactly.
 """
-function count_graph_edges(nodemap, four_neighbors)
+function count_graph_edges(gmap, nodemap, four_neighbors)
     nrows, ncols = size(nodemap)
     n = 0
     @inbounds for j = 1:ncols
         for i = 1:nrows
-            nodemap[i,j] == 0 && continue
-            if j != ncols && nodemap[i,j+1] != 0
+            (nodemap[i,j] == 0 || gmap[i,j] == 0) && continue
+            if j != ncols && nodemap[i,j+1] != 0 && gmap[i,j+1] != 0
                 n += 1
             end
-            if i != nrows && nodemap[i+1,j] != 0
+            if i != nrows && nodemap[i+1,j] != 0 && gmap[i+1,j] != 0
                 n += 1
             end
             if !four_neighbors
-                if i != nrows && j != ncols && nodemap[i+1,j+1] != 0
+                if i != nrows && j != ncols && nodemap[i+1,j+1] != 0 && gmap[i+1,j+1] != 0
                     n += 1
                 end
-                if i != 1 && j != ncols && nodemap[i-1,j+1] != 0
+                if i != 1 && j != ncols && nodemap[i-1,j+1] != 0 && gmap[i-1,j+1] != 0
                     n += 1
                 end
             end
@@ -190,18 +196,22 @@ function create_new_polymap(gmap, polymap::Matrix{V}, points_rc,
                 end
             end
         else
-            k = max(maximum(polymap), maximum(point_map))
-            for i in findall(x->x!=0,point_map)
-                v1 = point_map[i]
-                v2 = newpoly[i]
-                if v2 == 0
-                    newpoly[i] = k + v1
-                    continue
+            # Focal regions with polygons, as in Circuitscape 4's
+            # get_poly_map_temp: for each point id in turn, the polygons it
+            # overlaps and all of its own cells get one fresh id above every
+            # existing polygon number. Overlaps are found on the running map,
+            # so two regions that share a polygon collapse into one node.
+            k = maximum(polymap)
+            for p in sort!(unique(point_map[point_map .!= 0]))
+                k += 1
+                cells = findall(==(p), point_map)
+                vals = unique(newpoly[c] for c in cells if newpoly[c] != 0)
+                if !isempty(vals)
+                    for i in eachindex(newpoly)
+                        newpoly[i] in vals && (newpoly[i] = k)
+                    end
                 end
-                if v1 != v2
-                    ind = findall(x -> x == v2, newpoly)
-                    newpoly[ind] .= v1
-                end
+                newpoly[cells] .= k
             end
         end
         return newpoly

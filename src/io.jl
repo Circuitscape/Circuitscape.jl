@@ -142,6 +142,9 @@ function read_cellmap(habitat_file::String, is_res::Bool, ::Type{T};
         copyto!(gmap, cell_map)
         gmap[ind] .= 0
     end
+    # Negative values (resistance or conductance) are not meaningful; like
+    # Circuitscape 4 (csio.py), treat them as null cells.
+    map!(x -> x < 0 ? zero(T) : x, gmap, gmap)
     gmap, rastermeta
 end
 
