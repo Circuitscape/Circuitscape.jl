@@ -1,5 +1,6 @@
 name = "Circuitscape"
 uuid = "2b7a1792-8151-5239-925d-e2b8fdfa3201"
+authors = ["Ranjan Anantharaman <ranjan.anantharaman@gmail.com>", "Viral B. Shah <viral@mayin.org>"]
 version = "6.1.0"
 
 [deps]
