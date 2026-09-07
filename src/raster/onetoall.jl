@@ -24,9 +24,18 @@ function run_onetoall(data::RasterData{T,V}, cfg)::Matrix{T} where {T,V}
     one_to_all = is_onetoall(cfg)
 
     use_included_pairs && prune_points!(points_rc, included_pairs.point_ids)
-    # Assigned once: `strengths` is captured by `solve_point` below.
-    strengths = use_included_pairs && use_variable_strengths ?
-        prune_strengths(data.strengths, included_pairs.point_ids) : data.strengths
+
+    # Variable source strengths keyed by focal id, as Python's
+    # `get_strengths_rc`: the row order of the file is irrelevant, an id the
+    # file does not list gets strength 1, and ids the point file does not
+    # contain are ignored (so nothing has to be pruned against the include
+    # file). The first row wins when an id is repeated.
+    strength_of = Dict{V,T}()
+    if use_variable_strengths
+        for r in axes(data.strengths, 1)
+            get!(strength_of, V(data.strengths[r,1]), data.strengths[r,2])
+        end
+    end
 
     # Construct point map
     point_map = zeros(V, size(gmap))
@@ -48,12 +57,16 @@ function run_onetoall(data::RasterData{T,V}, cfg)::Matrix{T} where {T,V}
     res = zeros(T, size(points_unique, 1))
     num_points_to_solve = size(points_unique, 1)
     original_point_map = copy(point_map)
-    unique_point_map = zeros(V, size(gmap))
-    strength_map = use_variable_strengths ? zeros(T, size(gmap)) : zeros(T, 0, 0)
 
-    for i in points_unique
-        ind = findfirst(x -> x == i, points_rc[3])
-        unique_point_map[_pt(1,ind), _pt(2,ind)] = _pt(3,ind)
+    # One representative cell per focal id (its first cell in `points_rc`),
+    # aligned with `points_unique`; `unique_point_map` marks those cells.
+    unique_cells = map(points_unique) do id
+        ind = findfirst(isequal(id), points_rc[3])
+        (_pt(1,ind), _pt(2,ind))
+    end
+    unique_point_map = zeros(V, size(gmap))
+    for (k, (r, c)) in enumerate(unique_cells)
+        unique_point_map[r, c] = points_unique[k]
     end
 
     # With an include/exclude file the set of focal points that act as
@@ -72,8 +85,8 @@ function run_onetoall(data::RasterData{T,V}, cfg)::Matrix{T} where {T,V}
     # the graph for focal regions, and a closure that reassigns captured
     # variables boxes them, which made the whole body dynamically typed.
     solve_point(i) = solve_onetoall_point(i, data, cfg, G, cc, nodemap, newpoly,
-        original_point_map, strength_map, unique_point_map, points_unique,
-        strengths, res, mode, use_variable_strengths, use_included_pairs,
+        original_point_map, unique_point_map, unique_cells, points_unique,
+        strength_of, res, mode, use_variable_strengths, use_included_pairs,
         point_file_no_polygons, one_to_all)
 
     is_parallel = cfg.parallelize
@@ -99,12 +112,12 @@ end
 # for focal regions with an include/exclude file, its own graph), solve its
 # component with the advanced kernel, record its effective resistance in
 # `res[i]` and return its current map, or nothing if the point was skipped.
-# `point_map` and `strength_map` are copied because the include/exclude
-# handling edits them per point; every other argument is read only, so the
-# function is safe to run on several threads at once.
+# `point_map` is copied because the include/exclude handling edits it per
+# point; every other argument is read only, so the function is safe to run
+# on several threads at once.
 function solve_onetoall_point(i, data::RasterData{T,V}, cfg, G, cc, nodemap, newpoly,
-                              original_point_map, strength_map, unique_point_map,
-                              points_unique, strengths, res, mode,
+                              original_point_map, unique_point_map, unique_cells,
+                              points_unique, strength_of, res, mode,
                               use_variable_strengths, use_included_pairs,
                               point_file_no_polygons, one_to_all) where {T,V}
     included_pairs = data.included_pairs
@@ -116,10 +129,9 @@ function solve_onetoall_point(i, data::RasterData{T,V}, cfg, G, cc, nodemap, new
     num_points_to_solve = length(points_unique)
 
     point_map = copy(original_point_map)
-    strength_map = copy(strength_map)
-    str = use_variable_strengths ? strengths[i,2] : 1
     @info("Solving point $i of $num_points_to_solve")
     n = points_unique[i]
+    str = use_variable_strengths ? get(strength_of, n, one(T)) : one(T)
     if use_included_pairs
         # `i` indexes the focal points present in the raster, but the
         # include matrix is indexed by position in `point_ids`. These differ
@@ -141,38 +153,45 @@ function solve_onetoall_point(i, data::RasterData{T,V}, cfg, G, cc, nodemap, new
             nodemap = point_geometry.nodemap
         end
     end
-    if use_variable_strengths
-        _tmp = [point_map[points_rc[1][x], points_rc[2][x]] for x = 1:size(points_rc[1], 1)]
-        idx = findall(x -> x == 0, _tmp)
-        _strengths = deepcopy(strengths)
-        _strengths[idx, 2] .= 1
-        for x = 1:size(points_rc[1], 1)
-            strength_map[points_rc[1][x], points_rc[2][x]] = _strengths[x,2]
-        end
-    end
-    if sum(point_map) == n
+    # Nothing to solve when every other focal point is excluded for this one
+    # (Python: `unique_point_map.sum() == src`). Test the cells rather than
+    # sum them so a lone multi-cell focal region is recognised as well.
+    if all(x -> x == 0 || x == n, point_map)
         res[i] = -1
         return nothing
     end
     if one_to_all
-        source_map = map(x -> x == n ? T(str) : T(0), unique_point_map)
+        source_map = map(x -> x == n ? str : zero(T), unique_point_map)
         ground_map = map(x -> x == n ? T(0) : T(x), point_map)
         map!(x -> x > 0 ? Inf : x, ground_map, ground_map)
     else
         if use_variable_strengths
+            # Python's `get_strength_map`: one entry per focal id at its
+            # representative cell. A point the include file drops for this
+            # solve keeps a unit strength (Python zeroes its id before the
+            # lookup, which then defaults to 1), so with variable strengths
+            # an excluded point still acts as a unit source. This reproduces
+            # Python's own behaviour and allToOneVerify12 depends on it; the
+            # unit-strength branch below does exclude such points.
+            strength_map = zeros(T, size(gmap))
+            for (k, (r, c)) in enumerate(unique_cells)
+                strength_map[r, c] = point_map[r, c] == 0 ? one(T) :
+                                     get(strength_of, points_unique[k], one(T))
+            end
             source_map = map((x,y) -> x == n ? T(0) : T(y), unique_point_map, strength_map)
         else
-            source_map = map(x -> x != 0 ? T(1) : T(0), unique_point_map)
-            source_map = map((x,y) -> x == n ? T(0) : y, point_map, source_map)
+            # Every active focal point other than `n` is a unit source; the
+            # points the include file excludes are zero in `point_map`.
+            source_map = map((x,y) -> (x != 0 && y != 0 && x != n) ? one(T) : zero(T),
+                             unique_point_map, point_map)
         end
         ground_map = map(x -> x == n ? Inf : T(0), point_map)
     end
 
     # Only the component holding this focal node is solved. `i` indexes
-    # `points_unique`, not the rows of `points_rc`; look the cell up by id
-    # so focal regions get the right node.
-    ind = findfirst(isequal(n), points_rc[3])
-    check_node = nodemap[points_rc[1][ind], points_rc[2][ind]]
+    # `points_unique`, not the rows of `points_rc`; use its representative
+    # cell so focal regions get the right node.
+    check_node = nodemap[unique_cells[i]...]
 
     point_geometry = RasterGeometry(nodemap, newpoly, hbmeta, gmap)
     policy = one_to_all ? :rmvgnd : :rmvsrc
@@ -188,16 +207,15 @@ function solve_onetoall_point(i, data::RasterData{T,V}, cfg, G, cc, nodemap, new
 end
 
 # The effective resistance of focal node `n` from one solve: in one-to-all its
-# voltage over the injected strength, -1 if nothing was solved or the voltage
-# is zero; all-to-one only writes maps and reports 0 for a solved node.
+# voltage over the injected strength, -1 if nothing was solved; all-to-one
+# only writes maps and reports 0 for a solved node.
 function onetoall_resistance(voltages::Vector{T}, solver_called, one_to_all, n, str,
                              unique_point_map, nodemap) where T
     solver_called || return T(-1)
     one_to_all || return T(0)
     cell = findfirst(isequal(n), unique_point_map)
     node = nodemap[cell]
-    val = node == 0 ? T(0) : voltages[node] / T(str)
-    val ≈ 0 ? T(-1) : val
+    node == 0 ? T(0) : voltages[node] / T(str)
 end
 
 function prune_points!(points_rc, point_ids::Vector{V}) where V
@@ -211,18 +229,4 @@ function prune_points!(points_rc, point_ids::Vector{V}) where V
         end
     end
     for i in 1:3 deleteat!(points_rc[i], rmv) end
-end
-
-function prune_strengths(strengths, point_ids::Vector{V}) where V
-    pts = strengths[:,1]
-    l = length(pts)
-    rmv = V[]
-    for (i,p) in enumerate(pts)
-        if !(p in point_ids)
-           push!(rmv, i)
-       end
-    end
-    rng = collect(1:l)
-    deleteat!(rng, rmv)
-    strengths[rng,:]
 end
