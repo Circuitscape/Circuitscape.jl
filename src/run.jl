@@ -37,13 +37,12 @@ function _run(cfg)
         @warn("Pardiso solver works only in double precision. Switching precision to double.")
         T = Float64
     end
-    V = cfg.use_64bit_indexing ? Int64 : Int32
     @info("Precision used: $(_precision_str(cfg.precision))")
     if cfg.parallelize
         @info("Starting up Circuitscape to use $(Threads.nthreads()) threads in parallel")
     end
     with(CSTIMER => TimerOutput()) do
-        r = @timeit CSTIMER[] "complete job" _compute(T, V, cfg)
+        r = @timeit CSTIMER[] "complete job" _compute(T, cfg)
         if cfg.log_level == Logging.Debug
             timings = CSTIMER[]
             @info("\n", timings)
@@ -52,8 +51,8 @@ function _run(cfg)
     end
 end
 
-function _compute(T, V, cfg)
-    data = @timeit CSTIMER[] "load data" load_data(T, V, cfg)
+function _compute(T, cfg)
+    data = @timeit CSTIMER[] "load data" load_data(T, cfg)
     if is_pairwise(cfg)
         run_pairwise(data, cfg)
     elseif is_advanced(cfg) || is_network(cfg)

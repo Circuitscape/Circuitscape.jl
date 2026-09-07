@@ -521,6 +521,21 @@ function solve_pairs!(handle_pair, factor, solver::DirectSolver, matrix::SparseM
     nothing
 end
 
+"""
+    regularize(matrix)
+
+`matrix + 10ε I`: the diagonal shift that makes a component's singular
+Laplacian positive definite for the direct solvers. The identity is built
+with the index type of `matrix`; `sparse(c * I, n, n)` is always `Int`
+indexed, and adding it silently promoted a 32-bit matrix, and the factor
+built from it, back to 64-bit indices.
+"""
+function regularize(matrix::SparseMatrixCSC{T,V}) where {T,V}
+    n = size(matrix, 1)
+    r = V(1):V(n)
+    matrix + sparse(r, r, T(10) * eps(T), n, n)
+end
+
 # TODO: In the pardiso case, we're not really constructing the factor
 # So can we make this consistent?
 function construct_cholesky_factor(matrix, ::CholmodSolver)

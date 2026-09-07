@@ -857,3 +857,52 @@ end
     @test rn[2, 3] ≈ 3.0
     @test !any(f -> startswith(f, "net") && occursin("currents", f), readdir(dir))
 end
+
+# 32-bit indices: chosen automatically when the problem fits, forced to
+# 64-bit by use_64bit_indexing, and kept through the whole pipeline. The
+# regularization used to promote a 32-bit matrix (and so the CHOLMOD factor)
+# back to 64-bit indices via `sparse(c * I, n, n)`.
+@testset "index type" begin
+    SparseMatrixCSC, sparse, nnz = SparseArrays.SparseMatrixCSC, SparseArrays.sparse, SparseArrays.nnz
+    I = LinearAlgebra.I
+    cfg =Circuitscape.parse_config("input/raster/one_to_all/11/oneToAllVerify11.ini")
+    cfg64 = Circuitscape.CSConfig(cfg; use_64bit_indexing = true)
+    @test Circuitscape.index_type(cfg, 10, 10) == Int32
+    @test Circuitscape.index_type(cfg, typemax(Int32) - 1, typemax(Int32) - 1) == Int32
+    @test Circuitscape.index_type(cfg, typemax(Int32), 10) == Int64
+    @test Circuitscape.index_type(cfg, 10, typemax(Int32)) == Int64
+    @test Circuitscape.index_type(cfg64, 10, 10) == Int64
+    @test Circuitscape.raster_nnz_bound(1_000_000) > nnz(model_problem(1000)) 
+
+    @test Circuitscape.load_raster_data(Float64, cfg) isa Circuitscape.RasterData{Float64,Int32}
+    @test Circuitscape.load_raster_data(Float64, cfg64) isa Circuitscape.RasterData{Float64,Int64}
+    @test Circuitscape.load_raster_data(Float32, Int64, cfg) isa Circuitscape.RasterData{Float32,Int64}
+    net = Circuitscape.parse_config("input/network/sgNetworkVerify1.ini")
+    @test Circuitscape.get_network_data(Float64, net) isa Circuitscape.NetworkData{Float64,Int32}
+    @test Circuitscape.get_network_data(Float64, Int64, net) isa Circuitscape.NetworkData{Float64,Int64}
+    @test Circuitscape.get_network_data(Float64, net).coords ==
+          Circuitscape.get_network_data(Float64, Int64, net).coords
+
+    for V in (Int32, Int64)
+        prob = Circuitscape.build_problem(Circuitscape.load_data(Float64, V, cfg), cfg)
+        @test prob.G isa SparseMatrixCSC{Float64,V}
+        @test prob.cc isa Vector{Vector{V}}
+        n = size(prob.G, 1)
+        R = Circuitscape.regularize(prob.G)
+        @test R isa SparseMatrixCSC{Float64,V}
+        @test R == prob.G + sparse(10eps() * I, n, n)
+        F = Circuitscape.construct_cholesky_factor(prob.G, Circuitscape.CholmodSolver(10))
+        @test F isa SparseArrays.CHOLMOD.Factor{Float64,V}
+        # Advanced mode's finite grounds go on the diagonal with the same index type
+        a = deepcopy(prob.G)
+        sources = zeros(n); sources[1] = 1
+        grounds = zeros(n); grounds[end] = 2.0
+        finitegrounds = copy(grounds)
+        v32 = Circuitscape.multiple_solver(cfg, Circuitscape.CholmodSolver(10), a, sources, grounds, finitegrounds)
+        @test length(v32) == n
+    end
+    # Same answers whichever index type is used
+    r32 = Circuitscape.run_onetoall(Circuitscape.load_data(Float64, Int32, cfg), cfg)
+    r64 = Circuitscape.run_onetoall(Circuitscape.load_data(Float64, Int64, cfg), cfg)
+    @test r32 == r64
+end

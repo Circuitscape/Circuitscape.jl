@@ -421,17 +421,52 @@ function read_included_pairs(V, filename; starts_from_zero = false)
 
 end
 
-function get_network_data(T, V, cfg)::NetworkData{T,V}
+"""
+    index_type(cfg, nnodes, nnz) -> Int32 or Int64
+
+Integer type for node numbers and sparse matrix indices of a problem with
+node numbers up to `nnodes` and at most `nnz` stored matrix entries: `Int32`
+when both fit, which halves the index memory of the graph, its connected
+components, the AMG hierarchy and the CHOLMOD factor's index arrays, and
+`Int64` otherwise or when `cfg.use_64bit_indexing` is set. Every downstream
+step is generic in the type.
+"""
+index_type(cfg, nnodes, nnz) =
+    (!cfg.use_64bit_indexing && max(nnodes, nnz) < typemax(Int32)) ? Int32 : Int64
+
+# Stored entries of a raster Laplacian: at most 4 undirected edges per cell
+# (8 neighbours), both orientations stored, plus the diagonal.
+raster_nnz_bound(ncells) = 9 * ncells + 1
+
+"""
+    get_network_data(T, cfg) -> NetworkData
+    get_network_data(T, V, cfg)
+
+Read a network's edge list, focal nodes, sources and grounds. The node number
+type `V` is chosen by [`index_type`](@ref) from the largest node number and
+the edge count unless given.
+"""
+function get_network_data(T, cfg)
+    i, j, v, starts_from_zero = load_graph(Int64, cfg.habitat_file, T)
+    m = max(maximum(i), maximum(j))
+    V = index_type(cfg, m, 2 * length(i) + m)
+    @info("Node indices: $V")
+    _get_network_data(T, V, cfg, (Vector{V}(i), Vector{V}(j), v), starts_from_zero)
+end
+
+function get_network_data(T, V, cfg)
+    i, j, v, starts_from_zero = load_graph(V, cfg.habitat_file, T)
+    _get_network_data(T, V, cfg, (i, j, v), starts_from_zero)
+end
+
+function _get_network_data(T, V, cfg, (i, j, v), starts_from_zero)::NetworkData{T,V}
 
     hab_is_res = cfg.habitat_map_is_resistances
-    hab_file = cfg.habitat_file
     fp_file = cfg.point_file
     source_file = cfg.source_file
     ground_file = cfg.ground_file
 
     is_pairwise = cfg.scenario == sc_pairwise
-
-    i,j,v,starts_from_zero = load_graph(V, hab_file, T)
 
     if hab_is_res
         v = 1 ./ v
@@ -461,11 +496,40 @@ function get_network_data(T, V, cfg)::NetworkData{T,V}
     NetworkData((i,j,v), fp, source_list, ground_list, included_pairs)
 end
 
-function load_raster_data(T, V, cfg)::RasterData{T,V}
+"""
+    load_raster_data(T, cfg) -> RasterData
+    load_raster_data(T, V, cfg)
 
-    # Habitat file
-    hab_file = cfg.habitat_file
-    hab_is_res = cfg.habitat_map_is_resistances
+Read the habitat raster and everything `cfg` names alongside it. The node
+number type `V` is chosen by [`index_type`](@ref) from the number of cells
+unless given.
+"""
+function load_raster_data(T, cfg)
+    cellmap, hbmeta = read_habitat(T, cfg)
+    ncells = length(cellmap)
+    V = index_type(cfg, ncells, raster_nnz_bound(ncells))
+    @info("Node indices: $V")
+    _load_raster_data(T, V, cfg, cellmap, hbmeta)
+end
+
+load_raster_data(T, V, cfg) = _load_raster_data(T, V, cfg, read_habitat(T, cfg)...)
+
+# The habitat raster, reclassified if asked to, with its metadata.
+function read_habitat(T, cfg)
+    @info("Reading maps")
+    reclass_table = cfg.use_reclass_table ? read_reclass_table(T, cfg.reclass_file) : nothing
+    cellmap, hbmeta = read_cellmap(cfg.habitat_file, cfg.habitat_map_is_resistances, T;
+                                   reclass_table)
+    c = count(x -> x > 0, cellmap)
+    ncells = length(cellmap)
+    if ncells > 5_000_000 && cfg.solver == st_cholmod
+        @warn("The landscape has $(ncells) cells and the CHOLMOD solver is selected. CHOLMOD is a sparse direct solver that consumes a lot of memory on large grids. Consider using solver = cg+amg instead.")
+    end
+    @info("Resistance/Conductance map has $c nodes")
+    cellmap, hbmeta
+end
+
+function _load_raster_data(T, V, cfg, cellmap, hbmeta)::RasterData{T,V}
 
     # Polygons
     use_polygons = cfg.use_polygons
@@ -492,18 +556,6 @@ function load_raster_data(T, V, cfg)::RasterData{T,V}
     source_file = cfg.source_file
     ground_file = cfg.ground_file
     ground_is_res = cfg.ground_file_is_resistances
-
-    @info("Reading maps")
-
-    # Read cell map, reclassifying its values first if asked to
-    reclass_table = cfg.use_reclass_table ? read_reclass_table(T, cfg.reclass_file) : nothing
-    cellmap, hbmeta = read_cellmap(hab_file, hab_is_res, T; reclass_table)
-    c = count(x -> x > 0, cellmap)
-    ncells = length(cellmap)
-    if ncells > 5_000_000 && cfg.solver == st_cholmod
-        @warn("The landscape has $(ncells) cells and the CHOLMOD solver is selected. CHOLMOD is a sparse direct solver that consumes a lot of memory on large grids. Consider using solver = cg+amg instead.")
-    end
-    @info("Resistance/Conductance map has $c nodes")
 
     # Read polymap
     if use_polygons

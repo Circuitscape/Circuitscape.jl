@@ -3,7 +3,8 @@ module CircuitscapePardisoExt
 using Pardiso
 using SparseArrays
 using LinearAlgebra
-import Circuitscape: PardisoSolver, construct_cholesky_factor, solve_linear_system, solve_linear_system!, refine_columns!
+import Circuitscape: PardisoSolver, construct_cholesky_factor, solve_linear_system, solve_linear_system!,
+                     refine_columns!, regularize
 
 mutable struct PardisoFactorize
     const ps::Pardiso.MKLPardisoSolver
@@ -44,7 +45,7 @@ end
 
 function solve_linear_system!(lhs, factor::PardisoFactorize, matrix, rhs;
                               tol = 1e-4, resid = similar(lhs))
-    mat = sparse(10eps(eltype(matrix)) * I, size(matrix)...) + matrix
+    mat = regularize(matrix)
     op = PardisoOp(factor, mat)
     for i = 1:size(lhs, 2)
         lhs[:, i] .= op \ rhs[:, i]
