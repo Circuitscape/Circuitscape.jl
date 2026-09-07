@@ -72,8 +72,7 @@ function accumulate_current_maps(path, f)
     dir = dirname(path)
     base = basename(path)
 
-    # If base file has a dot
-    name = split(base, ".out")[1]
+    name = output_prefix(base)
 
     cmap_list = readdir(dir) |>
                     x -> filter(y -> startswith(y, "$(name)_"), x) |>
@@ -138,14 +137,6 @@ end
 
 calculate_cum_current_map(path) = accumulate_current_maps(path, +)
 calculate_max_current_map(path) = accumulate_current_maps(path, max)
-
-function postprocess_cum_curmap!(accum)
-    for i in eachindex(accum)
-        if accum[i] < -9999
-            accum[i] = -9999
-        end
-    end
-end
 
 # `V` is the problem's index type, so the result is the `Cumulative{T,V}` that
 # `GraphProblem{T,V}` and `Output{T,V}` hold; the branch vectors stay empty for

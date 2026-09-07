@@ -423,7 +423,7 @@ Files should be in tab-delimited text with a .txt extension.
 
 ## Output Files
 
-Every output name starts with `output_file` with its `.out` extension removed; below this prefix is written `<out>`. The configuration as run is written, in INI form, to `output_file` itself, so the options are recorded next to the results. Focal node IDs in file names are the IDs from the focal node file.
+Every output name starts with `output_file` with its extension removed (`output/run.out` gives `output/run`); below this prefix is written `<out>`. The configuration as run is written, in INI form, to `<out>.ini`, so the options are recorded next to the results. Focal node IDs in file names are the IDs from the focal node file.
 
 ### Which files are written
 
@@ -436,23 +436,24 @@ Raster modes write ESRI ASCII grids (`.asc`), or GeoTIFF (`.tif`) when `write_as
 | `<out>_cum_curmap.asc` | pairwise | `write_cur_maps = True` or `write_cum_cur_map_only = True` |
 | `<out>_max_curmap.asc` | pairwise | `write_max_cur_maps = True`, together with `write_cur_maps` or `write_cum_cur_map_only` |
 | `<out>_voltmap_<i>_<j>.asc` | pairwise | `write_volt_maps = True` |
-| `<out>_curmap_<id>.asc` (one per focal node) | one-to-all, all-to-one | `write_cur_maps = True` or `write_cum_cur_map_only = True` (`write_cum_cur_map_only` does not suppress the per-node maps in these modes) |
+| `<out>_resistances.out` | one-to-all, all-to-one | always; two columns, focal node ID and effective resistance |
+| `<out>_curmap_<id>.asc` (one per focal node) | one-to-all, all-to-one | `write_cur_maps = True` and `write_cum_cur_map_only = False` |
 | `<out>_cum_curmap.asc`, `<out>_max_curmap.asc` | one-to-all, all-to-one | as in pairwise |
 | `<out>_voltmap_<id>.asc` | one-to-all, all-to-one | `write_volt_maps = True` |
-| `<out>_curmap.asc` | advanced | `write_cur_maps = True` or `write_cum_cur_map_only = True` |
+| `<out>_curmap.asc` | advanced | `write_cur_maps = True` |
 | `<out>_voltmap.asc` | advanced | `write_volt_maps = True` |
 
-One-to-all and all-to-one do not write a resistances file; their result (one value per focal node) is the return value of `compute`. `set_focal_node_currents_to_zero`, `log_transform_maps` and `set_null_currents_to_nodata` are applied to each per-pair or per-node map before it is accumulated, so they affect the cumulative and maximum maps as well.
+`set_focal_node_currents_to_zero` is applied to each per-pair or per-node map before it is accumulated, so it affects the cumulative and maximum maps as well. `log_transform_maps`, `set_null_currents_to_nodata` and `set_null_voltages_to_nodata` are output transforms: the maps are accumulated as raw currents and the transform is applied to every grid as it is written (per-pair, per-node, advanced, cumulative and maximum), so the cumulative map is `log10` of the summed current, not the sum of the logarithms.
 
 Network modes write tab-separated text. Branch current files omit branches carrying less than `1e-6` A.
 
 | File | Mode | Written when |
 |------|------|--------------|
 | `<out>_resistances.out`, `<out>_resistances_3columns.out` | pairwise | always |
-| `<out>_node_currents_<i>_<j>.txt`, `<out>_branch_currents_<i>_<j>.txt` | pairwise | `write_cur_maps = True`. Since 6.0 these honour the flag as the raster path always did; before, they were written on every run. (They are also produced when any other map option is on, since every map option enables the per-pair postprocessing; `write_cum_cur_map_only` does not suppress them.) |
+| `<out>_node_currents_<i>_<j>.txt`, `<out>_branch_currents_<i>_<j>.txt` | pairwise | `write_cur_maps = True` and `write_cum_cur_map_only = False`. Since 6.0 these honour the flags as the raster path does; before, they were written on every run. |
 | `<out>_node_currents_cum.txt`, `<out>_branch_currents_cum.txt` | pairwise | `write_cur_maps = True` |
 | `<out>_voltages_<i>_<j>.txt` | pairwise | `write_volt_maps = True` |
-| `<out>_node_currents.txt`, `<out>_branch_currents.txt` | advanced | `write_cur_maps = True` or `write_cum_cur_map_only = True` |
+| `<out>_node_currents.txt`, `<out>_branch_currents.txt` | advanced | `write_cur_maps = True` |
 | `<out>_voltages.txt` | advanced | `write_volt_maps = True` |
 
 `write_max_cur_maps` has no effect in network mode. Node current files have two columns (node ID, current); branch current files three (node, node, current); voltage files two (node ID, voltage).
