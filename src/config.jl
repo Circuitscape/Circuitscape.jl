@@ -314,8 +314,23 @@ policy(cfg::CSConfig) = _remove_policy_symbol(cfg.remove_src_or_gnd)
 
 Copy of `cfg` with the given fields replaced.
 """
-CSConfig(cfg::CSConfig; kwargs...) =
-    CSConfig(; (f => getfield(cfg, f) for f in fieldnames(CSConfig))..., kwargs...)
+CSConfig(cfg::CSConfig; kwargs...) = _copy_with(cfg, values(kwargs))
+
+# The field names to override are part of the NamedTuple's type, so the copy
+# is emitted as one positional call with every argument's type known to
+# inference: 0 bytes, instead of building a 46-entry NamedTuple at run time
+# and dispatching the keyword constructor on it (~10 us and 17 KB per copy,
+# once per moving window in `compute_omniscape_current`). The positional
+# constructor converts each value to its field type, as the keyword one does.
+@generated function _copy_with(cfg::CSConfig, kw::NamedTuple{names}) where {names}
+    for n in names
+        n in fieldnames(CSConfig) ||
+            return :(throw(ArgumentError($("CSConfig has no field $n"))))
+    end
+    args = [n in names ? :(kw.$n) : :(getfield(cfg, $(QuoteNode(n))))
+            for n in fieldnames(CSConfig)]
+    :(CSConfig($(args...)))
+end
 
 function Base.Dict{String,String}(cfg::CSConfig)
     a = Dict{String,String}()

@@ -147,14 +147,17 @@ function postprocess_cum_curmap!(accum)
     end
 end
 
-function initialize_cum_maps(cellmap::Matrix{T}, max = false) where T
+# `V` is the problem's index type, so the result is the `Cumulative{T,V}` that
+# `GraphProblem{T,V}` and `Output{T,V}` hold; the branch vectors stay empty for
+# rasters.
+function initialize_cum_maps(::Type{V}, cellmap::Matrix{T}, max = false) where {T,V}
     cum_curr = zeros(T, size(cellmap)...)
     max_curr = max ? fill(T(-9999), size(cellmap)...) : zeros(T, 0, 0)
     cum_branch_curr = Vector{T}()
     cum_node_curr = Vector{T}()
 
     Cumulative(cum_curr, max_curr, cum_branch_curr, cum_node_curr,
-               Vector{Tuple{Int,Int}}(), Dict{Tuple{Int,Int},Int}(), ReentrantLock())
+               Vector{Tuple{V,V}}(), Dict{Tuple{V,V},Int}(), ReentrantLock())
 end
 
 function initialize_cum_vectors(coords::Tuple{Vector{V},Vector{V},Vector{T}}, num_nodes::Int64) where {T,V}

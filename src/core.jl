@@ -39,7 +39,7 @@ struct GraphProblem{T,V,W,Geom<:Geometry}
     user_points::Vector{V}
     exclude_pairs::Vector{Tuple{V,V}}
     geometry::Geom
-    cum::Cumulative{T}
+    cum::Cumulative{T,V}
     solver::W
 end
 
@@ -62,7 +62,7 @@ struct Output{T,V}
     comp_idx::Tuple{V,V}
     resistance::T
     col::V
-    cum::Cumulative{T}
+    cum::Cumulative{T,V}
 end
 
 # The pairwise kernel hands `write_cur_maps` / `write_volt_maps` an `Output`
@@ -278,23 +278,29 @@ function solve(prob::GraphProblem{T,V}, solver::Solver, cfg, log)::Matrix{T} whe
 
     @info("Graph has $(size(a,1)) nodes, $numpoints focal points and $(length(cc)) connected components")
 
-    num_pairs, pair_numbers = get_num_pairs(cc, points, exclude, orig_pts)
-    log && @info("Total number of pair solves = $num_pairs")
+    # Decide the shortcut before counting pairs so that `num_pairs` and
+    # `pair_numbers` are assigned once: they are captured by `pair_label`
+    # and `handle_pair` below, and a captured variable that is reassigned
+    # is boxed, which made every per-pair call dynamic.
+    get_shortcut_resistances = is_raster(geometry) && !write_volt_maps &&
+        !write_cur_maps && !write_cum_cur_map_only && !write_max_cur_maps &&
+        isempty(exclude)
+    num_pairs, pair_numbers = if get_shortcut_resistances
+        np, pn = get_num_pairs_shortcut(cc, points, exclude, orig_pts)
+        log && @info("Triggering resistance calculation shortcut")
+        log && @info("Total number of pair solves has been reduced to $np")
+        np, pn
+    else
+        np, pn = get_num_pairs(cc, points, exclude, orig_pts)
+        log && @info("Total number of pair solves = $np")
+        np, pn
+    end
 
     # Initialize pairwise resistance
     resistances = -1 * ones(T, numpoints, numpoints)
     voltmatrix = zeros(T, size(resistances))
     shortcut_res = -1 * ones(T, size(resistances))
 
-    get_shortcut_resistances = false
-    if is_raster(geometry) && !write_volt_maps && !write_cur_maps &&
-            !write_cum_cur_map_only && !write_max_cur_maps &&
-            isempty(exclude)
-        get_shortcut_resistances = true
-        log && @info("Triggering resistance calculation shortcut")
-        num_pairs, pair_numbers = get_num_pairs_shortcut(cc, points, exclude, orig_pts)
-        log && @info("Total number of pair solves has been reduced to $num_pairs")
-    end
     shortcut = Shortcut(get_shortcut_resistances, voltmatrix, shortcut_res)
 
     pair_label(job) = haskey(pair_numbers, (job.src_node, job.dst_node)) ?
@@ -353,16 +359,16 @@ function solve(prob::GraphProblem{T,V}, solver::Solver, cfg, log)::Matrix{T} whe
         end
     end
 
-    if get_shortcut_resistances
-        resistances = shortcut.shortcut_res
-    end
+    # A new binding rather than reassigning `resistances`, which is captured
+    # by `handle_pair` and would otherwise be boxed.
+    final_res = get_shortcut_resistances ? shortcut.shortcut_res : resistances
 
-    for i = 1:size(resistances,1)
-        resistances[i,i] = 0
+    for i = 1:size(final_res,1)
+        final_res[i,i] = 0
     end
 
     # Pad it with the user points
-    r = vcat(vcat(0,orig_pts)', hcat(orig_pts, resistances))
+    r = vcat(vcat(0,orig_pts)', hcat(orig_pts, final_res))
 
     # Save resistances
     save_resistances(r, cfg)
