@@ -93,11 +93,29 @@ function read_focal_points(V, path::String)
 	ret
 end
 
-function read_point_strengths(T, path::String, starts_from_zero) 
+# Network advanced mode: `node strength` rows, shifted along with the graph's
+# node numbering when that starts from 0.
+function read_point_strengths(T, path::String, starts_from_zero)
 	str = readdlm(path, T)
-	starts_from_zero = minimum(str[:,1]) == 0 || starts_from_zero 
+	starts_from_zero = minimum(str[:,1]) == 0 || starts_from_zero
 	starts_from_zero && (str[:,1] .+= 1)
 	str
+end
+
+"""
+    read_variable_strengths(T, path)
+
+The variable source strength file of raster one-to-all / all-to-one modes:
+two whitespace-separated columns, `focal_id strength`, one row per line, in
+any order. Ids are taken as written: a raster focal id is never 0-based, so
+unlike `read_point_strengths` nothing is shifted. `run_onetoall` looks the
+strengths up by id, with 1 for an id the file does not list.
+"""
+function read_variable_strengths(::Type{T}, path::String) where {T}
+    str = readdlm(path, T)
+    size(str, 2) == 2 ||
+        throw(ArgumentError("variable_source_file = \"$path\" must have exactly two columns (focal id, strength); found $(size(str, 2))"))
+    str
 end
 
 """
@@ -615,7 +633,7 @@ function _load_raster_data(T, V, cfg, cellmap, hbmeta)::RasterData{T,V}
 
     # Variable source strengths
     if use_var_source
-        strengths = read_point_strengths(T, var_source_file, false)
+        strengths = read_variable_strengths(T, var_source_file)
     else
         strengths = Matrix{T}(undef, 0,0)
     end
