@@ -36,6 +36,7 @@ Circuitscape.parse_config
 Circuitscape.CSConfig
 Circuitscape.validate
 Circuitscape.write_config
+Circuitscape.output_prefix
 ```
 
 ## Internals
