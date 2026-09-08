@@ -1,7 +1,7 @@
 name = "Circuitscape"
 uuid = "2b7a1792-8151-5239-925d-e2b8fdfa3201"
-authors = ["Ranjan Anantharaman <ranjan.anantharaman@gmail.com>", "Viral B. Shah <viral@mayin.org>"]
 version = "6.1.0"
+authors = ["Ranjan Anantharaman <ranjan.anantharaman@gmail.com>", "Viral B. Shah <viral@mayin.org>"]
 
 [deps]
 AlgebraicMultigrid = "2169fc97-5a83-5252-b627-83903c6c433c"
@@ -16,15 +16,15 @@ TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 
 [weakdeps]
 AppleAccelerate = "13e28ba4-7ad8-5781-acae-3021b1ed3924"
-REPL = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 ArchGDAL = "c9ce4bd3-c3d5-55b8-8973-c0e20141b8c3"
 Pardiso = "46dd5b70-b6fb-5a00-ae2d-e8fea33afaf2"
+REPL = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 
 [extensions]
 CircuitscapeAppleAccelerateExt = "AppleAccelerate"
-CircuitscapeREPLExt = "REPL"
 CircuitscapeArchGDALExt = "ArchGDAL"
 CircuitscapePardisoExt = "Pardiso"
+CircuitscapeREPLExt = "REPL"
 
 [compat]
 AlgebraicMultigrid = "2"
@@ -32,7 +32,7 @@ AppleAccelerate = "0.7"
 ArchGDAL = "0.10"
 Dates = "1"
 DelimitedFiles = "1.9"
-GZip = "0.7"
+GZip = "0.7, 0.8"
 Krylov = "0.10"
 LinearAlgebra = "1"
 Logging = "1"
@@ -43,8 +43,8 @@ julia = "1.12"
 
 [extras]
 Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
-Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 REPL = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
