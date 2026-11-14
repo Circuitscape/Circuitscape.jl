@@ -128,10 +128,12 @@ end
 """
     read_point_strengths(T, path, starts_from_zero) -> Matrix{T}
 
-Two columns, `id strength`. The ids are shifted to 1-based exactly when
-`starts_from_zero` is set, i.e. when the network graph was 0-based; as with
-focal nodes the shift is never inferred from the list itself (Circuitscape 4
-matches the ids against the graph's node names). Raster mode passes `false`.
+The source or ground list of a network advanced run: two columns,
+`id strength`. The ids are shifted to 1-based exactly when `starts_from_zero`
+is set, i.e. when the network graph was 0-based; as with focal nodes the
+shift is never inferred from the list itself (Circuitscape 4 matches the ids
+against the graph's node names). Raster variable source strengths are read by
+[`read_variable_strengths`](@ref) instead.
 """
 function read_point_strengths(T, path::String, starts_from_zero::Bool)
 	str = readdlm(path, T)
