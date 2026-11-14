@@ -27,6 +27,19 @@ that can require action when upgrading.
   errors.** These Circuitscape 4 options were never implemented here; remove
   them or set them to `False`.
 
+## Changed results
+
+- **One-to-all and all-to-one variable source strengths are matched by focal
+  node ID.** Previously the file's rows were applied in order, so a file not
+  sorted by ID, or one that skipped an ID or listed an ID absent from the
+  point file, gave strengths to the wrong nodes or failed. Sorted files that
+  list exactly the focal nodes give the same results as before.
+- **All-to-one with an include/exclude file:** a focal node excluded from a
+  pair with the current ground no longer injects current into that solve.
+  Previously it injected 1 A (and Circuitscape 4.0.5 does the same when
+  variable source strengths are used), so current maps change wherever the
+  file excludes pairs.
+
 Everything else in 6.0 is additive or internal; see the
 [release notes](https://github.com/Circuitscape/Circuitscape.jl/releases) for
 the full list, and *What Makes a Run Fast* in
