@@ -66,6 +66,7 @@ parse as whitespace-delimited is read again as comma-delimited. Used for the
 network edge list and the network focal node list.
 """
 function read_network_table(path::String, ::Type{T}) where {T}
+    isfile(path) || throw(ArgumentError("Network file \"$path\" does not exist"))
     try
         readdlm(path, T; comments = true, comment_char = '#')
     catch
@@ -106,24 +107,34 @@ function load_graph(V, gpath::String, ::Type{T}) where {T}
 end
 
 """
-    read_focal_points(V, path, starts_from_zero) -> Vector{V}
+    read_focal_points(V, path, starts_from_zero; is_graph = false) -> Vector{V}
 
 The focal node ids of a network, sorted and without duplicates (Circuitscape
 4 takes `np.unique` of the file). Circuitscape 4 matches focal ids to the
 graph's node names, so the ids are shifted to 1-based exactly when the graph
 was (`starts_from_zero` from [`load_graph`](@ref)) and never inferred from
 the list itself: a 0-based graph with focal list `1, 3` names the original
-nodes 1 and 3.
+nodes 1 and 3. With `is_graph = true` the file is the edge list itself and
+only its two node columns are read, so every node of the graph is focal.
 """
-function read_focal_points(V, path::String, starts_from_zero::Bool)
-    ret = vec(V.(read_network_table(path, Float64)))
+function read_focal_points(V, path::String, starts_from_zero::Bool; is_graph::Bool = false)
+    table = read_network_table(path, Float64)
+    is_graph && (table = table[:, 1:min(2, size(table, 2))])
+    ret = vec(V.(table))
     starts_from_zero && (ret .+= 1)
     sort!(unique!(ret))
 end
 
-function read_point_strengths(T, path::String, starts_from_zero) 
+"""
+    read_point_strengths(T, path, starts_from_zero) -> Matrix{T}
+
+Two columns, `id strength`. The ids are shifted to 1-based exactly when
+`starts_from_zero` is set, i.e. when the network graph was 0-based; as with
+focal nodes the shift is never inferred from the list itself (Circuitscape 4
+matches the ids against the graph's node names). Raster mode passes `false`.
+"""
+function read_point_strengths(T, path::String, starts_from_zero::Bool)
 	str = readdlm(path, T)
-	starts_from_zero = minimum(str[:,1]) == 0 || starts_from_zero 
 	starts_from_zero && (str[:,1] .+= 1)
 	str
 end
@@ -161,18 +172,19 @@ end
 """
     reclassify!(values, table)
 
-Apply a reclass table in place, row by row in ascending order of old value,
-as Circuitscape 4 does (csio.py `read_point_strengths` sorts the table and
-`read_cell_map` / compute.py `read_graph` apply each row in turn). Chained
-rows therefore compound: `1 -> 2, 2 -> 3` sends 1 to 3, whichever order the
-rows are written in. `values` is a habitat raster or a network's edge values.
+Apply a reclass table in place as a single lookup: every value equal to an
+`old` entry becomes the matching `new`, other values are left alone. Chained
+rows do not compound, so `1 -> 2, 2 -> 3` sends 1 to 2, not to 3, whatever the
+order of the rows. `values` is a habitat raster or a network's edge values.
+
+Circuitscape 4 applied the rows one after another in ascending order of old
+value, so chained rows compounded there; that made the result depend on how
+the old and new values happened to be ordered (`1 -> 2, 2 -> 3` sent 1 to 3,
+but `2 -> 1, 1 -> 5` sent 2 only to 1) and is deliberately not reproduced (#231).
 """
 function reclassify!(values::AbstractArray{T}, table::Matrix{T}) where {T}
-    for r in sortperm(table[:, 1])
-        old, new = table[r, 1], table[r, 2]
-        map!(x -> x == old ? new : x, values, values)
-    end
-    values
+    lookup = Dict{T,T}(table[i,1] => table[i,2] for i in axes(table, 1))
+    map!(x -> get(lookup, x, x), values, values)
 end
 
 function read_cellmap(habitat_file::String, is_res::Bool, ::Type{T};
@@ -585,7 +597,10 @@ function _get_network_data(T, V, cfg, (i, j, v), starts_from_zero)::NetworkData{
     end
 
     if is_pairwise
-        fp = read_focal_points(V, fp_file, starts_from_zero)
+        # As in Circuitscape 4, the edge list can double as the focal node
+        # list (every node is focal); its value column is then not a node id.
+        fp = read_focal_points(V, fp_file, starts_from_zero;
+                               is_graph = fp_file == cfg.habitat_file)
     else
         fp = V[]
     end

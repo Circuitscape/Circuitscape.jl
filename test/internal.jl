@@ -851,15 +851,18 @@ end
 
 # Issue 231: reclassify habitat raster values through a lookup table
 @testset "Reclass table (#231)" begin
-    # Rows apply one after another in ascending order of old value, as in
-    # Circuitscape 4, so chained rows compound (1 -> 2 -> 3) whatever their
-    # order in the file
+    # One pass: chained rows must not compound (1 -> 2 -> 3), whatever their
+    # order in the file. Circuitscape 4 compounded them; that is not kept.
     m = [1.0 2.0; 2.0 3.0]
     Circuitscape.reclassify!(m, [1.0 2.0; 2.0 3.0])
-    @test m == [3.0 3.0; 3.0 3.0]
+    @test m == [2.0 3.0; 3.0 3.0]
     m = [1.0 2.0; 2.0 3.0]
     Circuitscape.reclassify!(m, [2.0 3.0; 1.0 2.0])
-    @test m == [3.0 3.0; 3.0 3.0]
+    @test m == [2.0 3.0; 3.0 3.0]
+    # Swapping two values works as a lookup
+    m = [1.0 2.0; 2.0 3.0]
+    Circuitscape.reclassify!(m, [1.0 2.0; 2.0 1.0])
+    @test m == [2.0 1.0; 1.0 3.0]
     # Unrelated rows are a plain lookup
     m = [1.0 2.0; 2.0 3.0]
     Circuitscape.reclassify!(m, [1.0 5.0; 3.0 7.0])
@@ -1472,6 +1475,16 @@ end
     @test Circuitscape.read_focal_points(Int, joinpath(dir, "fp13.txt"), false) == [1, 3]
     @test Circuitscape.read_focal_points(Int, joinpath(dir, "fp13.txt"), true) == [2, 4]
 
+    # The edge list can double as the focal node list: its value column is
+    # not read as node ids (values 5, 7, 9 are not nodes of the graph)
+    write(joinpath(dir, "gv.txt"), "1 2 5\n2 3 7\n3 4 9\n")
+    @test Circuitscape.read_focal_points(Int, joinpath(dir, "gv.txt"), false; is_graph = true) == [1, 2, 3, 4]
+    r = network("graphfp", "gv.txt", "gv.txt")
+    @test r[1, 2:end] == [1, 2, 3, 4] && r[2, 5] ≈ 21.0
+    write(joinpath(dir, "gv0.txt"), "0 1 5\n1 2 7\n2 3 9\n")
+    r = network("graphfp0", "gv0.txt", "gv0.txt")
+    @test r[1, 2:end] == [1, 2, 3, 4] && r[2, 5] ≈ 21.0
+
     # The focal list is sorted and made unique (np.unique)
     write(joinpath(dir, "fpdup.txt"), "3\n1\n3\n")
     @test Circuitscape.read_focal_points(Int, joinpath(dir, "fpdup.txt"), false) == [1, 3]
@@ -1490,7 +1503,7 @@ end
     @test_throws ArgumentError Circuitscape.load_graph(Int, joinpath(dir, "gbad.txt"), Float64)
 
     # The reclass table applies to edge values, before the conversion to
-    # conductances; chained rows compound
+    # conductances; chained rows do not compound
     write(joinpath(dir, "rc.txt"), "1 10\n")
     r = network("reclass", "g1.txt", "fp13.txt";
                 use_reclass_table = "True", reclass_file = joinpath(dir, "rc.txt"))
@@ -1498,7 +1511,7 @@ end
     write(joinpath(dir, "rc2.txt"), "2 3\n1 2\n")
     r = network("reclass2", "g1.txt", "fp13.txt";
                 use_reclass_table = "True", reclass_file = joinpath(dir, "rc2.txt"))
-    @test r[2, 3] ≈ 6.0     # 1 -> 2 -> 3 and 2 -> 3
+    @test r[2, 3] ≈ 5.0     # 1 -> 2 and 2 -> 3 in one pass
 
     # A zero resistance edge is refused at load rather than becoming Inf
     write(joinpath(dir, "gz.txt"), "1 2 0\n2 3 1\n")
@@ -1529,6 +1542,21 @@ end
         Logging.disable_logging(Logging.Warn)
     end
     @test r[:, 1] == [1, 2, 3, 4]
+    @test r[1, 2] - r[3, 2] ≈ 3.0
+    @test abs(r[3, 2]) < 1e-10
+
+    # Source and ground ids shift with the graph only: on a 1-based graph a
+    # source listed at 0 is not a node and does not shift the other ids
+    write(joinpath(dir, "src0.txt"), "0 1\n1 1\n")
+    @test Circuitscape.read_point_strengths(Float64, joinpath(dir, "src0.txt"), false)[:, 1] == [0, 1]
+    @test Circuitscape.read_point_strengths(Float64, joinpath(dir, "src0.txt"), true)[:, 1] == [1, 2]
+    a["source_file"] = joinpath(dir, "src0.txt"); a["output_file"] = joinpath(dir, "adv0.out")
+    Logging.disable_logging(Logging.Debug)
+    r = try
+        @test_logs (:warn, r"Ignoring source at node 0") match_mode = :any compute(a)
+    finally
+        Logging.disable_logging(Logging.Warn)
+    end
     @test r[1, 2] - r[3, 2] ≈ 3.0
     @test abs(r[3, 2]) < 1e-10
 end
