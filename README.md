@@ -89,16 +89,17 @@ Example INI files can be found in the
 
 ### Solver Modes
 
-Circuitscape supports four solver modes:
+Circuitscape supports five solvers:
 
 - **CG+AMG** (default) — an iterative solver using algebraic multigrid preconditioning. Scales well to large problems.
 - **CHOLMOD** — a direct solver using [Cholesky decomposition](https://en.wikipedia.org/wiki/Cholesky_decomposition) via the [SuiteSparse](https://people.engr.tamu.edu/davis/suitesparse.html) library. Can be significantly faster for smaller problems, but memory use grows quickly with problem size due to [fill-in](https://algowiki-project.org/en/Cholesky_method#Reordering_to_reduce_the_number_of_fill-in_elements).
 - **Apple Accelerate** — a direct solver using Apple's [Accelerate](https://developer.apple.com/documentation/accelerate/sparse_solvers) framework sparse Cholesky, available as a package extension on macOS (requires macOS 13.4+). Requires `using AppleAccelerate` before `using Circuitscape`.
 - **Pardiso** — a direct solver via [Pardiso.jl](https://github.com/JuliaSparse/Pardiso.jl), available as a package extension. Requires `using Pardiso` before `using Circuitscape`.
+- **AMGX** — an iterative solver on NVIDIA GPUs (conjugate gradient with algebraic multigrid) via [AMGX.jl](https://github.com/JuliaGPU/AMGX.jl), available as a package extension on Linux. Requires `using AMGX` before computing.
 
 To select a solver, add to your INI file:
 ```
-solver = cholmod   # or accelerate, pardiso
+solver = cholmod   # or accelerate, pardiso, amgx
 ```
 
 ### Parallel Computing

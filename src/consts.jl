@@ -14,6 +14,7 @@ const AMG = ["cg+amg", "amg+cg"]
 const CHOLMOD = ["cholmod", "cholesky", "cholfact"]
 const PARDISO = ["mklpardiso", "MKLPardiso", "PARDISO", "pardiso"]
 const ACCELERATE = ["accelerate", "Accelerate", "ACCELERATE", "apple_accelerate"]
+const AMGX_GPU = ["amgx", "AMGX"]
 
 # Constants used in IO
 const AAGRID = 2

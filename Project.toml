@@ -15,18 +15,21 @@ SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 
 [weakdeps]
+AMGX = "c963dde9-0319-47f5-bf0c-b07d3c80ffa6"
 AppleAccelerate = "13e28ba4-7ad8-5781-acae-3021b1ed3924"
 ArchGDAL = "c9ce4bd3-c3d5-55b8-8973-c0e20141b8c3"
 Pardiso = "46dd5b70-b6fb-5a00-ae2d-e8fea33afaf2"
 REPL = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 
 [extensions]
+CircuitscapeAMGXExt = "AMGX"
 CircuitscapeAppleAccelerateExt = "AppleAccelerate"
 CircuitscapeArchGDALExt = "ArchGDAL"
 CircuitscapePardisoExt = "Pardiso"
 CircuitscapeREPLExt = "REPL"
 
 [compat]
+AMGX = "0.2.1"
 AlgebraicMultigrid = "2"
 AppleAccelerate = "0.7"
 ArchGDAL = "0.10"

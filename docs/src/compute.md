@@ -29,7 +29,8 @@ The `cg+amg` solver benefits most from threading — each focal point pair is so
 independently on a separate thread. For problems with many focal points, this can
 provide significant speedups.
 
-The `cholmod`, `accelerate`, and `pardiso` solvers perform batched direct solves.
+The `cholmod`, `accelerate`, and `pardiso` solvers perform batched direct solves,
+and `amgx` solves batches of pairs one after another on the GPU.
 Threading in these modes parallelizes the postprocessing step (current map
 accumulation and output writing).
 
@@ -262,6 +263,39 @@ Pkg.add("AppleAccelerate")
 
 The Accelerate solver supports both single and double precision, and uses the
 same batched solve strategy as the CHOLMOD and Pardiso solvers.
+
+## AMGX GPU Solver
+
+On Linux with an NVIDIA GPU, Circuitscape can solve on the GPU with NVIDIA's
+[AMGX](https://github.com/NVIDIA/AMGX) library through
+[AMGX.jl](https://github.com/JuliaGPU/AMGX.jl). Like `cg+amg` it is an
+iterative solver, conjugate gradient preconditioned by algebraic multigrid,
+so its memory grows with the Laplacian rather than with a factor's fill-in.
+The multigrid hierarchy is built on the GPU once per connected component in
+pairwise mode and reused for every pair. To use it:
+
+```julia
+using Pkg
+Pkg.add("AMGX")
+```
+
+```julia
+using AMGX
+using Circuitscape
+Circuitscape.compute("config.ini")  # with solver = amgx in the INI file
+```
+
+AMGX.jl ships prebuilt AMGX binaries for Linux; elsewhere point
+`JULIA_AMGX_PATH` at a local AMGX build. The solver supports single and
+double precision. Every solution is checked against `residual_tolerance` on
+the host, as for the other solvers. AMGX indexes with 32-bit integers, so a
+connected component must have fewer than 2^31 stored matrix entries (about
+230 million cells with eight-neighbor connections).
+
+AMGX runs on the device that is current when it is first used; select another
+GPU with `CUDA_VISIBLE_DEVICES`. Its calls are serialized, so in one-to-all
+and all-to-one modes, and under Omniscape, threads still build graphs and
+accumulate currents in parallel while the GPU solves one problem at a time.
 
 !!! note
     Circuitscape sets BLAS to single-threaded at startup. Its workload is

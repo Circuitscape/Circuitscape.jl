@@ -1,6 +1,6 @@
 @enum DataType dt_raster dt_network
 @enum Scenario sc_pairwise sc_advanced sc_onetoall sc_alltoone
-@enum SolverType st_cg_amg st_cholmod st_pardiso st_accelerate
+@enum SolverType st_cg_amg st_cholmod st_pardiso st_accelerate st_amgx
 @enum Precision pr_single pr_double
 @enum RemovePolicy rp_keepall rp_rmvsrc rp_rmvgnd rp_rmvall
 
@@ -102,7 +102,8 @@ function _parse_solver(s)
     s in CHOLMOD ? st_cholmod :
     s in PARDISO ? st_pardiso :
     s in ACCELERATE ? st_accelerate :
-    _bad_value("solver", s, ["cg+amg", "cholmod", "pardiso", "accelerate"])
+    s in AMGX_GPU ? st_amgx :
+    _bad_value("solver", s, ["cg+amg", "cholmod", "pardiso", "accelerate", "amgx"])
 end
 
 function _parse_precision(s)
@@ -272,7 +273,8 @@ function _solver_str(v::SolverType)
     v == st_cg_amg ? "cg+amg" :
     v == st_cholmod ? "cholmod" :
     v == st_pardiso ? "mklpardiso" :
-    v == st_accelerate ? "accelerate" : "cg+amg"
+    v == st_accelerate ? "accelerate" :
+    v == st_amgx ? "amgx" : "cg+amg"
 end
 
 _precision_str(v::Precision) = v == pr_single ? "single" : "double"

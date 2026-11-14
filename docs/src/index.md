@@ -134,11 +134,11 @@ _Julia-CHOLMOD_, which uses a direct solver.
 ### Solvers, Threads and Precision
 
 Circuitscape ships with the iterative `cg+amg` solver (the default) and the
-direct CHOLMOD solver, and can use Apple Accelerate (macOS) or Intel MKL
-Pardiso through optional package extensions. Runs are parallelized with Julia
+direct CHOLMOD solver, and can use Apple Accelerate (macOS), Intel MKL
+Pardiso or NVIDIA's AMGX on a GPU through optional package extensions. Runs are parallelized with Julia
 threads (`julia -t N` together with `parallelize = True`). Single precision
 (`precision = single`) is supported: it is tested in CI for `cg+amg`, CHOLMOD
-and Accelerate with a precision-aware residual check, and trades memory for
+Accelerate and AMGX with a precision-aware residual check, and trades memory for
 some accuracy. GeoTIFF input and output needs the optional ArchGDAL package;
 ESRI ASCII grids need nothing extra.
 

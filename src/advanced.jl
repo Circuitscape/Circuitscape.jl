@@ -323,3 +323,12 @@ function multiple_solve(cfg, s::AccelerateSolver, matrix::SparseMatrixCSC{T,V}, 
     factor = construct_cholesky_factor(matrix, s)
     solve_linear_system(factor, matrix, sources; tol = residual_tolerance(cfg, T))
 end
+
+function multiple_solve(cfg, s::AMGXSolver, matrix::SparseMatrixCSC{T,V}, sources::Vector{T}) where {T,V}
+    handle = construct_amgx_solver(matrix, s)
+    try
+        solve_linear_system(handle, matrix, sources; tol = residual_tolerance(cfg, T))
+    finally
+        release!(handle)
+    end
+end

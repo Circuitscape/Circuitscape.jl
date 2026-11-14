@@ -128,6 +128,21 @@ double and single precision.
 struct AccelerateSolver <: Solver
     bs::Int
 end
+
+"""
+    AMGXSolver(bs)
+
+Iterative solver on an NVIDIA GPU through the AMGX library (`solver = amgx`):
+conjugate gradient preconditioned by AMGX's algebraic multigrid. The
+hierarchy is built once per connected component on the GPU and the pairs are
+solved `bs` right-hand sides per batch, with the true residual of every
+solution checked on the host as for the direct solvers. Requires the AMGX.jl
+package extension (`using AMGX`) and a CUDA GPU; double and single precision.
+"""
+struct AMGXSolver <: Solver
+    bs::Int
+end
+
 """
 Core kernel of Circuitscape - used to solve several pairs
 
@@ -161,12 +176,24 @@ function get_solver(cfg)
         @info("Solver used: Apple Accelerate")
         bs = cfg.cholmod_batch_size
         return AccelerateSolver(bs)
+    elseif s == st_amgx
+        Base.get_extension(@__MODULE__, :CircuitscapeAMGXExt) === nothing &&
+            error("solver = amgx requires the AMGX.jl package extension: install AMGX " *
+                  "and run `using AMGX` before computing.")
+        @info("Solver used: AMGX (GPU)")
+        bs = cfg.cholmod_batch_size
+        return AMGXSolver(bs)
     else
         error("Unknown solver: $s")
     end
 end
 
 const DirectSolver = Union{CholmodSolver, PardisoSolver, AccelerateSolver}
+
+# Solvers that build one handle per component (a factorization, or the AMGX
+# GPU hierarchy) and solve batches of right-hand sides through
+# `solve_linear_system!` against it.
+const BatchedSolver = Union{DirectSolver, AMGXSolver}
 
 """
     PairJob
@@ -351,7 +378,11 @@ function solve(prob::GraphProblem{T,V}, solver::Solver, cfg, log)::Matrix{T} whe
             end
         end
 
-        solve_pairs!(handle_pair, handle, solver, matrix, groups, cfg, log, pair_label)
+        try
+            solve_pairs!(handle_pair, handle, solver, matrix, groups, cfg, log, pair_label)
+        finally
+            release!(handle)
+        end
 
         if get_shortcut_resistances
             idx = first(positions[csub[1]])
@@ -415,6 +446,27 @@ end
 prepare!(solver::DirectSolver, matrix) =
     @timeit CSTIMER[] "construct cholesky factor" construct_cholesky_factor(matrix, solver)
 
+prepare!(solver::AMGXSolver, matrix) =
+    @timeit CSTIMER[] "construct AMGX solver" construct_amgx_solver(matrix, solver)
+
+"""
+    construct_amgx_solver(matrix, solver::AMGXSolver)
+
+Upload `matrix` to the GPU and build the AMGX hierarchy for it. Defined by
+the AMGX.jl package extension; the handle it returns must be passed to
+[`release!`](@ref) once its solves are done.
+"""
+function construct_amgx_solver end
+
+"""
+    release!(handle)
+
+Free what [`prepare!`](@ref) allocated outside Julia's garbage collector once
+a component is solved. A no-op except for the AMGX handle, whose GPU objects
+must be destroyed explicitly.
+"""
+release!(handle) = nothing
+
 """
     solve_pairs!(handle_pair, handle, solver, matrix, groups, cfg, log, pair_label)
 
@@ -469,7 +521,7 @@ function solve_pairs!(handle_pair, P, ::AMGSolver, matrix::SparseMatrixCSC{T},
     nothing
 end
 
-function solve_pairs!(handle_pair, factor, solver::DirectSolver, matrix::SparseMatrixCSC{T},
+function solve_pairs!(handle_pair, factor, solver::BatchedSolver, matrix::SparseMatrixCSC{T},
                       groups, cfg, log, pair_label) where T
 
     jobs = collect(Iterators.flatten(groups))
@@ -499,7 +551,7 @@ function solve_pairs!(handle_pair, factor, solver::DirectSolver, matrix::SparseM
 
         log && @debug("Solving a batch of $m pairs: " * pair_label(first(batch)) *
                       " to " * pair_label(last(batch)))
-        solve_linear_system!(lhs, factor, matrix, rhs; tol, resid)
+        @timeit CSTIMER[] "solve linear system" solve_linear_system!(lhs, factor, matrix, rhs; tol, resid)
 
         # Clear the ±1 entries so the buffer is all zeros for the next batch,
         # which is cheaper than zeroing the n × bs buffer again.

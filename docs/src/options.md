@@ -85,10 +85,10 @@ All Circuitscape configuration is done through an `.ini` file. Below is a comple
 
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|
-| `solver` | String | `cg+amg` | Linear solver to use. Values: `cg+amg` (iterative, recommended for large grids), `cholmod` (direct, uses more memory), `accelerate` (direct, macOS only, requires [AppleAccelerate.jl](https://github.com/JuliaLinearAlgebra/AppleAccelerate.jl)), `pardiso` (direct, requires [Pardiso.jl](https://github.com/JuliaSparse/Pardiso.jl)). Also accepted: `amg+cg`, `cholesky`, `cholfact`, `mklpardiso`, `apple_accelerate`. Any other value is an error. |
-| `precision` | String | `double` | Floating-point precision. Values: `double`, `single` (either case). Single precision is supported and tested for `cg+amg`, `cholmod` and `accelerate`; `pardiso` is double-only and switches to double with a warning. See the accuracy note under *Convergence Checks* in [On Solvers and Computation Time](compute.md). |
+| `solver` | String | `cg+amg` | Linear solver to use. Values: `cg+amg` (iterative, recommended for large grids), `cholmod` (direct, uses more memory), `accelerate` (direct, macOS only, requires [AppleAccelerate.jl](https://github.com/JuliaLinearAlgebra/AppleAccelerate.jl)), `pardiso` (direct, requires [Pardiso.jl](https://github.com/JuliaSparse/Pardiso.jl)), `amgx` (iterative on an NVIDIA GPU, requires [AMGX.jl](https://github.com/JuliaGPU/AMGX.jl)). Also accepted: `amg+cg`, `cholesky`, `cholfact`, `mklpardiso`, `apple_accelerate`, `AMGX`. Any other value is an error. |
+| `precision` | String | `double` | Floating-point precision. Values: `double`, `single` (either case). Single precision is supported and tested for `cg+amg`, `cholmod`, `accelerate` and `amgx`; `pardiso` is double-only and switches to double with a warning. See the accuracy note under *Convergence Checks* in [On Solvers and Computation Time](compute.md). |
 | `use_64bit_indexing` | Boolean | `False` | If `True`, always use 64-bit integer indices for node numbers and the sparse matrices. If `False`, 32-bit indices are used whenever the input fits (fewer than 100 million cells or network nodes with `cg+amg`, fewer than 8 million with the direct solvers whose Cholesky factor must fit 32-bit indices too, and a network's twice-edge count below 2^31), and 64-bit indices otherwise. 32-bit indices halve the memory of the graph's index arrays, the connected components, the AMG hierarchy and the index arrays of the CHOLMOD factor; the results are identical. |
-| `cholmod_batch_size` | Integer | `32` | Number of right-hand sides the direct solvers (`cholmod`, `pardiso`, `accelerate`) solve at once in pairwise mode. Postprocessing of each batch runs across threads. Ignored by `cg+amg`. |
+| `cholmod_batch_size` | Integer | `32` | Number of right-hand sides the direct solvers (`cholmod`, `pardiso`, `accelerate`) and `amgx` solve per batch in pairwise mode. Postprocessing of each batch runs across threads. Ignored by `cg+amg`. |
 | `residual_tolerance` | Float | `auto` | Every linear solve is accepted only if its true relative residual `‖Gv − b‖ / ‖b‖` is below this. `auto` means `1e-4` in double precision and `1e-3` in single. With `cg+amg`, a solve that stops short is retried with tighter Krylov tolerances before the run is aborted. |
 | `parallelize` | Boolean | `False` | If `True`, run pair solves (or per-focal-node solves) in parallel using Julia threads. Start Julia with `julia -t N` for N threads; see *Parallelism* below. |
 | `low_memory_mode` | Boolean | `False` | Circuitscape 4 option, not implemented in Circuitscape.jl. Setting it to `True` is an error so that it cannot be relied on silently. |
@@ -120,7 +120,7 @@ Since 6.0 a configuration is checked in full before any data is read, and a prob
 **Values.** `solver`, `scenario`, `data_type`, `precision`, `log_level`, `remove_src_or_gnd` and every boolean option accept only the values listed in the tables above. Anything else is an error naming the key and the valid values. In earlier versions `solver = cholmodd` ran `cg+amg`, `scenario = pairwsie` ran pairwise and `write_cur_maps = Ture` wrote nothing; each of these is now refused:
 
 ```
-ArgumentError: solver = "cholmodd" is not recognised; expected one of: cg+amg, cholmod, pardiso, accelerate
+ArgumentError: solver = "cholmodd" is not recognised; expected one of: cg+amg, cholmod, pardiso, accelerate, amgx
 ArgumentError: write_cur_maps = "Ture" is not recognised; expected one of: True, False
 ```
 
