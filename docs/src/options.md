@@ -4,7 +4,7 @@
 
 All Circuitscape configuration is done through an `.ini` file. Below is a complete reference of all arguments, organized by section, with their types, default values, and descriptions.
 
-The file is read as Circuitscape 4 read it. Each line is `key = value` or `key: value`. Blank lines and lines starting with `#` or `;` are skipped. Section headers such as `[Calculation options]` lay out the file but do not affect how it is read, so a key may appear under any section. Any other line is an error naming the file and line number.
+The file is read as Circuitscape 4 read it. Each line is `key = value` or `key: value`. Blank lines and lines starting with `#` or `;` are skipped, and a `;` after a space or tab starts a comment, as in `solver = cholmod ; faster`. Section headers such as `[Calculation options]` lay out the file but do not affect how it is read, so a key may appear under any section. Any other line is an error naming the file and line number.
 
 Keys and option values are case-insensitive: `solver = CHOLMOD`, `Solver = cholmod` and `write_cur_maps = TRUE` all work, in an INI file or in a dictionary passed to `compute`. File paths keep their case.
 

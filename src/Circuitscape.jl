@@ -2,6 +2,7 @@ module Circuitscape
 using AlgebraicMultigrid
 using Krylov
 using GZip
+using IniFile: IniFile, Inifile, merged
 
 using LinearAlgebra
 using SparseArrays
