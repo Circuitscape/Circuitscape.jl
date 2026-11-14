@@ -57,8 +57,31 @@ struct RasterData{T,V} <: Data
     hbmeta::RasterMeta
 end
 
+"""
+    read_network_table(path, T) -> Matrix{T}
+
+A whitespace-delimited numeric table as Circuitscape 4's `load_graph` reads
+it (csio.py): lines starting with `#` are comments, and a file that does not
+parse as whitespace-delimited is read again as comma-delimited. Used for the
+network edge list and the network focal node list.
+"""
+function read_network_table(path::String, ::Type{T}) where {T}
+    isfile(path) || throw(ArgumentError("Network file \"$path\" does not exist"))
+    try
+        readdlm(path, T; comments = true, comment_char = '#')
+    catch
+        try
+            readdlm(path, ',', T; comments = true, comment_char = '#')
+        catch
+            throw(ArgumentError("Error reading network file \"$path\": expected whitespace- or comma-delimited numeric columns (lines starting with # are ignored)"))
+        end
+    end
+end
+
 function load_graph(V, gpath::String, ::Type{T}) where {T}
-    g = readdlm(gpath, T)
+    g = read_network_table(gpath, T)
+    size(g, 2) >= 3 ||
+        throw(ArgumentError("Network file \"$gpath\" must have three columns (node, node, value); found $(size(g, 2))"))
     i = zeros(V, size(g, 1))
     j = zeros(V, size(g, 1))
     v = zeros(T, size(g, 1))
@@ -83,19 +106,37 @@ function load_graph(V, gpath::String, ::Type{T}) where {T}
     i,j,v, min_node==0
 end
 
-function read_focal_points(V, path::String) 
-	ret = try 
-			vec(readdlm(path, V)) 
-		catch
-			vec(V.(readdlm(path)))
-		end
-	minimum(ret) == 0 && (ret .+= 1)
-	ret
+"""
+    read_focal_points(V, path, starts_from_zero; is_graph = false) -> Vector{V}
+
+The focal node ids of a network, sorted and without duplicates (Circuitscape
+4 takes `np.unique` of the file). Circuitscape 4 matches focal ids to the
+graph's node names, so the ids are shifted to 1-based exactly when the graph
+was (`starts_from_zero` from [`load_graph`](@ref)) and never inferred from
+the list itself: a 0-based graph with focal list `1, 3` names the original
+nodes 1 and 3. With `is_graph = true` the file is the edge list itself and
+only its two node columns are read, so every node of the graph is focal.
+"""
+function read_focal_points(V, path::String, starts_from_zero::Bool; is_graph::Bool = false)
+    table = read_network_table(path, Float64)
+    is_graph && (table = table[:, 1:min(2, size(table, 2))])
+    ret = vec(V.(table))
+    starts_from_zero && (ret .+= 1)
+    sort!(unique!(ret))
 end
 
-function read_point_strengths(T, path::String, starts_from_zero) 
+"""
+    read_point_strengths(T, path, starts_from_zero) -> Matrix{T}
+
+The source or ground list of a network advanced run: two columns,
+`id strength`. The ids are shifted to 1-based exactly when `starts_from_zero`
+is set, i.e. when the network graph was 0-based; as with focal nodes the
+shift is never inferred from the list itself (Circuitscape 4 matches the ids
+against the graph's node names). Raster variable source strengths are read by
+[`read_variable_strengths`](@ref) instead.
+"""
+function read_point_strengths(T, path::String, starts_from_zero::Bool)
 	str = readdlm(path, T)
-	starts_from_zero = minimum(str[:,1]) == 0 || starts_from_zero 
 	starts_from_zero && (str[:,1] .+= 1)
 	str
 end
@@ -120,8 +161,8 @@ end
     read_reclass_table(T, path)
 
 Two whitespace-separated columns, `old new`, one pair per line. Applied to the
-habitat raster's values as read from the file, i.e. before any conversion
-between resistance and conductance (issue #231).
+habitat raster's values, or a network's edge values, as read from the file,
+i.e. before any conversion between resistance and conductance (issue #231).
 """
 function read_reclass_table(::Type{T}, path::String) where {T}
     table = readdlm(path, T)
@@ -130,11 +171,22 @@ function read_reclass_table(::Type{T}, path::String) where {T}
     table
 end
 
-function reclassify!(cell_map::Matrix{T}, table::Matrix{T}) where {T}
-    # A single lookup so that chained rows (1 -> 2, 2 -> 3) do not compound:
-    # applying them one after the other would send 1 to 3.
+"""
+    reclassify!(values, table)
+
+Apply a reclass table in place as a single lookup: every value equal to an
+`old` entry becomes the matching `new`, other values are left alone. Chained
+rows do not compound, so `1 -> 2, 2 -> 3` sends 1 to 2, not to 3, whatever the
+order of the rows. `values` is a habitat raster or a network's edge values.
+
+Circuitscape 4 applied the rows one after another in ascending order of old
+value, so chained rows compounded there; that made the result depend on how
+the old and new values happened to be ordered (`1 -> 2, 2 -> 3` sent 1 to 3,
+but `2 -> 1, 1 -> 5` sent 2 only to 1) and is deliberately not reproduced (#231).
+"""
+function reclassify!(values::AbstractArray{T}, table::Matrix{T}) where {T}
     lookup = Dict{T,T}(table[i,1] => table[i,2] for i in axes(table, 1))
-    map!(x -> get(lookup, x, x), cell_map, cell_map)
+    map!(x -> get(lookup, x, x), values, values)
 end
 
 function read_cellmap(habitat_file::String, is_res::Bool, ::Type{T};
@@ -533,12 +585,24 @@ function _get_network_data(T, V, cfg, (i, j, v), starts_from_zero)::NetworkData{
 
     is_pairwise = cfg.scenario == sc_pairwise
 
+    # Reclassify the edge values as read, before any resistance-to-conductance
+    # conversion, as Circuitscape 4 does for networks too (compute.py read_graph).
+    if cfg.use_reclass_table
+        reclassify!(v, read_reclass_table(T, cfg.reclass_file))
+        @info("Reclassified network graph using $(cfg.reclass_file)")
+    end
+
     if hab_is_res
+        any(iszero, v) &&
+            throw(ArgumentError("zero resistance values are not currently allowed in network/graph input file $(cfg.habitat_file)"))
         v = 1 ./ v
     end
 
     if is_pairwise
-        fp = read_focal_points(V, fp_file)
+        # As in Circuitscape 4, the edge list can double as the focal node
+        # list (every node is focal); its value column is then not a node id.
+        fp = read_focal_points(V, fp_file, starts_from_zero;
+                               is_graph = fp_file == cfg.habitat_file)
     else
         fp = V[]
     end
