@@ -143,7 +143,9 @@ function advanced_kernel(prob::AdvancedProblem{T,V}, cfg;
             continue
         end
 
-        a_local = G[c,c]
+        # A component spanning the whole graph is the graph: no local copies.
+        whole = length(c) == size(G, 1)
+        a_local = whole ? G : G[c,c]
         s_local = sources[c]
         g_local = grounds[c]
 
@@ -160,7 +162,7 @@ function advanced_kernel(prob::AdvancedProblem{T,V}, cfg;
         voltages[c] .+= multiple_solver(cfg, prob.solver, a_local, s_local, g_local, f_local)
         solver_called = true
 
-        local_geometry = restrict(geometry, c)
+        local_geometry = whole && is_raster(geometry) ? geometry : restrict(geometry, c)
         write_v_maps && accum_voltages!(outvolt, voltages[c], local_geometry)
         accumulate_currents && accum_currents!(outcurr, a_local, voltages[c], f_local, local_geometry)
     end
