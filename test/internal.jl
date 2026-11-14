@@ -187,10 +187,17 @@ end
 
 import Circuitscape: resolve_conflicts
 
-@test resolve_conflicts([1.,0.,0.], [1.,0.,0.], :rmvgnd) == ([1, 0, 0], [0, 0, 0], [1, 0, 0])
+# The finite grounds are those left after the conflicts are resolved (a
+# removed ground does not stay on the solver diagonal), and rmvall removes
+# both sides; -9999 marks "no finite grounds".
+@test resolve_conflicts([1.,0.,0.], [1.,0.,0.], :rmvgnd) == ([1, 0, 0], [0, 0, 0], [-9999])
 @test resolve_conflicts([1.,0.,0.], [1.,0.,0.], :rmvsrc) == ([0, 0, 0], [1, 0, 0], [1, 0, 0])
 @test resolve_conflicts([1.,0.,0.], [1.,0.,0.], :keepall) == ([1, 0, 0], [1, 0, 0], [1, 0, 0])
-@test resolve_conflicts([1.,0.,0.], [1.,0.,0.], :rmvall) == ([0, 0, 0], [1, 0, 0], [1, 0, 0])
+@test resolve_conflicts([1.,0.,0.], [1.,0.,0.], :rmvall) == ([0, 0, 0], [0, 0, 0], [-9999])
+@test resolve_conflicts([1.,1.,0.], [1.,0.,2.], :rmvgnd) == ([1, 1, 0], [0, 0, 2], [0, 0, 2])
+@test resolve_conflicts([1.,1.,0.], [1.,0.,2.], :rmvall) == ([0, 1, 0], [0, 0, 2], [0, 0, 2])
+# A direct ground under a source is removed whatever the source's sign
+@test resolve_conflicts([-1.,1.,0.], [Inf,0.,2.], :keepall) == ([-1, 1, 0], [0, 0, 2], [0, 0, 2])
 
 # Construct graph
 import Circuitscape: construct_graph
@@ -600,6 +607,37 @@ end
     p2 = Circuitscape.build_problem(data, cfg)
     @test data.ground_map[1, 2] == 4.0
     @test p1.grounds == p2.grounds && maximum(p1.grounds) ≈ 0.25
+
+    # Network conflicts are resolved on the nodes only. rmvgnd takes the
+    # ground off the solver diagonal too, and rmvall removes both sides (Python
+    # keeps the finite ground under rmvgnd and the ground under rmvall here).
+    write(joinpath(dir, "nsrc12.txt"), "1\t1.0\n2\t1.0\n")
+    write(joinpath(dir, "ngnd13.txt"), "1\t4.0\n3\t1.0\n")
+    write(joinpath(dir, "nsrc2.txt"), "2\t1.0\n")
+    write(joinpath(dir, "ngnd3.txt"), "3\t1.0\n")
+    function netrun(src, gnd, pol)
+        dd = copy(d)
+        dd["source_file"] = joinpath(dir, src); dd["ground_file"] = joinpath(dir, gnd)
+        dd["remove_src_or_gnd"] = pol
+        compute(dd)
+    end
+    @test netrun("nsrc12.txt", "ngnd13.txt", "rmvgnd") ≈ netrun("nsrc12.txt", "ngnd3.txt", "keepall")
+    @test netrun("nsrc12.txt", "ngnd13.txt", "rmvall") ≈ netrun("nsrc2.txt", "ngnd3.txt", "keepall")
+    @test netrun("nsrc12.txt", "ngnd13.txt", "rmvsrc") ≈ netrun("nsrc2.txt", "ngnd13.txt", "keepall")
+    # A component left with no source is an error in advanced mode
+    @test_throws ErrorException("All sources conflicted with grounds and were removed. There is nothing to solve.") netrun(
+        "nsrc.txt", "ngnd13.txt", "rmvsrc")
+
+    # One-to-all / all-to-one: a focal node short-circuited to every other
+    # focal node (here by a polygon) has nothing to solve and reports -1, as
+    # a lone focal node does, instead of ending the run.
+    write(joinpath(dir, "pts.asc"), asc([[1, 2, -9999], [-9999, -9999, -9999], [-9999, -9999, -9999]]))
+    write(joinpath(dir, "poly.asc"), asc([[5, 5, -9999], [-9999, -9999, -9999], [-9999, -9999, -9999]]))
+    for sc in ("one-to-all", "all-to-one")
+        dd = config(scenario = sc, point_file = joinpath(dir, "pts.asc"),
+                    use_polygons = "True", polygon_file = joinpath(dir, "poly.asc"))
+        @test compute(dd) == [1 -1; 2 -1]
+    end
 end
 
 # Issue 470: the residual gate is configurable, and an unreachable tolerance

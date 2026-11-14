@@ -21,7 +21,7 @@ end
 
 """
     sources_and_grounds(geometry, source_map, ground_map, G, cfg, conflict_policy = policy(cfg);
-                        cc = nothing, check_node = -1)
+                        cc = nothing)
 
 Source and ground vectors over the graph nodes from the user's source and
 ground inputs, with conflicts between the two resolved by `conflict_policy`.
@@ -29,10 +29,12 @@ For a raster the inputs are grids read through the nodemap; for a network
 they are `(node, value)` lists. Given the connected components `cc`, a
 component that had sources and grounds but keeps none of one after the
 conflicts are resolved is an error, as in Python (`compute.resolve_conflicts`
-is run per component there); with `check_node` only its component is checked.
+is run per component there). One-to-all / all-to-one do not pass `cc`: a focal
+node whose solve is left with nothing to solve reports `-1`, as when it is the
+only focal node, rather than ending the whole run.
 """
 function sources_and_grounds(geometry::Geometry, source_map, ground_map, G, cfg,
-                             conflict_policy = policy(cfg); cc = nothing, check_node = -1)
+                             conflict_policy = policy(cfg); cc = nothing)
 
     # Initialize sources and grounds
     sources = zeros(eltype(G), size(G, 1))
@@ -46,7 +48,7 @@ function sources_and_grounds(geometry::Geometry, source_map, ground_map, G, cfg,
         resolve_conflicts(sources, grounds, conflict_policy)
 
     cc === nothing ||
-        check_conflicts_resolved(cc, had_sources, had_grounds, sources, grounds, check_node)
+        check_conflicts_resolved(cc, had_sources, had_grounds, sources, grounds)
 
     sources, grounds, finitegrounds
 end
@@ -54,13 +56,12 @@ end
 # Python resolves conflicts per component and raises when a component that
 # had both sources and grounds is left without one of them; a component that
 # never had both is skipped by the kernel instead.
-function check_conflicts_resolved(cc, had_sources, had_grounds, sources, grounds, check_node)
+function check_conflicts_resolved(cc, had_sources, had_grounds, sources, grounds)
     for c in cc
-        check_node != -1 && !(check_node in c) && continue
-        any(had_sources[c]) && any(had_grounds[c]) || continue
-        any(!iszero, sources[c]) || throw(ErrorException(
+        any(i -> had_sources[i], c) && any(i -> had_grounds[i], c) || continue
+        any(i -> !iszero(sources[i]), c) || throw(ErrorException(
             "All sources conflicted with grounds and were removed. There is nothing to solve."))
-        any(!iszero, grounds[c]) || throw(ErrorException(
+        any(i -> !iszero(grounds[i]), c) || throw(ErrorException(
             "All grounds conflicted with sources and were removed. There is nothing to solve."))
     end
     nothing
@@ -96,34 +97,35 @@ function fill_sources_and_grounds!(sources, grounds, source_map, ground_map, cfg
     nothing
 end
 
+# Resolve the nodes that are both a source and a ground by `policy`, then
+# drop any direct ground still under a source. Python's node-level pass
+# (`compute.resolve_conflicts`) differs on purpose in two ways that only show
+# where its read-time cell pass did not already resolve the conflict (network
+# inputs, cells merged into one node by polygons): its `rmvall` removes only
+# the source, and it takes the finite grounds before resolving, so a ground
+# removed by `rmvgnd` stays on the solver diagonal. Here `rmvall` removes both,
+# as its name and the Circuitscape 4 GUI ("Remove both source and ground")
+# say, and the finite grounds are the grounds that remain.
 function resolve_conflicts(sources::Vector{T},
                             grounds::Vector{T}, policy) where T
 
-    l = size(sources, 1)
+    conflicts = map((s, g) -> !iszero(s) && !iszero(g), sources, grounds)
 
-    finitegrounds = map(x -> x < T(Inf) ? x : T(0.), grounds)
-    if count(x -> x != 0, finitegrounds) == 0
-        finitegrounds = T.([-9999.])
+    if policy == :rmvsrc || policy == :rmvall
+        sources[conflicts] .= 0
+    end
+    if policy == :rmvgnd || policy == :rmvall
+        grounds[conflicts] .= 0
     end
 
-    conflicts = falses(l)
-    for i = 1:l
-        conflicts[i] = sources[i] != 0 && grounds[i] != 0
-    end
-
-    if any(conflicts)
-        if policy == :rmvsrc
-            sources[findall(x->x!=0,conflicts)] .= 0
-        elseif policy == :rmvgnd
-            grounds[findall(x->x!=0,conflicts)] .= 0
-        elseif policy == :rmvall
-            sources[findall(x->x!=0,conflicts)] .= 0
-        end
-    end
-
-    infgrounds = map(x -> x == Inf, grounds)
-    infconflicts = map((x,y) -> x > 0 && y > 0, infgrounds, sources)
+    # A direct ground under a source (of either sign) is removed, as in Python.
+    infconflicts = map((s, g) -> !iszero(s) && g == T(Inf), sources, grounds)
     grounds[infconflicts] .= 0
+
+    finitegrounds = map(x -> x < T(Inf) ? x : T(0), grounds)
+    if !any(!iszero, finitegrounds)
+        finitegrounds = T[-9999]
+    end
 
     sources, grounds, finitegrounds
 end
