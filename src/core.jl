@@ -770,30 +770,37 @@ Preconditioned CG. Krylov's stopping test is on the *preconditioned* residual
 `sqrt(r' M⁻¹ r)`, while the result is accepted on the true 2-norm relative
 residual. When the AMG preconditioner is a poor fit for a component the two
 diverge: CG reports success in its own norm while the true residual is still
-above `tol` (issue #470). Rather than abort a multi-hour job on one such
-solve, tighten the stopping tolerances and retry; solves that pass first time
+above `tol` (issue #470). This is the rule rather than the exception for a
+grounded window, as Omniscape solves: there CG stops after about 28
+iterations at a true residual near 1e-3. Rather than abort, CG is restarted
+from the solution it returned and asked for a further 100-fold reduction;
+that takes about 7 more iterations, where restarting from zero with a tighter
+`rtol` repeated the whole solve (34 iterations). Solves that pass first time
 are unaffected.
 """
 function solve_linear_system(
             G::SparseMatrixCSC{T,V},
             curr::Vector{T}, M; tol = TOL_DOUBLE)::Vector{T} where {T,V}
     # Krylov's own default for atol; in Float32 it is ~3e-4 and is what
-    # actually stops CG, so it has to be tightened along with rtol.
+    # actually stops CG, so it has to be tightened on every retry.
     atol = sqrt(eps(T))
     rtol = T === Float32 ? T(1e-5) : T(1e-6)
-    local v, stats, residual
-    for attempt in 1:3
-        v, stats = Krylov.cg(G, curr, M=M, ldiv=true, atol=atol, rtol=rtol, itmax=100_000)
-        residual = norm(G*v .- curr) / norm(curr)
+    v, stats = Krylov.cg(G, curr, M=M, ldiv=true, atol=atol, rtol=rtol, itmax=100_000)
+    residual = norm(G*v .- curr) / norm(curr)
+    iters = stats.niter
+    for retry in 1:2
         residual < tol && return v
-        attempt < 3 && @warn("CG stopped after $(stats.niter) iterations ($(stats.status)) " *
-                             "but the relative residual $residual exceeds $tol; " *
-                             "retrying with rtol = $(rtol / 100)")
+        @debug("CG stopped after $(stats.niter) iterations ($(stats.status)) but the " *
+               "relative residual $residual exceeds $tol; continuing from that solution")
+        # Restarted from `v`, rtol is relative to the residual of `v`.
         atol /= 100
-        rtol /= 100
+        v, stats = Krylov.cg(G, curr, v; M=M, ldiv=true, atol=atol, rtol=T(1e-2), itmax=100_000)
+        residual = norm(G*v .- curr) / norm(curr)
+        iters += stats.niter
     end
+    residual < tol && return v
     error("CG solver did not converge: relative residual $residual exceeds tolerance $tol " *
-          "after 3 attempts (last rtol = $(rtol * 100), $(stats.niter) iterations, $(stats.status))")
+          "after 3 attempts ($iters iterations in all, last status $(stats.status))")
 end
 
 """
