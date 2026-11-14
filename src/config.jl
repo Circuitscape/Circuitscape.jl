@@ -11,6 +11,8 @@ Typed, immutable configuration for one Circuitscape run: one field per INI key,
 with the INI's string values parsed into enums, booleans and numbers. Built by
 `parse_config(path)` or `CSConfig(dict::Dict{String,String})`; every parser
 rejects values it does not recognise rather than falling back to a default.
+Keys and option values are case-insensitive (see [`normalize_config`](@ref));
+file paths keep their case.
 `Dict{String,String}(cfg)` converts back to INI strings, and
 `CSConfig(cfg; field = value, ...)` returns a copy with fields replaced.
 
@@ -76,8 +78,35 @@ end
 _bad_value(key, val, valid) =
     throw(ArgumentError("$key = \"$val\" is not recognised; expected one of: $(join(valid, ", "))"))
 
+# Keys whose values are paths or free text and keep their case; every other
+# value is lowercased by `normalize_config` before it is parsed.
+const CASE_SENSITIVE_KEYS = Set(["version", "habitat_file", "polygon_file", "source_file",
+    "ground_file", "mask_file", "variable_source_file", "included_pairs_file", "point_file",
+    "reclass_file", "output_file", "log_file"])
+
+"""
+    normalize_config(dict) -> Dict{String,String}
+
+`dict` with every key lowercased and stripped, and every value stripped and,
+unless it is a path or free text (`CASE_SENSITIVE_KEYS`), lowercased, so that
+`solver = CHOLMOD`, `Solver = cholmod` and `write_cur_maps = TRUE` all parse.
+"""
+function normalize_config(dict)
+    d = Dict{String,String}()
+    for (k, v) in dict
+        key = lowercase(strip(k))
+        val = String(strip(v))
+        val = key in CASE_SENSITIVE_KEYS ? val : lowercase(val)
+        haskey(d, key) && d[key] != val &&
+            throw(ArgumentError("configuration key $key is given twice, in different case, " *
+                                "with different values: \"$(d[key])\" and \"$val\""))
+        d[key] = val
+    end
+    d
+end
+
 function _parse_bool(dict, key, default="false")
-    v = get(dict, key, default)
+    v = lowercase(get(dict, key, default))
     v in TRUELIST && return true
     v in FALSELIST && return false
     _bad_value(key, v, ["True", "False"])
@@ -110,7 +139,7 @@ function _parse_precision(s)
     s in DOUBLE ? pr_double : _bad_value("precision", s, ["single", "double"])
 end
 
-_parse_tolerance(s) = s in ("auto", "Auto", "AUTO", "None", "") ? 0.0 : parse(Float64, s)
+_parse_tolerance(s) = lowercase(s) in ("auto", "none", "") ? 0.0 : parse(Float64, s)
 _tolerance_str(v) = v > 0 ? string(v) : "auto"
 
 function _parse_log_level(s)
@@ -133,6 +162,7 @@ function _parse_remove_policy(s)
 end
 
 function CSConfig(dict::Dict{String,String})
+    dict = normalize_config(dict)
     unknown = setdiff(keys(dict), keys(init_config()))
     isempty(unknown) ||
         @warn("Ignoring unrecognised configuration keys: $(join(sort!(collect(unknown)), ", "))")
@@ -156,7 +186,7 @@ function CSConfig(dict::Dict{String,String})
         mask_file = get(dict, "mask_file", ""),
         solver = _parse_solver(get(dict, "solver", "cg+amg")),
         parallelize = _parse_bool(dict, "parallelize"),
-        precision = _parse_precision(get(dict, "precision", "Double")),
+        precision = _parse_precision(get(dict, "precision", "double")),
         use_64bit_indexing = _parse_bool(dict, "use_64bit_indexing", "false"),
         cholmod_batch_size = parse(Int, get(dict, "cholmod_batch_size", "32")),
         residual_tolerance = _parse_tolerance(get(dict, "residual_tolerance", "auto")),
@@ -180,7 +210,7 @@ function CSConfig(dict::Dict{String,String})
         compress_grids = _parse_bool(dict, "compress_grids"),
         log_transform_maps = _parse_bool(dict, "log_transform_maps"),
         write_as_tif = _parse_bool(dict, "write_as_tif"),
-        log_file = let v = get(dict, "log_file", "None"); v == "None" ? "" : v end,
+        log_file = let v = get(dict, "log_file", "None"); lowercase(v) == "none" ? "" : v end,
         log_level = _parse_log_level(get(dict, "log_level", "INFO")),
         suppress_messages = _parse_bool(dict, "suppress_messages"),
     )
@@ -388,7 +418,8 @@ end
 
 Read a Circuitscape INI file. Section headers are ignored; every `key = value`
 line is parsed on top of the defaults from [`init_config`](@ref), so keys that
-are absent take their default value. Unrecognised values for `solver`,
+are absent take their default value. Keys and option values are
+case-insensitive; file paths keep their case. Unrecognised values for `solver`,
 `scenario`, `data_type`, `precision`, `log_level`, `remove_src_or_gnd` and any
 boolean raise an `ArgumentError` naming the key; unknown keys produce a
 warning and are ignored. File existence is not checked here but in
@@ -402,7 +433,7 @@ function parse_config(path::String)
             continue
         end
         idx = something(findfirst(isequal('='), i), 0)
-        var = rstrip(i[1:idx-1])
+        var = lowercase(strip(i[1:idx-1]))
         val = strip(i[idx+1:end])
         cf[var] = val
     end
@@ -491,7 +522,7 @@ values are parsed or checked here (that happens in `CSConfig(cfg)`).
 """
 function update!(cfg, new)
     for (key,val) in new
-        cfg[key] = val
+        cfg[lowercase(strip(key))] = val
     end
 end
 

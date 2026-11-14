@@ -1,27 +1,29 @@
 # Various constants used to determine problem type
 
-const RASTER = ["raster", "Raster"]
-const NETWORK = ["network", "Network"]
-const PAIRWISE = ["pairwise", "Pairwise"]
-const ADVANCED = ["advanced", "Advanced"]
+# Option values are lowercased before they are matched (see `CSConfig`), so
+# these lists hold lowercase spellings only.
+const RASTER = ["raster"]
+const NETWORK = ["network"]
+const PAIRWISE = ["pairwise"]
+const ADVANCED = ["advanced"]
 const ONETOALL = ["one-to-all", "one_to_all"]
 const ALLTOONE = ["all-to-one", "all_to_one"]
-const SINGLE = ["single", "Single"]
-const DOUBLE = ["double", "Double"]
+const SINGLE = ["single"]
+const DOUBLE = ["double"]
 
 # Solver constants
 const AMG = ["cg+amg", "amg+cg"]
 const CHOLMOD = ["cholmod", "cholesky", "cholfact"]
-const PARDISO = ["mklpardiso", "MKLPardiso", "PARDISO", "pardiso"]
-const ACCELERATE = ["accelerate", "Accelerate", "ACCELERATE", "apple_accelerate"]
+const PARDISO = ["mklpardiso", "pardiso"]
+const ACCELERATE = ["accelerate", "apple_accelerate"]
 
 # Constants used in IO
 const AAGRID = 2
 const TXTLIST = 3
 const PAIRS_AAGRID = 4
 const PAIRS_LIST = 5
-const TRUELIST = ["True", "true", "1"]
-const FALSELIST = ["False", "false", "0"]
+const TRUELIST = ["true", "1"]
+const FALSELIST = ["false", "0"]
 
 const FILE_TYPE_NPY = 1
 const FILE_TYPE_AAGRID = 2
