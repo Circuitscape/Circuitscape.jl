@@ -23,6 +23,11 @@ that can require action when upgrading.
   `Pkg.add("ArchGDAL")` once, then `using ArchGDAL` before `using Circuitscape`
   whenever a job names a `.tif` or sets `write_as_tif = True`. ESRI ASCII grids
   need nothing extra.
+- **A line in an INI file that is not `key = value` is an error.** Comment
+  lines (`#` or `;`), blank lines and section headers are skipped, and
+  `key: value` and keys in any case are read, as in Circuitscape 4. Any
+  other line, such as `precision single`, was silently dropped and now
+  stops the run, naming the file and line.
 - **`low_memory_mode` and `preemptive_memory_release` set to `True` are
   errors.** These Circuitscape 4 options were never implemented here; remove
   them or set them to `False`.

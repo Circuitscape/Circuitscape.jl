@@ -34,6 +34,7 @@ check or write INI files without running them.
 ```@docs
 Circuitscape.parse_config
 Circuitscape.CSConfig
+Circuitscape.normalize_config
 Circuitscape.validate
 Circuitscape.write_config
 Circuitscape.output_prefix

@@ -39,7 +39,7 @@ function _run(cfg, input_ini = nothing)
         @warn("Pardiso solver works only in double precision. Switching precision to double.")
         T = Float64
     end
-    @info("Precision used: $(_precision_str(cfg.precision))")
+    @info("Precision used: $(_to_ini(cfg.precision))")
     if cfg.parallelize
         @info("Starting up Circuitscape to use $(Threads.nthreads()) threads in parallel")
     end

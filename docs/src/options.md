@@ -4,6 +4,10 @@
 
 All Circuitscape configuration is done through an `.ini` file. Below is a complete reference of all arguments, organized by section, with their types, default values, and descriptions.
 
+The file is read as Circuitscape 4 read it. Each line is `key = value` or `key: value`. Blank lines and lines starting with `#` or `;` are skipped. Section headers such as `[Calculation options]` lay out the file but do not affect how it is read, so a key may appear under any section. Any other line is an error naming the file and line number.
+
+Keys and option values are case-insensitive: `solver = CHOLMOD`, `Solver = cholmod` and `write_cur_maps = TRUE` all work, in an INI file or in a dictionary passed to `compute`. File paths keep their case.
+
 ### Circuitscape Mode
 
 | Argument | Type | Default | Description |
@@ -85,8 +89,8 @@ All Circuitscape configuration is done through an `.ini` file. Below is a comple
 
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|
-| `solver` | String | `cg+amg` | Linear solver to use. Values: `cg+amg` (iterative, recommended for large grids), `cholmod` (direct, uses more memory), `accelerate` (direct, macOS only, requires [AppleAccelerate.jl](https://github.com/JuliaLinearAlgebra/AppleAccelerate.jl)), `pardiso` (direct, requires [Pardiso.jl](https://github.com/JuliaSparse/Pardiso.jl)), `amgx` (iterative on an NVIDIA GPU, requires [AMGX.jl](https://github.com/JuliaGPU/AMGX.jl)). Also accepted: `amg+cg`, `cholesky`, `cholfact`, `mklpardiso`, `apple_accelerate`, `AMGX`. Any other value is an error. |
-| `precision` | String | `double` | Floating-point precision. Values: `double`, `single` (either case). Single precision is supported and tested for `cg+amg`, `cholmod`, `accelerate` and `amgx`; `pardiso` is double-only and switches to double with a warning. See the accuracy note under *Convergence Checks* in [On Solvers and Computation Time](compute.md). |
+| `solver` | String | `cg+amg` | Linear solver to use. Values: `cg+amg` (iterative, recommended for large grids), `cholmod` (direct, uses more memory), `accelerate` (direct, macOS only, requires [AppleAccelerate.jl](https://github.com/JuliaLinearAlgebra/AppleAccelerate.jl)), `pardiso` (direct, requires [Pardiso.jl](https://github.com/JuliaSparse/Pardiso.jl)), `amgx` (iterative on an NVIDIA GPU, requires [AMGX.jl](https://github.com/JuliaGPU/AMGX.jl)). Also accepted: `amg+cg`, `cholesky`, `cholfact`, `mklpardiso`, `apple_accelerate`. Any other value is an error. |
+| `precision` | String | `double` | Floating-point precision. Values: `double`, `single`. Single precision is supported and tested for `cg+amg`, `cholmod`, `accelerate` and `amgx`; `pardiso` is double-only and switches to double with a warning. See the accuracy note under *Convergence Checks* in [On Solvers and Computation Time](compute.md). |
 | `use_64bit_indexing` | Boolean | `False` | If `True`, always use 64-bit integer indices for node numbers and the sparse matrices. If `False`, 32-bit indices are used whenever the input fits (fewer than 100 million cells or network nodes with `cg+amg`, fewer than 8 million with the direct solvers whose Cholesky factor must fit 32-bit indices too, and a network's twice-edge count below 2^31), and 64-bit indices otherwise. 32-bit indices halve the memory of the graph's index arrays, the connected components, the AMG hierarchy and the index arrays of the CHOLMOD factor; the results are identical. |
 | `cholmod_batch_size` | Integer | `32` | Number of right-hand sides the direct solvers (`cholmod`, `pardiso`, `accelerate`) and `amgx` solve per batch in pairwise mode. Postprocessing of each batch runs across threads. Ignored by `cg+amg`. |
 | `residual_tolerance` | Float | `auto` | Every linear solve is accepted only if its true relative residual `‖Gv − b‖ / ‖b‖` is below this. `auto` means `1e-4` in double precision and `1e-3` in single. With `cg+amg`, a solve that stops short is retried with tighter Krylov tolerances before the run is aborted. |
@@ -106,7 +110,7 @@ All Circuitscape configuration is done through an `.ini` file. Below is a comple
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|
 | `log_file` | Path | `None` | Path to log file. If `None`, no file logging. |
-| `log_level` | String | `INFO` | Logging level. Values: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` (case-insensitive; `WARN` is also accepted; `CRITICAL` is treated as `ERROR`). Any other value is an error. `DEBUG` logs every pair solve and prints a timing table at the end of the run. |
+| `log_level` | String | `INFO` | Logging level. Values: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` (`WARN` is also accepted; `CRITICAL` is treated as `ERROR`). Any other value is an error. `DEBUG` logs every pair solve and prints a timing table at the end of the run. |
 | `suppress_messages` | Boolean | `False` | If `True`, suppress informational messages on the console. Warnings and errors are still shown, and a `log_file` still receives everything. |
 
 The Circuitscape 4 keys `profiler_log_file`, `print_timings`, `print_rusages` and `screenprint_log` are accepted without a warning and have no effect.
@@ -142,7 +146,7 @@ ArgumentError: Invalid configuration:
 
 **Unknown keys** produce a warning (`Ignoring unrecognised configuration keys: ...`) and are otherwise ignored, so a misspelt key is visible without breaking old INI files.
 
-**Circuitscape 4 spellings** still work: `remove_src_or_gnd = not entered` means `keepall`, Python log level names (`WARNING`, `CRITICAL`, any case) are read, and `residual_tolerance = None` means automatic.
+**Circuitscape 4 spellings** still work: `remove_src_or_gnd = not entered` means `keepall`, Python log level names (`WARNING`, `CRITICAL`, any case) are read, `residual_tolerance = None` means automatic, and `None` for a file path means not set.
 
 ## Data Type
 
