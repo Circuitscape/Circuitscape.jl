@@ -41,11 +41,12 @@ relative residual `‖Gv − b‖ / ‖b‖` is below `residual_tolerance` (by d
 `1e-4` in double precision and `1e-3` in single). For `cg+amg` there is a subtlety: Krylov's stopping test is on the
 *preconditioned* residual, and when the multigrid preconditioner is a poor fit
 for a particular component the two norms can disagree — CG reports success
-while the true residual is still too large. Circuitscape then tightens the
-Krylov tolerance and retries (up to three attempts) before failing, so a single
-awkward component does not abort a long run. The retry is logged as a warning;
-if you see many of them, the grid probably has extreme resistance contrasts
-worth examining.
+while the true residual is still too large. Circuitscape then continues CG
+from the solution it returned, asking for a further 100-fold reduction (up to
+three attempts in all) before failing, so a single awkward component does not
+abort a long run. This is routine for grounded problems such as Omniscape's
+moving windows and costs a few extra iterations; the retries are logged at
+the debug level.
 
 Single precision (`precision = single`) halves memory at a cost in accuracy
 that depends on the problem: on the largest raster in the test suite,
