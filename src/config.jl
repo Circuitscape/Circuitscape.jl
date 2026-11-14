@@ -11,6 +11,8 @@ Typed, immutable configuration for one Circuitscape run: one field per INI key,
 with the INI's string values parsed into enums, booleans and numbers. Built by
 `parse_config(path)` or `CSConfig(dict::Dict{String,String})`; every parser
 rejects values it does not recognise rather than falling back to a default.
+Keys and option values are case-insensitive (see [`normalize_config`](@ref));
+file paths keep their case.
 `Dict{String,String}(cfg)` converts back to INI strings, and
 `CSConfig(cfg; field = value, ...)` returns a copy with fields replaced.
 
@@ -71,28 +73,29 @@ Base.@kwdef struct CSConfig
     suppress_messages::Bool = false
 end
 
-# The INI spellings each boolean and enumerated value is read from; the first
-# is the one written. Every parser rejects values it does not recognise.
+# The INI spellings each boolean and enumerated value is read from, in any
+# case; the first is the one written. Every parser rejects values it does not
+# recognise.
 # Falling back to a default silently turned typos into different runs:
 # `solver = cholmodd` ran cg+amg, `scenario = pairwsie` ran pairwise,
 # `write_cur_maps = Ture` wrote nothing (issues #246, #341, #436).
 const INI_NAMES = [
-    Bool => [true => ["True", "true", "1"], false => ["False", "false", "0"]],
-    DataType => [dt_raster => ["raster", "Raster"], dt_network => ["network", "Network"]],
-    Scenario => [sc_pairwise => ["pairwise", "Pairwise"],
-                 sc_advanced => ["advanced", "Advanced"],
+    Bool => [true => ["True", "1"], false => ["False", "0"]],
+    DataType => [dt_raster => ["raster"], dt_network => ["network"]],
+    Scenario => [sc_pairwise => ["pairwise"],
+                 sc_advanced => ["advanced"],
                  sc_onetoall => ["one-to-all", "one_to_all"],
                  sc_alltoone => ["all-to-one", "all_to_one"]],
     SolverType => [st_cg_amg => ["cg+amg", "amg+cg"],
                    st_cholmod => ["cholmod", "cholesky", "cholfact"],
-                   st_pardiso => ["pardiso", "mklpardiso", "MKLPardiso", "PARDISO"],
-                   st_accelerate => ["accelerate", "Accelerate", "ACCELERATE", "apple_accelerate"],
-                   st_amgx => ["amgx", "AMGX"]],
-    Precision => [pr_single => ["single", "Single"], pr_double => ["double", "Double"]],
+                   st_pardiso => ["pardiso", "mklpardiso"],
+                   st_accelerate => ["accelerate", "apple_accelerate"],
+                   st_amgx => ["amgx"]],
+    Precision => [pr_single => ["single"], pr_double => ["double"]],
     # Circuitscape 4 wrote "not entered" for the default policy
     RemovePolicy => [rp_keepall => ["keepall", "not entered"], rp_rmvsrc => ["rmvsrc"],
                      rp_rmvgnd => ["rmvgnd"], rp_rmvall => ["rmvall"]],
-    # Matched in any case. Circuitscape 4 took Python's level names; keep them.
+    # Circuitscape 4 took Python's level names; keep reading them.
     Logging.LogLevel => [Logging.Debug => ["DEBUG"], Logging.Info => ["INFO"],
                          Logging.Warn => ["WARNING", "WARN"],
                          Logging.Error => ["ERROR", "CRITICAL"]],
@@ -103,22 +106,27 @@ for (T, names) in INI_NAMES
     @eval _names(::Type{$T}) = $names
 end
 
+# Equality ignoring ASCII case, without allocating; every spelling is ASCII.
+_lower(c::UInt8) = UInt8('A') <= c <= UInt8('Z') ? c + 0x20 : c
+_same(a, b) = ncodeunits(a) == ncodeunits(b) &&
+    all(i -> _lower(codeunit(a, i)) == _lower(codeunit(b, i)), 1:ncodeunits(a))
+
 # `_from_ini(T, key, s)` reads the INI string `s` of `key` as a `T`;
 # `_to_ini(v)` writes `v` back.
 function _from_ini(::Type{T}, key, s) where {T<:Named}
-    t = T === Logging.LogLevel ? uppercase(s) : s
     for (v, names) in _names(T)
-        t in names && return v
+        any(n -> _same(s, n), names) && return v
     end
     valid = join((first(names) for (_, names) in _names(T)), ", ")
     # init_config leaves `scenario` as "not entered"
-    s == "not entered" && throw(ArgumentError("$key is not set; expected one of: $valid"))
+    _same(s, "not entered") && throw(ArgumentError("$key is not set; expected one of: $valid"))
     throw(ArgumentError("$key = \"$s\" is not recognised; expected one of: $valid"))
 end
 _to_ini(v::T) where {T<:Named} = first(only(names for (x, names) in _names(T) if x == v))
 
-# "None" is how Circuitscape 4 (Python) wrote an unset path.
-_from_ini(::Type{String}, key, s) = s == "None" ? "" : String(s)
+# Paths and free text keep their case. "None" is how Circuitscape 4 (Python)
+# wrote an unset path.
+_from_ini(::Type{String}, key, s) = _same(s, "None") ? "" : String(s)
 _to_ini(v::String) = v == "" ? "None" : v
 
 _from_ini(::Type{Int}, key, s) =
@@ -127,7 +135,7 @@ _to_ini(v::Int) = string(v)
 
 # residual_tolerance, the only real-valued option: 0 means automatic.
 _from_ini(::Type{Float64}, key, s) =
-    s in ("auto", "Auto", "AUTO", "None", "") ? 0.0 :
+    any(x -> _same(s, x), ("auto", "none", "")) ? 0.0 :
     @something(tryparse(Float64, s), throw(ArgumentError("$key = \"$s\" is not a number or auto")))
 _to_ini(v::Float64) = v > 0 ? string(v) : "auto"
 
@@ -184,18 +192,47 @@ Base.Dict{String,String}(cfg::CSConfig) =
 
 const INI_DEFAULTS = merge(Dict{String,String}(CSConfig()), INI_PLACEHOLDERS)
 
+"""
+    normalize_config(dict) -> Dict{String,String}
+
+`dict` with every key lowercased and every key and value stripped of
+surrounding whitespace, so that `Solver = cholmod` sets `solver`. A key given
+twice in different case with different values is an `ArgumentError`. Values
+keep their case here: option values are matched in any case when they are
+parsed, and paths and free text (the `String` fields of [`CSConfig`](@ref))
+keep theirs.
+"""
+function normalize_config(dict)
+    d = Dict{String,String}()
+    for (k, v) in dict
+        key = lowercase(strip(k))
+        val = String(strip(v))
+        haskey(d, key) && d[key] != val &&
+            throw(ArgumentError("configuration key $key is given twice, in different case, " *
+                                "with different values: \"$(d[key])\" and \"$val\""))
+        d[key] = val
+    end
+    d
+end
+
 function CSConfig(dict::Dict{String,String})
-    unknown = sort!([k for k in keys(dict) if !haskey(INI_DEFAULTS, k)])
-    isempty(unknown) ||
-        @warn("Ignoring unrecognised configuration keys: $(join(unknown, ", "))")
+    # Known keys are lowercase and stripped, so only a dict with other keys
+    # (never one built from init_config with update!) needs normalising.
+    if !all(k -> haskey(INI_DEFAULTS, k), keys(dict))
+        dict = normalize_config(dict)
+        unknown = sort!([k for k in keys(dict) if !haskey(INI_DEFAULTS, k)])
+        isempty(unknown) ||
+            @warn("Ignoring unrecognised configuration keys: $(join(unknown, ", "))")
+    end
     _parse_fields(dict)
 end
 
 # One positional constructor call with every field's parser known statically,
-# as in `_copy_with` below. A key absent from `dict` takes its init_config value.
+# as in `_copy_with` below. A key absent from `dict` takes its init_config
+# value; values are stripped of surrounding whitespace.
 @generated function _parse_fields(dict::Dict{String,String})
     args = [:(_from_ini($(fieldtype(CSConfig, f)), $(String(f)),
-                        get(dict, $(String(f)), INI_DEFAULTS[$(String(f))])))
+                        strip(get(dict, $(String(f)), INI_DEFAULTS[$(String(f))]))))
             for f in fieldnames(CSConfig)]
     :(CSConfig($(args...)))
 end
@@ -311,8 +348,8 @@ end
     parse_config(path::AbstractString) -> CSConfig
 
 Read a Circuitscape INI file as Circuitscape 4 (Python's ConfigParser) did:
-each line is `key = value` or `key: value`, keys are case-insensitive, and
-blank lines, comment lines (starting with `#` or `;`) and section headers are
+each line is `key = value` or `key: value`, keys and option values are
+case-insensitive (file paths keep their case), and blank lines, comment lines (starting with `#` or `;`) and section headers are
 skipped; any other line is an error naming the file and line. Every key is
 parsed on top of the defaults from [`init_config`](@ref), so keys that are
 absent take their default value. Unrecognised values for `solver`,
@@ -352,15 +389,17 @@ init_config() = copy(INI_DEFAULTS)
 
 Merge the INI keys and values in `new` (any iterable of `key => value`
 pairs, typically a `Dict{String,String}`) into the configuration dictionary
-`cfg`, overwriting existing entries. Mutates and returns `cfg`. This is how a
+`cfg`, overwriting existing entries; keys are lowercased and stripped, as in
+an INI file. Mutates and returns `cfg`. This is how a
 caller layers its own settings on top of [`init_config`](@ref) before passing
 the result to [`compute`](@ref) or [`compute_omniscape_current`](@ref); no
 values are parsed or checked here (that happens in `CSConfig(cfg)`).
 """
 function update!(cfg, new)
     for (key,val) in new
-        cfg[key] = val
+        cfg[lowercase(strip(key))] = val
     end
+    cfg
 end
 
 """
