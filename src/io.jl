@@ -93,11 +93,9 @@ function read_focal_points(V, path::String)
 	ret
 end
 
-# Network advanced mode: `node strength` rows, shifted along with the graph's
-# node numbering when that starts from 0.
-function read_point_strengths(T, path::String, starts_from_zero)
+function read_point_strengths(T, path::String, starts_from_zero) 
 	str = readdlm(path, T)
-	starts_from_zero = minimum(str[:,1]) == 0 || starts_from_zero
+	starts_from_zero = minimum(str[:,1]) == 0 || starts_from_zero 
 	starts_from_zero && (str[:,1] .+= 1)
 	str
 end
