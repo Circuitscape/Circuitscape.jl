@@ -1276,6 +1276,14 @@ end
         finitegrounds = copy(grounds)
         v32 = Circuitscape.multiple_solver(cfg, Circuitscape.CholmodSolver(10), a, sources, grounds, finitegrounds)
         @test length(v32) == n
+        # With a direct ground too, the finite one goes on the reduced copy
+        # in place; `a` itself is never written to.
+        grounds[2] = Inf
+        v = Circuitscape.multiple_solver(cfg, Circuitscape.CholmodSolver(10), a, copy(sources), grounds, finitegrounds)
+        @test a == prob.G
+        keep = [1; 3:n]
+        @test v[2] == 0
+        @test v[keep] ≈ (Matrix(a) + LinearAlgebra.Diagonal(finitegrounds))[keep, keep] \ sources[keep]
     end
     # Same answers whichever index type is used
     r32 = Circuitscape.run_onetoall(Circuitscape.load_data(Float64, Int32, cfg), cfg)

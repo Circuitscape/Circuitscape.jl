@@ -273,25 +273,39 @@ write_advanced_cur_map(name, voltages, outcurr, G, finitegrounds, geometry::Netw
     write_cur_maps(name, voltages, ComponentData(geometry.nodes, G, geometry), finitegrounds, cfg)
 
 
+# `A + Diagonal(d)`, zeros dropped as by sparse `+`. Written into `A` when the
+# caller owns it (`inplace`) and every diagonal entry is already stored.
+function add_diagonal!(A::SparseMatrixCSC{T,V}, d, inplace) where {T,V}
+    n = size(A, 1)
+    rowval, nzval = rowvals(A), nonzeros(A)
+    if inplace && all(i -> any(j -> rowval[j] == i, nzrange(A, i)), 1:n)
+        for i = 1:n, j in nzrange(A, i)
+            rowval[j] == i && (nzval[j] += d[i])
+        end
+        return dropzeros!(A)
+    end
+    # Diagonal built with the index type of `A`: `spdiagm` is always `Int`
+    # indexed and would promote a 32-bit matrix to 64-bit indices.
+    r = V(1):V(n)
+    A + sparse(r, r, d, n, n)
+end
+
 function multiple_solver(cfg, solver, a::SparseMatrixCSC{T,V}, sources, grounds, finitegrounds) where {T,V}
 
-    # No copy of `a` here: `asolve[r, r]` below copies, and `a` is left as is.
-    asolve = a
-    if finitegrounds[1] != -9999
-        # Diagonal built with the index type of `a`: `spdiagm` is always
-        # `Int` indexed and would promote a 32-bit matrix to 64-bit indices.
-        n = size(a, 1)
-        r = V(1):V(n)
-        asolve = a + sparse(r, r, finitegrounds, n, n)
-    end
-
+    # `a` is never written to: it is copied at most once, by dropping the
+    # direct grounds or adding the finite ones, and otherwise solved as is.
     infgrounds = findall(x -> x == Inf, grounds)
     deleteat!(sources, infgrounds)
-    dst_del = V[]
-    append!(dst_del, infgrounds)
-    r = collect(1:size(a, 1))
-    deleteat!(r, dst_del)
-    asolve = asolve[r, r]
+    asolve = a
+    if !isempty(infgrounds)
+        r = collect(V(1):V(size(a, 1)))
+        deleteat!(r, infgrounds)
+        asolve = a[r, r]
+    end
+    if finitegrounds[1] != -9999
+        fg = isempty(infgrounds) ? finitegrounds : deleteat!(copy(finitegrounds), infgrounds)
+        asolve = add_diagonal!(asolve, fg, asolve !== a)
+    end
 
     volt = multiple_solve(cfg, solver, asolve, sources)
 
