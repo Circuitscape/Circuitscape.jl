@@ -81,7 +81,7 @@ Keys and option values are case-insensitive: `solver = CHOLMOD`, `Solver = cholm
 | `set_null_currents_to_nodata` | Boolean | `False` | If `True`, cells that are NODATA in the resistance map (and so have no graph node) are written as NODATA in current maps instead of 0. |
 | `set_null_voltages_to_nodata` | Boolean | `False` | If `True`, cells that are NODATA in the resistance map are written as NODATA in voltage maps instead of 0. |
 | `set_focal_node_currents_to_zero` | Boolean | `False` | If `True`, the cells of the *active* focal nodes carry zero current in each raster current map: the two focal nodes of the pair in pairwise mode, every focal node in one-to-all and all-to-one. Cumulative and maximum maps then show only current that flows *through* a focal region while other pairs are active. Raster current maps only; network node currents and resistances are unaffected. |
-| `compress_grids` | Boolean | `False` | Accepted for compatibility with Circuitscape 4. Output grids are currently written uncompressed; gzipped *input* grids (`.asc.gz`) are read. |
+| `compress_grids` | Boolean | `False` | If `True`, write ASCII output grids gzipped, as `.asc.gz`. GeoTIFF output (`write_as_tif = True`) is always compressed. Gzipped *input* grids (`.asc.gz`) are read either way. |
 | `log_transform_maps` | Boolean | `False` | If `True`, log10-transform values in output current maps. Cells with zero current are set to NODATA. |
 | `write_as_tif` | Boolean | `False` | If `True`, write current and voltage maps as GeoTIFF (LZW-compressed) instead of ESRI ASCII grids. Requires the optional GDAL support: `Pkg.add("ArchGDAL")`, then `using ArchGDAL` before running. |
 
@@ -245,7 +245,7 @@ Set `write_cum_cur_map_only = True` to calculate current maps for each iteration
 
 ### Compress Output Grids
 
-Set `compress_grids = True` to compress output ASCII grids using gzip. This can be useful when many large maps will be written.
+Set `compress_grids = True` to compress output ASCII grids using gzip; each map is written as `<name>.asc.gz` instead of `<name>.asc`. This can be useful when many large maps will be written.
 
 ### Log-Transform Current Maps
 

@@ -44,6 +44,9 @@ that can require action when upgrading.
   Previously it injected 1 A (and Circuitscape 4.0.5 does the same when
   variable source strengths are used), so current maps change wherever the
   file excludes pairs.
+- **`compress_grids = True` gzips output grids.** ASCII maps are written as
+  `.asc.gz`, as in Circuitscape 4. Before, the option was accepted and
+  ignored, and maps were written as plain `.asc`.
 
 Everything else in 6.0 is additive or internal; see the
 [release notes](https://github.com/Circuitscape/Circuitscape.jl/releases) for
