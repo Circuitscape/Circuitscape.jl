@@ -3,6 +3,7 @@ using Circuitscape
 using Circuitscape: compute
 import LinearAlgebra
 import Graphs, SparseArrays, Random
+import Logging
 
 # Omniscape moving window solve test 
 # just checking syntax, other tests should be sufficient to ensure correctness.
@@ -165,8 +166,9 @@ end
                 0 0 0 0]
 
     # Region 5 overlaps polygon 1 in one cell: the polygon and every cell
-    # of the region become one node (this branch used to throw).
-    r = Circuitscape.create_new_polymap(gmap, poly,
+    # of the region become one node (this branch used to throw). The return
+    # type must be inferred (a captured, reassigned `newpoly` made it `Any`).
+    r = @inferred Circuitscape.create_new_polymap(gmap, poly,
             prc([(1,2), (2,2), (4,4)], [5, 5, 6]), 5, 6)
     @test r == [3 3 0 0
                 0 3 0 0
@@ -275,6 +277,10 @@ end
 end
 
 @testset "read_cellmap: negative values are null" begin
+    # runtests.jl disables warnings globally; turn them back on here so that
+    # @test_logs can see the warning, and restore runtests.jl's setting after.
+    Logging.disable_logging(Logging.BelowMinLevel)
+    try
     d = mktempdir()
     hab = joinpath(d, "hab.asc")
     open(hab, "w") do io
@@ -282,19 +288,77 @@ end
         println(io, "-2 1 1\n1 -9999 1\n1 1 4")
     end
     for is_res in (true, false)
-        gmap, _ = Circuitscape.read_cellmap(hab, is_res, Float64)
+        gmap, _ = @test_logs (:warn, r"1 cell\(s\) .* negative") Circuitscape.read_cellmap(hab, is_res, Float64)
         @test gmap[1,1] == 0
         @test gmap[2,2] == 0
         @test gmap[3,3] == (is_res ? 0.25 : 4.0)
         @test all(gmap .>= 0)
     end
     # A polygon covering the negative cell does not reach across it
-    gmap, _ = Circuitscape.read_cellmap(hab, true, Float64)
+    gmap, _ = @test_logs (:warn,) Circuitscape.read_cellmap(hab, true, Float64)
     poly = zeros(Int, 3, 3); poly[1,1] = 1; poly[3,3] = 1
     nm = Circuitscape.construct_node_map(gmap, poly)
     A = Circuitscape.construct_graph(gmap, nm, false, true)
     @test A[nm[1,1], nm[1,2]] == 0
     @test A[nm[1,1], nm[2,1]] == 0
+    # No negative cells: no warning
+    open(hab, "w") do io
+        println(io, "ncols 2\nnrows 1\nxllcorner 0\nyllcorner 0\ncellsize 1\nNODATA_value -9999")
+        println(io, "-9999 2")
+    end
+    gmap, _ = @test_logs Circuitscape.read_cellmap(hab, true, Float64)
+    @test gmap == [0.0 0.5]
+    finally
+        Logging.disable_logging(Logging.Warn)
+    end
+end
+
+@testset "construct_graph: non-positive in-memory cells inside a polygon" begin
+    # API callers (Omniscape) pass conductance arrays directly, with -9999
+    # for nodata. A polygon over such a cell must not link it either.
+    for bad in (-9999.0, -1.0, NaN)
+        g = [bad 1.0; 1.0 1.0]
+        poly = [1 0; 0 1]
+        nm = Circuitscape.construct_node_map(g, poly)
+        @test nm[1,1] == nm[2,2] != 0
+        for avg_res in (false, true), four in (false, true)
+            A = Circuitscape.construct_graph(g, nm, avg_res, four)
+            @test all(isfinite, SparseArrays.nonzeros(A))
+            @test all(>=(0), SparseArrays.nonzeros(A))
+            @test A[nm[1,1], nm[1,2]] == A[nm[1,1], nm[2,1]] == 1
+            @test SparseArrays.nnz(A) == 2 * Circuitscape.count_graph_edges(g, nm, four)
+        end
+    end
+end
+
+@testset "create_new_polymap: focal regions over polygons, randomised" begin
+    # Reference: Circuitscape 4's get_poly_map_temp / get_overlap_polymap,
+    # relabelling the running map once per point id.
+    function cs4_poly_map_temp(poly_map, point_map)
+        m = copy(poly_map)
+        k = maximum(poly_map)
+        for p in sort!(unique(point_map[point_map .!= 0]))
+            k += 1
+            cells = findall(==(p), point_map)
+            vals = unique(m[c] for c in cells if m[c] != 0)
+            for i in eachindex(m)
+                m[i] in vals && (m[i] = k)
+            end
+            m[cells] .= k
+        end
+        m
+    end
+    rng = Random.MersenneTwister(523)
+    gmap = ones(12, 12)
+    for trial in 1:300
+        poly = rand(rng, 0:6, 12, 12) .* (rand(rng, 12, 12) .< 0.3)
+        pm = rand(rng, 0:8, 12, 12) .* (rand(rng, 12, 12) .< 0.25)
+        I = findall(!iszero, pm)
+        points_rc = (getindex.(I, 1), getindex.(I, 2), pm[I])
+        length(unique(points_rc[3])) == length(points_rc[3]) && continue
+        r = @inferred Circuitscape.create_new_polymap(gmap, poly, points_rc, 0, 0, pm)
+        @test r == cs4_poly_map_temp(poly, pm)
+    end
 end
 
 import Circuitscape: resolve_conflicts

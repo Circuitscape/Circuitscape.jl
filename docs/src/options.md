@@ -158,7 +158,7 @@ The resistance file (`habitat_file`) specifies the ability of each cell in a lan
 
 Most users code their data in terms of resistances (with higher values denoting greater resistance to movement). Set `habitat_map_is_resistances = False` to specify conductances instead (conductance is the reciprocal of resistance; higher values indicate greater ease of movement).
 
-Zero and infinite values for conductances and resistances represent special cases. Infinite resistances are coded as NODATA values in input resistance grids, or as zero or NODATA in input conductance grids; these are treated as complete barriers and are disconnected from all other cells. For raster analyses, cells with zero resistance (infinite conductance) can be specified using a separate short-circuit region file as described below.
+Zero and infinite values for conductances and resistances represent special cases. Infinite resistances are coded as NODATA values in input resistance grids, or as zero or NODATA in input conductance grids; these are treated as complete barriers and are disconnected from all other cells. Negative values, which have no physical meaning, are treated the same way (as NODATA), and a warning reports how many cells were affected. For raster analyses, cells with zero resistance (infinite conductance) can be specified using a separate short-circuit region file as described below.
 
 ## Focal Nodes (Pairwise, One-to-All, and All-to-One Modes)
 
@@ -257,7 +257,7 @@ Set `use_mask = True` and provide `mask_file` to apply a raster mask. Cells with
 
 ### Short-Circuit Region Map
 
-Set `use_polygons = True` and provide `polygon_file` to load short-circuit regions. These act as areas of zero resistance, providing patches through which current gets a "free ride." Each region should have a unique positive integer identifier; cells within each region are merged into a single node, including non-adjacent cells (regions need not be contiguous). Non-region areas should be stored as NODATA values. The file must have the same cell size and extent as the resistance grid.
+Set `use_polygons = True` and provide `polygon_file` to load short-circuit regions. These act as areas of zero resistance, providing patches through which current gets a "free ride." Each region should have a unique positive integer identifier; cells within each region are merged into a single node, including non-adjacent cells (regions need not be contiguous). Non-region areas should be stored as NODATA values. A region may cover NODATA cells of the resistance grid: those cells become part of the region's node, but, being barriers, they are not connected to their neighbouring cells, so current enters and leaves the region only through its cells with finite resistance. The file must have the same cell size and extent as the resistance grid.
 
 ### Variable Source Strengths
 

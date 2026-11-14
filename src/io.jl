@@ -143,8 +143,16 @@ function read_cellmap(habitat_file::String, is_res::Bool, ::Type{T};
         gmap[ind] .= 0
     end
     # Negative values (resistance or conductance) are not meaningful; like
-    # Circuitscape 4 (csio.py), treat them as null cells.
-    map!(x -> x < 0 ? zero(T) : x, gmap, gmap)
+    # Circuitscape 4 (csio.py), treat them as null cells. They were already
+    # left out of the node map, but a polygon over one linked it with a
+    # negative weight, and null-to-nodata output did not cover it. Warn rather
+    # than throw: such cells are usually an undeclared NODATA code, and
+    # existing runs keep their results.
+    nneg = count(x -> x < 0, gmap)
+    if nneg > 0
+        @warn("$nneg cell(s) of the habitat map have negative values (other than NODATA); they are treated as NODATA (infinite resistance).")
+        map!(x -> x < 0 ? zero(T) : x, gmap, gmap)
+    end
     gmap, rastermeta
 end
 
