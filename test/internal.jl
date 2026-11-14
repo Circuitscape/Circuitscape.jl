@@ -992,7 +992,9 @@ end
     writedlm(missing5, rows[rows[:, 1] .!= 5, :])
     @test check_resistances(ref, job("one-to-all", missing5), 1e-6, label = "id 5 missing")
 
-    # All-to-one: the current maps depend on which strength each source gets
+    # All-to-one: the current maps depend on which strength each source gets.
+    # (allToOneVerify12's maps are CS5's own, not Circuitscape 4's: see the
+    # "All-to-one excluded points carry no source" testset.)
     cum_map() = readdlm(joinpath(dir, "all-to-one", "out_cum_curmap.asc"), skipstart = 6)
     job("all-to-one", shuffled; write_cur_maps = true)
     cum_ref = readdlm(joinpath(@__DIR__, "output_verify", "allToOneVerify12_cum_curmap.asc"), skipstart = 6)
@@ -1016,14 +1018,17 @@ end
     @test_throws ArgumentError Circuitscape.read_variable_strengths(Float64, joinpath(dir, "bad.txt"))
 end
 
-# All-to-one with an include file and unit strengths: a focal point the file
-# excludes for the current ground is not a source (Python zeroes it out of
-# `unique_point_map` before building the source map).
+# All-to-one with an include file: a focal point the file excludes for the
+# current ground is not a source. With unit strengths this is what Python
+# does (it zeroes the point out of `unique_point_map`). With variable
+# strengths Python 4.0.5 still injects 1 A at every excluded point (the
+# zeroed id falls back to strength 1 in `get_strengths_rc`); CS5 does not,
+# so the allToOneVerify12 reference maps were regenerated.
 @testset "All-to-one excluded points carry no source" begin
     n = 7
     hdr = "ncols $n\nnrows $n\nxllcorner 0\nyllcorner 0\ncellsize 1\nNODATA_value -9999\n"
     grid(f) = join([join([string(f(i, j)) for j in 1:n], " ") for i in 1:n], "\n") * "\n"
-    function run(dir, pts, include)
+    function run(dir, pts, include; strengths = nothing)
         write(joinpath(dir, "cell.asc"), hdr * grid((i, j) -> 1))
         write(joinpath(dir, "pts.asc"), hdr * grid((i, j) -> get(pts, (i, j), 0)))
         d = Circuitscape.init_config()
@@ -1040,6 +1045,11 @@ end
             d["use_included_pairs"] = "True"
             d["included_pairs_file"] = joinpath(dir, "inc.txt")
         end
+        if strengths !== nothing
+            write(joinpath(dir, "str.txt"), strengths)
+            d["use_variable_source_strengths"] = "True"
+            d["variable_source_file"] = joinpath(dir, "str.txt")
+        end
         compute(d)
         readdlm(joinpath(dir, "out_curmap_1.asc"), skipstart = 6)
     end
@@ -1054,6 +1064,39 @@ end
     @test c_all[1, 7] > c_ref[1, 7] + 0.5
     @test c_all[1, 1] ≈ 2 atol = 1e-8       # two unit sources into ground 1
     @test c_ref[1, 1] ≈ 1 atol = 1e-8
+
+    # Variable strengths: the excluded point 3 injects nothing either (not
+    # its own 4 A, and not the 1 A Python 4.0.5 gives it)
+    str = "1\t3.0\n2\t2.5\n3\t4.0\n"
+    v_inc = run(mktempdir(), pts, "mode\tinclude\n1\t2\n2\t3\n"; strengths = str)
+    v_ref = run(mktempdir(), filter(kv -> kv[2] != 3, pts), nothing; strengths = str)
+    @test v_inc ≈ v_ref atol = 1e-8
+    @test v_inc[1, 1] ≈ 2.5 atol = 1e-8     # only point 2's 2.5 A reaches ground 1
+    v_all = run(mktempdir(), pts, "mode\tinclude\n1\t2\n2\t3\n1\t3\n"; strengths = str)
+    @test v_all[1, 1] ≈ 6.5 atol = 1e-8
+
+    # The same on the allToOneVerify12 fixture: with ground 1 the include
+    # file excludes points 4 and 9, so its current map is that of a run
+    # whose point file lacks them (and the ids the include file never names)
+    fixture = joinpath(@__DIR__, "input", "raster", "all_to_one", "12")
+    d = Dict{String,String}(parse_config(joinpath(fixture, "allToOneVerify12.ini")))
+    for k in ("habitat_file", "point_file", "polygon_file", "mask_file", "variable_source_file")
+        d[k] = joinpath(@__DIR__, d[k])
+    end
+    dir = mktempdir()
+    hdr12 = readlines(d["point_file"])[1:6]
+    pts12 = readdlm(d["point_file"], skipstart = 6)
+    open(joinpath(dir, "pts.asc"), "w") do io
+        foreach(l -> println(io, l), hdr12)
+        writedlm(io, map(x -> x in (1, 2, 3, 5, 6, 8) ? Int(x) : -9999, pts12), ' ')
+    end
+    d["point_file"] = joinpath(dir, "pts.asc")
+    d["use_included_pairs"] = "False"
+    d["output_file"] = joinpath(dir, "out.out")
+    d["solver"] = "cholmod"; d["parallelize"] = "false"
+    compute(d)
+    @test sum(abs2, readdlm(joinpath(dir, "out_curmap_1.asc"), skipstart = 6) -
+              readdlm(joinpath(@__DIR__, "output_verify", "allToOneVerify12_curmap_1.asc"), skipstart = 6)) < 1e-10
 
     # A multi-cell focal region left on its own by the include file: nothing
     # to solve, reported as -1 rather than attempted

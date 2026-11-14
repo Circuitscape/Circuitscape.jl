@@ -165,25 +165,20 @@ function solve_onetoall_point(i, data::RasterData{T,V}, cfg, G, cc, nodemap, new
         ground_map = map(x -> x == n ? T(0) : T(x), point_map)
         map!(x -> x > 0 ? Inf : x, ground_map, ground_map)
     else
-        if use_variable_strengths
-            # Python's `get_strength_map`: one entry per focal id at its
-            # representative cell. A point the include file drops for this
-            # solve keeps a unit strength (Python zeroes its id before the
-            # lookup, which then defaults to 1), so with variable strengths
-            # an excluded point still acts as a unit source. This reproduces
-            # Python's own behaviour and allToOneVerify12 depends on it; the
-            # unit-strength branch below does exclude such points.
-            strength_map = zeros(T, size(gmap))
-            for (k, (r, c)) in enumerate(unique_cells)
-                strength_map[r, c] = point_map[r, c] == 0 ? one(T) :
-                                     get(strength_of, points_unique[k], one(T))
-            end
-            source_map = map((x,y) -> x == n ? T(0) : T(y), unique_point_map, strength_map)
-        else
-            # Every active focal point other than `n` is a unit source; the
-            # points the include file excludes are zero in `point_map`.
-            source_map = map((x,y) -> (x != 0 && y != 0 && x != n) ? one(T) : zero(T),
-                             unique_point_map, point_map)
+        # Every active focal point other than `n` is a source at its
+        # representative cell, with its variable strength (1 for an id the
+        # file does not list) or 1. The points the include file excludes for
+        # this ground are zero in `point_map` and inject nothing.
+        #
+        # Deliberate deviation from Circuitscape 4.0.5: with variable
+        # strengths Python zeroes an excluded point's id before looking up
+        # its strength (compute.py:251, 259), the lookup of id 0 falls back
+        # to 1 (compute.py:940), and so every excluded point still injects
+        # 1 A. Its unit-strength branch (compute.py:277) does exclude them.
+        # Here both branches exclude them, as the include/exclude file says.
+        source_map = map(unique_point_map, point_map) do x, y
+            (x == 0 || y == 0 || x == n) && return zero(T)
+            use_variable_strengths ? get(strength_of, x, one(T)) : one(T)
         end
         ground_map = map(x -> x == n ? Inf : T(0), point_map)
     end

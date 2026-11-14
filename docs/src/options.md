@@ -261,11 +261,11 @@ Set `use_polygons = True` and provide `polygon_file` to load short-circuit regio
 
 ### Variable Source Strengths
 
-In one-to-all and all-to-one modes, set `use_variable_source_strengths = True` and provide `variable_source_file` with focal node IDs and corresponding source strengths. The file should be a text list with two columns (ID followed by source strength). All nodes not in the list will default to 1 Amp.
+In one-to-all and all-to-one modes, set `use_variable_source_strengths = True` and provide `variable_source_file` with focal node IDs and corresponding source strengths. The file should be a text list with two columns (ID followed by source strength), in any order; strengths are matched to focal nodes by ID. All nodes not in the list will default to 1 Amp, and IDs that are not focal nodes are ignored.
 
 ### Include/Exclude Focal Node Pairs
 
-Set `use_included_pairs = True` and provide `included_pairs_file` to restrict calculations to a subset of focal node pairs. Users can either identify pairs to include or pairs to exclude, as specified in the first line of the file. This affects all modes except advanced mode. Files should be in tab-delimited text with a .txt extension.
+Set `use_included_pairs = True` and provide `included_pairs_file` to restrict calculations to a subset of focal node pairs. Users can either identify pairs to include or pairs to exclude, as specified in the first line of the file. This affects all modes except advanced mode. In one-to-all mode a node excluded from a pair with the current source is not a ground for that solve; in all-to-one mode a node excluded from a pair with the current ground injects no current for that solve, whether or not variable source strengths are used. Files should be in tab-delimited text with a .txt extension.
 
 ## Input Raster Format
 
