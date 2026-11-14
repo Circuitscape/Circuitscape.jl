@@ -409,7 +409,8 @@ function write_grid(cmap, name, cfg, hbmeta, cellmap = nothing;
                  cmap,
                  hbmeta.wkt,
                  hbmeta.transform,
-                 file_format)
+                 file_format;
+                 compress = cfg.compress_grids)
 end
 
 """
@@ -553,21 +554,24 @@ function write_cum_maps(cum, hbmeta::RasterMeta, cellmap::Matrix, cfg)
 end
 
 """
-    write_raster(fn_prefix, array, wkt, transform, file_format)
+    write_raster(fn_prefix, array, wkt, transform, file_format; compress = false)
 
 Write a single-band raster. `.asc` is written natively with `writedlm` —
 several times faster than the GDAL AAIGrid driver, and thread-safe, so it
-takes no lock; `.tif` goes through GDAL under `IO_LOCK`.
+takes no lock; `.tif` goes through GDAL under `IO_LOCK`. With `compress`, an
+ASCII grid is gzipped to `.asc.gz`, as `compress_grids` did in Circuitscape 4;
+GeoTIFF output is always LZW-compressed.
 """
 function write_raster(fn_prefix::String,
                       array::Matrix{T} where T <: Number,
                       wkt::String,
                       transform,
-                      file_format::String)
+                      file_format::String;
+                      compress::Bool = false)
     if file_format == "tif"
         write_raster_gdal(fn_prefix, array, wkt, transform)
     else
-        write_asc(fn_prefix, array, wkt, transform)
+        write_asc(fn_prefix, array, wkt, transform; compress)
     end
 end
 
@@ -584,10 +588,12 @@ function _asc_origin(transform, nrows)
     0.0, 0.0, 1.0, 1.0
 end
 
-function write_asc(fn_prefix::String, array::AbstractMatrix, wkt::String, transform)
+function write_asc(fn_prefix::String, array::AbstractMatrix, wkt::String, transform;
+                   compress::Bool = false)
     nrows, ncols = size(array)
     xll, yll, dx, dy = _asc_origin(transform, nrows)
-    open(fn_prefix * ".asc", "w") do io
+    path = fn_prefix * (compress ? ".asc.gz" : ".asc")
+    (compress ? GZip.open : open)(path, "w") do io
         println(io, "ncols         ", ncols)
         println(io, "nrows         ", nrows)
         println(io, "xllcorner     ", xll)

@@ -1004,13 +1004,11 @@ end
     @test occursin("dx", read(joinpath(dir, "e.asc"), String))
     @test Circuitscape.read_raster(joinpath(dir, "e.asc"), Float64)[3] == tr2
 
-    # Single-row grid and gzipped input
+    # Single-row grid, and a gzipped grid round trip with its projection
     write(joinpath(dir, "one.asc"), "ncols 2\nnrows 1\nxllcorner 0\nyllcorner 0\ncellsize 1\n7 8\n")
     @test Circuitscape.read_raster(joinpath(dir, "one.asc"), Float64)[1] == [7.0 8.0]
-    Circuitscape.GZip.open(joinpath(dir, "z.asc.gz"), "w") do io
-        write(io, read(joinpath(dir, "r.asc")))
-    end
-    @test Circuitscape.read_raster(joinpath(dir, "z.asc.gz"), Float64)[1] == a
+    Circuitscape.write_raster(joinpath(dir, "z"), a, "PROJCS[\"x\"]", tr, "asc"; compress = true)
+    @test Circuitscape.read_raster(joinpath(dir, "z.asc.gz"), Float64) == (a, "PROJCS[\"x\"]", tr)
 
     # Bad headers are reported by file
     write(joinpath(dir, "bad.asc"), "ncols 3\nnrows 3\nxllcorner 0\nyllcorner 0\ncellsize 1\n1 2 3\n4 5 6\n")
@@ -1307,6 +1305,31 @@ end
     rn = compute(n)
     @test rn[2, 3] ≈ 3.0
     @test !any(f -> startswith(f, "net") && occursin("currents", f), readdir(dir))
+end
+
+# compress_grids writes every map gzipped (.asc.gz), as Circuitscape 4 did.
+# It used to be accepted and ignored.
+@testset "compress_grids" begin
+    dir = mktempdir()
+    hdr = "ncols 3\nnrows 3\nxllcorner 0\nyllcorner 0\ncellsize 1\n"
+    write(joinpath(dir, "cell.asc"), hdr * "1 1 1\n1 1 1\n1 1 1\n")
+    write(joinpath(dir, "pts.asc"), hdr * "1 0 0\n0 0 0\n0 0 2\n")
+    d = Circuitscape.init_config()
+    d["data_type"] = "raster"; d["scenario"] = "pairwise"
+    d["habitat_file"] = joinpath(dir, "cell.asc"); d["point_file"] = joinpath(dir, "pts.asc")
+    d["write_cur_maps"] = "True"; d["write_volt_maps"] = "True"
+    d["output_file"] = joinpath(dir, "plain.out")
+    r = compute(d)
+    d["output_file"] = joinpath(dir, "gz.out"); d["compress_grids"] = "True"
+    @test compute(d) == r
+    maps = filter(f -> startswith(f, "gz_") && occursin("map", f), readdir(dir))
+    @test !isempty(maps) && all(endswith(".asc.gz"), maps)
+    for f in maps
+        @test read(joinpath(dir, f), 2) == [0x1f, 0x8b]    # gzip, not plain text
+        plain = joinpath(dir, replace(f, "gz_" => "plain_", ".gz" => ""))
+        @test Circuitscape.read_raster(joinpath(dir, f), Float64)[1] ==
+              Circuitscape.read_raster(plain, Float64)[1]
+    end
 end
 
 # 32-bit indices: chosen automatically when the problem fits, forced to
