@@ -230,6 +230,14 @@ let
                        0 0 0 0 0]
         @test sum(abs2, r) < 1e-6
 
+        # laplacian! inserts the diagonal, or fills it in place when stored;
+        # the isolated node 5 gets no entry either way.
+        L = Circuitscape.laplacian!(copy(A))
+        @test L ≈ SparseArrays.spdiagm(0 => vec(sum(A, dims = 1))) - A
+        @test SparseArrays.nnz(L) == SparseArrays.nnz(A) + 4
+        B = A + LinearAlgebra.I
+        @test Circuitscape.laplacian!(B) === B
+        @test B == L && B.rowval == L.rowval
 end
 
 # construct_graph must return exactly the matrix the original push!/`a + a'`

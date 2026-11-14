@@ -645,24 +645,47 @@ function smash_repeats!(resistances::Matrix{T}, I) where T
 end
 
 """
-Calculate laplacian of the adjacency matrix of a graph
+    laplacian!(G)
+
+Laplacian of the adjacency matrix `G`, with zeros dropped. Written into `G`
+when every column already stores its diagonal entry; otherwise built in one
+pass that inserts the diagonal, and `G` is left as is.
 """
 function laplacian!(G::SparseMatrixCSC{T,V}) where {T,V}
     n = size(G, 1)
-    s = Vector{eltype(G)}(undef,n)
-    for i = 1:n
-        s[i] = sum_off_diag(G, i)
-        for j in nzrange(G, i)
-            if i == G.rowval[j]
-                G.nzval[j] = 0
-            else
-                G.nzval[j] = -G.nzval[j]
+    rowval, nzval = rowvals(G), nonzeros(G)
+    ndiag = count(i -> any(j -> rowval[j] == i, nzrange(G, i)), 1:n)
+    if ndiag == n
+        for i = 1:n
+            s = sum_off_diag(G, i)
+            for j in nzrange(G, i)
+                nzval[j] = rowval[j] == i ? s : -nzval[j]
             end
         end
+        return dropzeros!(G)
     end
-    r = V(1):V(n)
-    S = sparse(r, r, s)
-    G + S
+    m = nnz(G) + n - ndiag
+    colptr = Vector{V}(undef, n + 1)
+    rv = Vector{V}(undef, m)
+    nz = Vector{T}(undef, m)
+    k = 1
+    for i = 1:n
+        colptr[i] = k
+        s = sum_off_diag(G, i)
+        placed = false
+        for j in nzrange(G, i)
+            r = rowval[j]
+            if !placed && r >= i
+                rv[k] = i; nz[k] = s; k += 1
+                placed = true
+            end
+            r == i && continue
+            rv[k] = r; nz[k] = -nzval[j]; k += 1
+        end
+        placed || (rv[k] = i; nz[k] = s; k += 1)
+    end
+    colptr[n + 1] = k
+    dropzeros!(SparseMatrixCSC(n, n, colptr, rv, nz))
 end
 
 function sum_off_diag(G, i)
