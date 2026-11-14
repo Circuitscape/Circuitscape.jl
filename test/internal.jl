@@ -1668,7 +1668,7 @@ end
     @test read_map("otacum2_cum_curmap.asc") ≈ nulls(logt(ota_cum))
 
     # Advanced mode: the options apply to its one voltage and current grid,
-    # and write_cum_cur_map_only alone writes nothing
+    # and write_cum_cur_map_only alone still writes (and computes) that grid
     write(joinpath(dir, "src.asc"), grid((i, j) -> (i, j) == (1, 1) ? 1 : 0))
     write(joinpath(dir, "gnd.asc"), grid((i, j) -> (i, j) == (5, 5) ? 1 : -9999))
     a = Circuitscape.init_config()
@@ -1691,7 +1691,10 @@ end
     a["output_file"] = joinpath(dir, "advcum.out")
     a["write_cur_maps"] = "False"; a["write_cum_cur_map_only"] = "True"
     compute(a)
-    @test !any(f -> occursin("curmap", f), files("advcum"))
+    @test read_map("advcum_curmap.asc") ≈ nulls(logt(adv_cur))
+    a["output_file"] = joinpath(dir, "advnone.out"); a["write_cum_cur_map_only"] = "False"
+    compute(a)
+    @test !any(f -> occursin("curmap", f), files("advnone"))
 
     # Network pairwise: per-pair current files only with write_cur_maps and
     # without write_cum_cur_map_only; the prefix helper is used there too
@@ -1726,4 +1729,54 @@ end
     write(joinpath(dir, "inside.txt"), "1 0.5 0.5\n2 4.5 4.5\n")
     i, j, v = Circuitscape.read_point_map(Int, joinpath(dir, "inside.txt"), meta)
     @test v == [1, 2] && i == [5, 1] && j == [1, 5]
+end
+
+# The INI copy of a run: complete, so it reads back as the configuration that
+# was run; written to <prefix>.ini, but never over the INI file being run.
+@testset "configuration copy" begin
+    dir = mktempdir()
+    hdr = "ncols 3\nnrows 3\nxllcorner 0\nyllcorner 0\ncellsize 1\nNODATA_value -9999\n"
+    write(joinpath(dir, "cell.asc"), hdr * "1 1 1\n1 1 1\n1 1 1\n")
+    write(joinpath(dir, "pts.asc"), hdr * "1 0 0\n0 0 0\n0 0 2\n")
+    d = Circuitscape.init_config()
+    d["data_type"] = "raster"; d["scenario"] = "pairwise"
+    d["habitat_file"] = joinpath(dir, "cell.asc"); d["point_file"] = joinpath(dir, "pts.asc")
+    d["output_file"] = joinpath(dir, "job.out")
+    d["write_cur_maps"] = "True"; d["set_focal_node_currents_to_zero"] = "True"
+    d["precision"] = "single"; d["cholmod_batch_size"] = "7"; d["write_as_tif"] = "False"
+    d["log_level"] = "WARNING"
+    cfg = Circuitscape.CSConfig(d)
+    # `version` records the writer ([Version] section), not an option
+    reads_as(path, c) = Circuitscape.CSConfig(Circuitscape.parse_config(path); version = c.version) == c
+
+    # write_config: every option round-trips; the default path is output_file
+    Circuitscape.write_config(cfg)
+    @test reads_as(joinpath(dir, "job.out"), cfg)
+    Circuitscape.write_config(cfg, joinpath(dir, "copy.ini"))
+    @test reads_as(joinpath(dir, "copy.ini"), cfg)
+    rm(joinpath(dir, "job.out")); rm(joinpath(dir, "copy.ini"))
+
+    # compute(dict) writes <prefix>.ini and not output_file
+    d["log_level"] = "INFO"
+    compute(d)
+    @test isfile(joinpath(dir, "job.ini")) && !isfile(joinpath(dir, "job.out"))
+    @test reads_as(joinpath(dir, "job.ini"), Circuitscape.CSConfig(d))
+
+    # compute(path) with the INI at <prefix>.ini leaves the user's file alone
+    ini = joinpath(dir, "job.ini")
+    text = "# my job\n" * join(["$k = $v" for (k, v) in d], "\n") * "\n"
+    write(ini, text)
+    compute(ini)
+    @test read(ini, String) == text
+    # ... but an INI elsewhere still gets its copy at <prefix>.ini
+    other = joinpath(dir, "other.ini")
+    write(other, text)
+    rm(ini)
+    compute(other)
+    @test read(other, String) == text
+    @test reads_as(ini, Circuitscape.CSConfig(d))
+
+    # an output_file naming a directory is a configuration error
+    d["output_file"] = dir * "/"
+    @test_throws "names a directory" Circuitscape.validate(Circuitscape.CSConfig(d))
 end

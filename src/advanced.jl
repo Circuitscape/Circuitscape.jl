@@ -157,13 +157,14 @@ Solve every connected component that has both a source and a ground, and
 write the voltage and current maps the options ask for, suffixed `name`.
 `voltages` is over all graph nodes (zero in components not solved); the
 current map is the per-cell sum over components for a raster (empty for a
-network), filled when `accumulate_currents`. One-to-all / all-to-one solve
+network), filled when `accumulate_currents` (by default when either current
+map option is set). One-to-all / all-to-one solve
 one focal node at a time and pass it as `check_node` to skip every other
 component.
 """
 function advanced_kernel(prob::AdvancedProblem{T,V}, cfg;
                          check_node = V(-1), name = "",
-                         accumulate_currents = cfg.write_cur_maps) where {T,V}
+                         accumulate_currents = cfg.write_cur_maps || cfg.write_cum_cur_map_only) where {T,V}
 
     # Data
     G = prob.G
@@ -225,11 +226,16 @@ function advanced_kernel(prob::AdvancedProblem{T,V}, cfg;
         zero_focal_nodes!(outcurr, geometry, Set(active))
     end
 
-    # Per-solve current files as in Circuitscape 4: advanced mode writes its
-    # one map with `write_cur_maps`; one-to-all / all-to-one write a map per
-    # focal node with `write_cur_maps` unless `write_cum_cur_map_only`.
-    per_solve = write_c_maps &&
-        !((is_onetoall(cfg) || is_alltoone(cfg)) && write_cum_cur_map_only)
+    # One-to-all / all-to-one write a map per focal node with
+    # `write_cur_maps` unless `write_cum_cur_map_only`, as Circuitscape 4 does;
+    # their cumulative map is written by the driver. Advanced mode has a single
+    # map, which is its cumulative map, so either option writes it (as in 6.x;
+    # Circuitscape 4 ignores `write_cum_cur_map_only` here and writes nothing).
+    per_solve = if is_onetoall(cfg) || is_alltoone(cfg)
+        write_c_maps && !write_cum_cur_map_only
+    else
+        write_c_maps || write_cum_cur_map_only
+    end
     per_solve && write_advanced_cur_map(name, voltages, outcurr, G, finitegrounds, geometry, cfg)
 
     voltages, outcurr, solver_called

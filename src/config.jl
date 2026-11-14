@@ -223,6 +223,10 @@ function validate(cfg::CSConfig)
 
     if unset(cfg.output_file)
         push!(problems, "output_file is not set")
+    elseif basename(cfg.output_file) == ""
+        # A trailing slash names a directory, not a file: the outputs would
+        # be written as `dir/_cum_curmap.asc`, `dir/.ini` and so on.
+        push!(problems, "output_file \"$(cfg.output_file)\" names a directory; give a file name in it, such as \"$(joinpath(cfg.output_file, "results.out"))\"")
     else
         outdir = dirname(cfg.output_file)
         outdir == "" || isdir(outdir) ||
@@ -508,16 +512,20 @@ output_prefix(cfg::CSConfig) = output_prefix(cfg.output_file)
 output_prefix(output_file::AbstractString) = first(splitext(String(output_file)))
 
 """
-    write_config(cfg::CSConfig)
-    write_config(cfg::Dict{String,String})
+    write_config(cfg::CSConfig, path = cfg.output_file)
+    write_config(cfg::Dict{String,String}, path = ...)
 
-Write the configuration, in Circuitscape INI form, to `<prefix>.ini`, where
-`<prefix>` is [`output_prefix`](@ref) of `cfg.output_file` (as Circuitscape
-4 did). `compute` calls this at the start of every run so that the options
-used are recorded next to the results.
+Write the configuration, in Circuitscape INI form, to `path`; by default the
+file named by `cfg.output_file`, as in every earlier release. The file holds
+every option, so `parse_config(path)` gives back `cfg` (the `[Version]`
+section records the writer, not `cfg.version`).
+
+`compute` records the options of each run in `<prefix>.ini` (see
+[`output_prefix`](@ref)), as Circuitscape 4 did, except when that file is
+the INI being run, which is never overwritten.
 """
-function write_config(cfg::CSConfig)
-    open(output_prefix(cfg) * ".ini", "w") do f
+function write_config(cfg::CSConfig, path::AbstractString = cfg.output_file)
+    open(path, "w") do f
         write(f, """
         [Circuitscape Mode]
         data_type = $(_data_type_str(cfg.data_type))
@@ -529,6 +537,10 @@ function write_config(cfg::CSConfig)
         [Habitat raster or graph]
         habitat_file = $(cfg.habitat_file)
         habitat_map_is_resistances = $(cfg.habitat_map_is_resistances)
+
+        [Options for reclassification of habitat data]
+        use_reclass_table = $(cfg.use_reclass_table)
+        reclass_file = $(cfg.reclass_file)
 
         [Connection Scheme for raster habitat data]
         connect_four_neighbors_only = $(cfg.connect_four_neighbors_only)
@@ -562,6 +574,12 @@ function write_config(cfg::CSConfig)
         [Calculation options]
         solver = $(_solver_str(cfg.solver))
         residual_tolerance = $(_tolerance_str(cfg.residual_tolerance))
+        precision = $(_precision_str(cfg.precision))
+        parallelize = $(cfg.parallelize)
+        use_64bit_indexing = $(cfg.use_64bit_indexing)
+        cholmod_batch_size = $(cfg.cholmod_batch_size)
+        low_memory_mode = $(cfg.low_memory_mode)
+        preemptive_memory_release = $(cfg.preemptive_memory_release)
 
         [Output options]
         write_cum_cur_map_only = $(cfg.write_cum_cur_map_only)
@@ -573,11 +591,18 @@ function write_config(cfg::CSConfig)
         set_null_voltages_to_nodata = $(cfg.set_null_voltages_to_nodata)
         compress_grids = $(cfg.compress_grids)
         write_cur_maps = $(cfg.write_cur_maps)
+        set_focal_node_currents_to_zero = $(cfg.set_focal_node_currents_to_zero)
+        write_as_tif = $(cfg.write_as_tif)
+
+        [Logging Options]
+        log_level = $(_log_level_str(cfg.log_level))
+        log_file = $(cfg.log_file == "" ? "None" : cfg.log_file)
+        suppress_messages = $(cfg.suppress_messages)
         """)
     end
 end
 
 # Keep backward compat for Dict-based write_config
-function write_config(cfg::Dict{String,String})
-    write_config(CSConfig(cfg))
+function write_config(cfg::Dict{String,String}, path::AbstractString = CSConfig(cfg).output_file)
+    write_config(CSConfig(cfg), path)
 end

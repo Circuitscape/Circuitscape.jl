@@ -197,9 +197,9 @@ function solve_onetoall_point(i, data::RasterData{T,V}, cfg, G, cc, nodemap, new
 
     prob = AdvancedProblem(G, cc, point_geometry, sources, grounds, finite_grounds, get_solver(cfg))
     # The current map feeds the cumulative map too, which
-    # `write_cum_cur_map_only` asks for without `write_cur_maps`.
-    voltages, curr, solver_called = advanced_kernel(prob, cfg; check_node, name = "_$(V(n))",
-        accumulate_currents = cfg.write_cur_maps || cfg.write_cum_cur_map_only)
+    # `write_cum_cur_map_only` asks for without `write_cur_maps`; the kernel
+    # accumulates it under either option.
+    voltages, curr, solver_called = advanced_kernel(prob, cfg; check_node, name = "_$(V(n))")
 
     res[i] = onetoall_resistance(voltages, solver_called, one_to_all, n, str,
                                  unique_point_map, nodemap)
