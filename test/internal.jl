@@ -655,8 +655,9 @@ end
 # dropped (running double) and `Solver = cholmod` was ignored (running cg+amg).
 @testset "INI syntax" begin
     ini = joinpath(mktempdir(), "job.ini")
-    write(ini, "[Circuitscape Mode]\n# a comment\n; another\n\n" *
-               "Scenario = pairwise\nSOLVER = cholmod\nprecision: single\n" *
+    # Inline `;` comments, as Circuitscape 4 read them, and a byte order mark (Notepad)
+    write(ini, "\ufeff[Circuitscape Mode]\n# a comment\n; another\n\n" *
+               "Scenario = pairwise\nSOLVER = cholmod\nprecision: single ; was double\n" *
                "habitat_file = C:\\data\\cell map.asc\r\n")
     Logging.disable_logging(Logging.Debug)
     cfg = try
@@ -672,7 +673,7 @@ end
 
     # A line that is not `key = value`, a comment or a section is an error
     write(ini, "scenario = pairwise\nprecision single\n")
-    @test_throws "job.ini, line 2: expected `key = value`" Circuitscape.parse_config(ini)
+    @test_throws r"malformed line 2 of .*job\.ini" Circuitscape.parse_config(ini)
 
     # write_config lays out every option once, in Circuitscape 4's sections
     keys = reduce(vcat, last.(Circuitscape.INI_SECTIONS))

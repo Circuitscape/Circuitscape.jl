@@ -359,28 +359,24 @@ end
 """
     parse_config(path::AbstractString) -> CSConfig
 
-Read a Circuitscape INI file as Circuitscape 4 (Python's ConfigParser) did:
-each line is `key = value` or `key: value`, keys and option values are
-case-insensitive (file paths keep their case), and blank lines, comment lines
-(starting with `#` or `;`) and section headers are skipped; any other line is
-an error naming the file and line. Every key is parsed on top of the defaults
-from [`init_config`](@ref), so keys that are absent take their default value.
-A value that an enumerated or boolean option does not accept raises an
-`ArgumentError` naming the key and the accepted values; unknown keys produce a
-warning and are ignored. File existence is not checked here but in
+Read a Circuitscape INI file, with IniFile.jl, as Circuitscape 4 (Python's
+ConfigParser) did: each line is `key = value` or `key: value`, keys and option
+values are case-insensitive (file paths keep their case), blank lines and
+comment lines (starting with `#` or `;`) are skipped, and a `;` after
+whitespace starts a comment. Any other line is an error naming the file and
+line. Sections do not matter: all keys are read, from every section. When a key
+is given more than once the later one wins; a section header that appears again
+continues its first section, as in Circuitscape 4. Every key is parsed on top
+of the defaults from [`init_config`](@ref), so keys that are absent take their
+default value. A value that an enumerated or boolean option does not accept
+raises an `ArgumentError` naming the key and the accepted values; unknown keys
+produce a warning and are ignored. File existence is not checked here but in
 [`validate`](@ref).
 """
 function parse_config(path::AbstractString)
-    cf = init_config()
-    for (n, line) in enumerate(eachline(path))
-        s = strip(line)
-        (isempty(s) || first(s) in "#;[") && continue
-        i = findfirst(in("=:"), s)
-        (i === nothing || i == 1) &&
-            throw(ArgumentError("$path, line $n: expected `key = value`, got \"$s\""))
-        cf[_ini_key(s[1:prevind(s, i)])] = s[nextind(s, i):end]
-    end
-    CSConfig(cf)
+    ini = read(Inifile, path; lowercase_keys = true, inline_comment_prefixes = (";",),
+               strict = true)
+    CSConfig(merge!(init_config(), merged(ini)))
 end
 
 """
@@ -441,17 +437,14 @@ section records the version of Circuitscape.jl that wrote it, not
 the INI being run, which is never overwritten.
 """
 function write_config(cfg::CSConfig, path::AbstractString = cfg.output_file)
-    open(path, "w") do io
-        for (n, (section, keys)) in enumerate(INI_SECTIONS)
-            n > 1 && println(io)
-            println(io, "[", section, "]")
-            for key in keys
-                value = key === :version ? string(pkgversion(@__MODULE__)) :
-                                           _to_ini(getfield(cfg, key))
-                println(io, key, " = ", value)
-            end
-        end
+    ini = Inifile()
+    for (section, keys) in INI_SECTIONS, key in keys
+        value = key === :version ? string(pkgversion(@__MODULE__)) :
+                                   _to_ini(getfield(cfg, key))
+        IniFile.set(ini, section, String(key), value)
     end
+    write(path, ini)
+    nothing
 end
 
 # Keep backward compat for Dict-based write_config
