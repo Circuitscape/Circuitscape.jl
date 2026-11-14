@@ -52,9 +52,10 @@ end
     construct_graph(gmap, nodemap, avg_res, four_neighbors)
 
 Build the symmetric weighted adjacency matrix of the raster graph. Every
-non-zero cell of `nodemap` is a node; each node is connected to its right and
-lower neighbours (and, unless `four_neighbors`, to its two right-hand diagonal
-neighbours). Edge weights are the conductance between the two cells, averaged
+non-zero cell of `nodemap` is a node; each cell with positive conductance is
+connected to its right and lower neighbours (and, unless `four_neighbors`, to
+its two right-hand diagonal neighbours) that also have positive conductance,
+so a nodata cell of a polygon belongs to the polygon's node but has no edges. Edge weights are the conductance between the two cells, averaged
 either as resistances (`avg_res`) or as conductances.
 
 Edges are counted in a first pass so that the COO buffers can be allocated
@@ -71,7 +72,7 @@ function construct_graph(gmap, nodemap::Matrix{S}, avg_res, four_neighbors) wher
     size(nodemap) == (nrows, ncols) ||
         throw(DimensionMismatch("gmap is $(size(gmap)) but nodemap is $(size(nodemap))"))
 
-    nedges = count_graph_edges(nodemap, four_neighbors)
+    nedges = count_graph_edges(gmap, nodemap, four_neighbors)
 
     I = Vector{S}(undef, 2nedges)
     J = Vector{S}(undef, 2nedges)
@@ -80,27 +81,27 @@ function construct_graph(gmap, nodemap::Matrix{S}, avg_res, four_neighbors) wher
     k = 0
     @inbounds for j = 1:ncols
         for i = 1:nrows
+            _linked(gmap, nodemap, i, j) || continue
             n = nodemap[i,j]
-            n == 0 && continue
             g = gmap[i,j]
 
             # Horizontal neighbour
-            if j != ncols && nodemap[i,j+1] != 0
+            if j != ncols && _linked(gmap, nodemap, i, j+1)
                 k = _emit_edge!(I, J, V, k, n, nodemap[i,j+1], f1(g, gmap[i,j+1]))
             end
 
             # Vertical neighbour
-            if i != nrows && nodemap[i+1,j] != 0
+            if i != nrows && _linked(gmap, nodemap, i+1, j)
                 k = _emit_edge!(I, J, V, k, n, nodemap[i+1,j], f1(g, gmap[i+1,j]))
             end
 
             if !four_neighbors
                 # Diagonal neighbours
-                if i != nrows && j != ncols && nodemap[i+1,j+1] != 0
+                if i != nrows && j != ncols && _linked(gmap, nodemap, i+1, j+1)
                     k = _emit_edge!(I, J, V, k, n, nodemap[i+1,j+1], f2(g, gmap[i+1,j+1]))
                 end
 
-                if i != 1 && j != ncols && nodemap[i-1,j+1] != 0
+                if i != 1 && j != ncols && _linked(gmap, nodemap, i-1, j+1)
                     k = _emit_edge!(I, J, V, k, n, nodemap[i-1,j+1], f2(g, gmap[i-1,j+1]))
                 end
             end
@@ -135,28 +136,29 @@ end
 end
 
 """
-    count_graph_edges(nodemap, four_neighbors)
+    count_graph_edges(gmap, nodemap, four_neighbors)
 
-Number of undirected edges `construct_graph` will emit for `nodemap`, using the
-same neighbour rules, so that its output buffers can be sized exactly.
+Number of undirected edges `construct_graph` will emit for `gmap` and
+`nodemap`, using the same neighbour rules (both cells must be nodes with
+nonzero conductance), so that its output buffers can be sized exactly.
 """
-function count_graph_edges(nodemap, four_neighbors)
+function count_graph_edges(gmap, nodemap, four_neighbors)
     nrows, ncols = size(nodemap)
     n = 0
     @inbounds for j = 1:ncols
         for i = 1:nrows
-            nodemap[i,j] == 0 && continue
-            if j != ncols && nodemap[i,j+1] != 0
+            _linked(gmap, nodemap, i, j) || continue
+            if j != ncols && _linked(gmap, nodemap, i, j+1)
                 n += 1
             end
-            if i != nrows && nodemap[i+1,j] != 0
+            if i != nrows && _linked(gmap, nodemap, i+1, j)
                 n += 1
             end
             if !four_neighbors
-                if i != nrows && j != ncols && nodemap[i+1,j+1] != 0
+                if i != nrows && j != ncols && _linked(gmap, nodemap, i+1, j+1)
                     n += 1
                 end
-                if i != 1 && j != ncols && nodemap[i-1,j+1] != 0
+                if i != 1 && j != ncols && _linked(gmap, nodemap, i-1, j+1)
                     n += 1
                 end
             end
@@ -165,10 +167,79 @@ function count_graph_edges(nodemap, four_neighbors)
     n
 end
 
+# Whether cell (i, j) takes part in edges: it must be a node and have positive
+# conductance. A cell of a polygon has the polygon's node id even when it is
+# nodata (conductance 0); like Circuitscape 4's _neighbors_* (which link two
+# cells only when both conductances are nonzero), such a cell is not linked to
+# its neighbours, so a polygon straddling nodata does not reach across it.
+# `> 0` rather than `!= 0` matches `construct_node_map`, and keeps negative or
+# -9999 cells passed in by API callers (e.g. Omniscape) out of the graph.
+@inline _linked(gmap, nodemap, i, j) =
+    @inbounds nodemap[i,j] != 0 && gmap[i,j] > 0
+
 res_avg(x, y) = 1 / ((1/x + 1/y) / 2)
 cond_avg(x, y) = (x + y) / 2
 weird_avg(x,y) = (x + y) / (2*√2)
 weirder_avg(x, y) = 1 / (√2 * (1/x + 1/y) / 2)
+
+"""
+    merge_regions_with_polygons!(newpoly, polymap, point_map)
+
+Write into `newpoly` the polygon map for one-to-all and all-to-one runs with
+focal regions and polygons, as Circuitscape 4's `get_poly_map_temp` builds it:
+for each point id in ascending order, the polygons it overlaps on the running
+map and all of its own cells get a fresh id above every polygon number. Two
+regions that share a polygon therefore collapse into one node.
+
+Relabelling the whole map once per point id costs O(points × cells), which is
+seconds per call on large grids with many regions (and the call is repeated
+for every focal node when an include/exclude file is used). Instead, each
+point id's fresh label absorbs the current root of every polygon label it
+overlaps (a union-find over labels; a parent is always a later, larger label,
+so the forest has no cycles), and one final pass writes every cell's root.
+"""
+function merge_regions_with_polygons!(newpoly::AbstractMatrix{V}, polymap,
+                                      point_map) where V
+    k0 = V(maximum(polymap))
+    # (point id, polygon label) for every cell of a region lying on a polygon
+    overlaps = Tuple{V,V}[]
+    ids = V[]
+    @inbounds for i in eachindex(point_map, polymap)
+        p = point_map[i]
+        p == 0 && continue
+        push!(ids, p)
+        polymap[i] != 0 && push!(overlaps, (V(p), V(polymap[i])))
+    end
+    unique!(sort!(ids))
+    unique!(sort!(overlaps))
+    label = Dict{V,V}(p => k0 + V(n) for (n, p) in enumerate(ids))
+
+    parent = Dict{V,V}()
+    function root(x)
+        while true
+            y = get(parent, x, x)
+            y == x && return x
+            x = y
+        end
+    end
+    for (p, l) in overlaps   # ascending point id, as in get_poly_map_temp
+        r = root(l)
+        k = label[p]
+        r != k && (parent[r] = k)
+    end
+
+    @inbounds for i in eachindex(newpoly, point_map, polymap)
+        p = point_map[i]
+        if p != 0
+            newpoly[i] = root(label[p])
+        elseif polymap[i] != 0
+            newpoly[i] = isempty(parent) ? polymap[i] : root(V(polymap[i]))
+        else
+            newpoly[i] = 0
+        end
+    end
+    newpoly
+end
 
 function create_new_polymap(gmap, polymap::Matrix{V}, points_rc,
                 pt1 = 0, pt2 = 0, point_map = Matrix{V}(undef,0,0)) where V
@@ -190,19 +261,7 @@ function create_new_polymap(gmap, polymap::Matrix{V}, points_rc,
                 end
             end
         else
-            k = max(maximum(polymap), maximum(point_map))
-            for i in findall(x->x!=0,point_map)
-                v1 = point_map[i]
-                v2 = newpoly[i]
-                if v2 == 0
-                    newpoly[i] = k + v1
-                    continue
-                end
-                if v1 != v2
-                    ind = findall(x -> x == v2, newpoly)
-                    newpoly[ind] .= v1
-                end
-            end
+            merge_regions_with_polygons!(newpoly, polymap, point_map)
         end
         return newpoly
     end
@@ -234,7 +293,14 @@ function create_new_polymap(gmap, polymap::Matrix{V}, points_rc,
             # means the second region merges with the first if they share
             # a polygon, again as in the original.
             k += 1
-            vals = unique(newpoly[f(x)...] for x in idx if newpoly[f(x)...] != 0)
+            # A loop, not a generator: a generator over `newpoly` captures
+            # it, and since `newpoly` is assigned on several branches it is
+            # then boxed and the function's return type becomes `Any`.
+            vals = V[]
+            for x in idx
+                v = newpoly[f(x)...]
+                v != 0 && !(v in vals) && push!(vals, v)
+            end
             if !isempty(vals)
                 for i in eachindex(newpoly)
                     newpoly[i] in vals && (newpoly[i] = k)
