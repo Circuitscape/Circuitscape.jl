@@ -62,9 +62,7 @@ Whether any raster named by `ini` is a GeoTIFF (or other GDAL-only format).
 """
 function requires_gdal(ini::String)
     cfg = parse_config(ini)
-    any(Circuitscape.needs_gdal(p) for p in
-        (cfg.habitat_file, cfg.point_file, cfg.polygon_file, cfg.mask_file,
-         cfg.source_file, cfg.ground_file) if isfile(p))
+    any(Circuitscape.needs_gdal(getfield(cfg, k)) for k in Circuitscape.RASTER_FILES)
 end
 
 # Skip a case when it needs GDAL and ArchGDAL is not loaded.

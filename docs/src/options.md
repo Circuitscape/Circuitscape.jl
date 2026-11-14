@@ -13,7 +13,7 @@ Keys and option values are case-insensitive: `solver = CHOLMOD`, `Solver = cholm
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|
 | `data_type` | String | `raster` | Input data type. Values: `raster`, `network`. |
-| `scenario` | String | `not entered` | Modeling mode. Values: `pairwise`, `advanced`, `one-to-all`, `all-to-one`. |
+| `scenario` | String | `not entered` | Modeling mode. Values: `pairwise`, `advanced`, `one-to-all`, `all-to-one`. Also accepted: `one_to_all`, `all_to_one`. |
 
 ### Habitat Raster or Graph
 
@@ -45,7 +45,7 @@ Keys and option values are case-insensitive: `solver = CHOLMOD`, `Solver = cholm
 | `ground_file_is_resistances` | Boolean | `True` | If `True`, ground file values are resistances. If `False`, conductances. Set to `False` with value 0 to connect directly to ground. |
 | `use_unit_currents` | Boolean | `False` | If `True`, all current sources are set to 1 Amp regardless of values in the source file. |
 | `use_direct_grounds` | Boolean | `False` | If `True`, all ground nodes are tied directly to ground (R=0) regardless of values in the ground file. |
-| `remove_src_or_gnd` | String | `keepall` | When a source and ground are at the same node: `keepall`, `rmvsrc`, `rmvgnd`, or `rmvall`. |
+| `remove_src_or_gnd` | String | `keepall` | When a source and ground are at the same node: `keepall`, `rmvsrc`, `rmvgnd`, or `rmvall`. `not entered`, which Circuitscape 4 wrote, means `keepall`. |
 
 ### Options for Pairwise, One-to-All, and All-to-One Modes
 

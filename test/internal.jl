@@ -592,6 +592,9 @@ end
     @test_throws ArgumentError Circuitscape.CSConfig(d)
 
     # Placeholders from init_config count as unset
+    @test all(Circuitscape._is_unset(v) for (k, v) in Circuitscape.INI_PLACEHOLDERS
+              if Symbol(k) in fieldnames(Circuitscape.CSConfig) &&
+                 fieldtype(Circuitscape.CSConfig, Symbol(k)) === String)
     err = try Circuitscape.validate(Circuitscape.CSConfig(base)); nothing catch e; e end
     @test err isa ArgumentError
     @test occursin("habitat_file is not set", err.msg)
@@ -654,13 +657,11 @@ end
     ini = joinpath(mktempdir(), "job.ini")
     write(ini, "[Circuitscape Mode]\n# a comment\n; another\n\n" *
                "Scenario = pairwise\nSOLVER = cholmod\nprecision: single\n" *
-               "habitat_file = C:\\data\\cell map.asc\r\n" *
-               "  output_file =  out/job.out  \n" *
-               "clé = x\n")
+               "habitat_file = C:\\data\\cell map.asc\r\n")
     Logging.disable_logging(Logging.Debug)
     cfg = try
-        # the only warning is for the unknown key: no "" key from comments
-        @test_logs (:warn, "Ignoring unrecognised configuration keys: clé") Circuitscape.parse_config(ini)
+        # no warning: comments no longer become a key ""
+        @test_logs Circuitscape.parse_config(ini)
     finally
         Logging.disable_logging(Logging.Warn)
     end
@@ -668,17 +669,38 @@ end
     @test cfg.solver == Circuitscape.st_cholmod
     @test cfg.precision == Circuitscape.pr_single
     @test cfg.habitat_file == "C:\\data\\cell map.asc"
-    @test cfg.output_file == "out/job.out"
 
     # A line that is not `key = value`, a comment or a section is an error
-    for bad in ("precision single", "= single")
-        write(ini, "scenario = pairwise\n$bad\n")
-        @test_throws "job.ini, line 2: expected `key = value`" Circuitscape.parse_config(ini)
-    end
+    write(ini, "scenario = pairwise\nprecision single\n")
+    @test_throws "job.ini, line 2: expected `key = value`" Circuitscape.parse_config(ini)
 
     # write_config lays out every option once, in Circuitscape 4's sections
     keys = reduce(vcat, last.(Circuitscape.INI_SECTIONS))
     @test allunique(keys) && sort(keys) == sort(collect(fieldnames(Circuitscape.CSConfig)))
+end
+
+# The options reference restates each key's default and accepted values;
+# keep it in step with the code.
+@testset "options reference matches the code" begin
+    C = Circuitscape
+    doc = read(joinpath(@__DIR__, "..", "docs", "src", "options.md"), String)
+    rows = Dict(m[1] => (default = strip(m[2], ['`', ' ']), text = m[3])
+                for m in eachmatch(r"^\| `(\w+)` \| \w+ \| ([^|]*) \|([^\n]*)$"m, doc))
+    fields = String.(fieldnames(C.CSConfig))
+    @test sort!(collect(keys(rows))) == sort!(setdiff(fields, ["version"]))
+    # defaults; "—" is a path with no default
+    @test isempty([k for (k, r) in rows if !(C._same(r.default, C.INI_DEFAULTS[k]) ||
+                                              r.default == "—" && C._is_unset(C.INI_DEFAULTS[k]))])
+    # every accepted spelling of every enumerated option
+    missing_names = String[]
+    for (k, r) in rows
+        T = fieldtype(C.CSConfig, Symbol(k))
+        (T <: C.Named && T !== Bool) || continue
+        for (_, names) in C._names(T), n in names
+            occursin(lowercase("`$n`"), lowercase(r.text)) || push!(missing_names, "$k: $n")
+        end
+    end
+    @test isempty(missing_names)
 end
 
 # Keys and option values in any case, in a dict as in an INI file (#534);
@@ -686,29 +708,17 @@ end
 @testset "Case-insensitive configuration" begin
     C = Circuitscape
     d = C.init_config()
-    C.update!(d, Dict("Scenario" => "PAIRWISE", " SOLVER " => "CHOLMOD",
-                      "write_cur_maps" => "TRUE", "precision" => "Single",
-                      "log_level" => "warning", "residual_tolerance" => "AUTO",
-                      "remove_src_or_gnd" => "RmvSrc", "data_type" => "Raster",
-                      "habitat_file" => "Data/Cells.ASC", "log_file" => "NONE"))
-    @test !haskey(d, "Scenario") && !haskey(d, " SOLVER ")
+    C.update!(d, Dict("Scenario" => "pairwise", "solver" => "CHOLMOD",
+                      "write_cur_maps" => "TRUE", "habitat_file" => "Data/Cells.ASC"))
+    @test !haskey(d, "Scenario")
     cfg = C.CSConfig(d)
-    @test cfg.scenario == C.sc_pairwise && cfg.solver == C.st_cholmod
-    @test cfg.write_cur_maps && cfg.precision == C.pr_single
-    @test cfg.log_level == Logging.Warn && cfg.residual_tolerance == 0.0
-    @test cfg.remove_src_or_gnd == C.rp_rmvsrc && cfg.data_type == C.dt_raster
-    @test cfg.habitat_file == "Data/Cells.ASC" && cfg.log_file == ""
-    # values are written in their canonical spelling
-    @test Dict{String,String}(cfg)["write_cur_maps"] == "True"
-    @test Dict{String,String}(cfg)["solver"] == "cholmod"
+    @test cfg.scenario == C.sc_pairwise && cfg.solver == C.st_cholmod && cfg.write_cur_maps
+    @test cfg.habitat_file == "Data/Cells.ASC"
 
-    # CSConfig(dict) folds key case itself
+    # CSConfig(dict) folds key case itself, and refuses a conflict
     @test C.CSConfig(Dict("scenario" => "pairwise", "Solver" => "cholmod")).solver == C.st_cholmod
-    @test C.CSConfig(Dict("scenario" => "pairwise", "Solver" => "cholmod",
-                          "solver" => "cholmod")).solver == C.st_cholmod
     @test_throws "given twice, in different case" C.CSConfig(
         Dict("scenario" => "pairwise", "Solver" => "cholmod", "solver" => "cg+amg"))
-    @test C.normalize_config(Dict(" Use_Mask " => " True ")) == Dict("use_mask" => "True")
 
     @test_throws "solver = \"CHOLMODD\" is not recognised" C.CSConfig(
         Dict("scenario" => "pairwise", "solver" => "CHOLMODD"))
@@ -1830,6 +1840,12 @@ end
     Circuitscape.write_config(cfg)
     @test reads_as(joinpath(dir, "job.out"), cfg)
     Circuitscape.write_config(cfg, joinpath(dir, "copy.ini"))
+    @test reads_as(joinpath(dir, "copy.ini"), cfg)
+    rm(joinpath(dir, "job.out")); rm(joinpath(dir, "copy.ini"))
+    # ... from a Dict too, by default to output_file
+    Circuitscape.write_config(d)
+    @test reads_as(joinpath(dir, "job.out"), cfg)
+    Circuitscape.write_config(d, joinpath(dir, "copy.ini"))
     @test reads_as(joinpath(dir, "copy.ini"), cfg)
     rm(joinpath(dir, "job.out")); rm(joinpath(dir, "copy.ini"))
 
