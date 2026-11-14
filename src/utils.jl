@@ -205,7 +205,8 @@ Arguments:
   affect the result; `data_type`, `scenario`, `ground_file_is_resistances`,
   `remove_src_or_gnd`, `connect_using_avg_resistances` and every map-writing
   option are overridden. The arithmetic precision is `T`, the element type of
-  `conductance`, not `cs_cfg["precision"]`; node indices are always `Int64`.
+  `conductance`, not `cs_cfg["precision"]`; node indices are 32-bit whenever
+  the window fits (see `use_64bit_indexing`).
 
 Returns a `Matrix{Float64}` of `size(conductance)`: the current through each
 cell (`max(inflow, outflow)` at its node), summed over every connected
@@ -220,7 +221,31 @@ function compute_omniscape_current(
         ground::Array{T, 2} where T <: Union{Float32, Float64},
         cs_cfg::Dict{String, String}
     )
-    V = Int64
+    # Omniscape drives a raster advanced-mode solve on in-memory arrays with
+    # the sources removed at conflicts and no maps written; only the solver
+    # settings and connect_four_neighbors_only are taken from the caller.
+    cfg = CSConfig(CSConfig(cs_cfg);
+                   data_type = dt_raster,
+                   scenario = sc_advanced,
+                   ground_file_is_resistances = false,
+                   remove_src_or_gnd = rp_rmvsrc,
+                   connect_using_avg_resistances = false,
+                   write_volt_maps = false,
+                   write_cur_maps = false,
+                   write_cum_cur_map_only = false,
+                   write_max_cur_maps = false,
+                   set_null_currents_to_nodata = false,
+                   set_null_voltages_to_nodata = false,
+                   set_focal_node_currents_to_zero = false,
+                   compress_grids = false,
+                   log_transform_maps = false)
+
+    # 32-bit node indices whenever the window fits, as for an INI run: a
+    # moving window is far below the limit, and the Laplacian, its AMG
+    # hierarchy and every index vector are then a quarter smaller, which is
+    # memory traffic saved on every one of the many concurrent solves.
+    ncells = length(conductance)
+    V = index_type(cfg, ncells, raster_nnz_bound(ncells))
     T = eltype(conductance)
 
     # get raster data
@@ -253,25 +278,6 @@ function compute_omniscape_current(
                             strengths,
                             included_pairs,
                             hbmeta)
-
-    # Omniscape drives a raster advanced-mode solve on in-memory arrays with
-    # the sources removed at conflicts and no maps written; only the solver
-    # settings and connect_four_neighbors_only are taken from the caller.
-    cfg = CSConfig(CSConfig(cs_cfg);
-                   data_type = dt_raster,
-                   scenario = sc_advanced,
-                   ground_file_is_resistances = false,
-                   remove_src_or_gnd = rp_rmvsrc,
-                   connect_using_avg_resistances = false,
-                   write_volt_maps = false,
-                   write_cur_maps = false,
-                   write_cum_cur_map_only = false,
-                   write_max_cur_maps = false,
-                   set_null_currents_to_nodata = false,
-                   set_null_voltages_to_nodata = false,
-                   set_focal_node_currents_to_zero = false,
-                   compress_grids = false,
-                   log_transform_maps = false)
 
     # The kernel accumulates the current map for us even though no map is
     # written; that map is Omniscape's result. Omniscape calls this from many
