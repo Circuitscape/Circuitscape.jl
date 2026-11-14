@@ -53,6 +53,20 @@ else
     println("Skipping Pardiso tests (MKL not available)")
 end
 
+# AMGX needs AMGX.jl in the environment and a working CUDA GPU.
+amgx_available = try
+    @eval using AMGX
+    @eval AMGX.CUDA.functional()
+catch
+    false
+end
+if amgx_available
+    runtests(solver="amgx", parallel=true, precision="double")
+    runtests(solver="amgx", parallel=true, precision="single")
+else
+    println("Skipping AMGX tests (AMGX.jl or a CUDA GPU not available)")
+end
+
 @testset "Issue 341: included pairs" begin
     include("issue341.jl")
 end

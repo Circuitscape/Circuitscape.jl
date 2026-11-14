@@ -539,8 +539,8 @@ index_type(cfg, nnodes, nnz) =
     int32_max_nodes(solver) -> Int
 
 Largest node count solved with 32-bit indices for a solver:
-`INT32_MAX_NODES_ITERATIVE` (100 million) for `cg+amg`, whose memory is a
-small multiple of the Laplacian, and `INT32_MAX_NODES_DIRECT` (8 million) for
+`INT32_MAX_NODES_ITERATIVE` (100 million) for the iterative `cg+amg` and
+`amgx`, whose memory is a small multiple of the Laplacian, and `INT32_MAX_NODES_DIRECT` (8 million) for
 the direct solvers, whose factor must fit 32-bit indices too. The fill of a
 Cholesky factor of a grid Laplacian grows faster than linearly and crosses
 2^31 entries around 15 to 20 million cells with the default ordering, so
@@ -548,7 +548,7 @@ the direct limit keeps a margin of two. Above the limit the run uses 64-bit
 indices; `use_64bit_indexing = true` forces them at any size.
 """
 int32_max_nodes(solver::SolverType) =
-    solver == st_cg_amg ? INT32_MAX_NODES_ITERATIVE : INT32_MAX_NODES_DIRECT
+    solver in (st_cg_amg, st_amgx) ? INT32_MAX_NODES_ITERATIVE : INT32_MAX_NODES_DIRECT
 
 const INT32_MAX_NODES_ITERATIVE = 100_000_000
 const INT32_MAX_NODES_DIRECT = 8_000_000

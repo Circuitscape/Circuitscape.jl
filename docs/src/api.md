@@ -96,6 +96,8 @@ Circuitscape.get_num_pairs
 Circuitscape.solve
 Circuitscape.component_matrix
 Circuitscape.prepare!
+Circuitscape.release!
+Circuitscape.construct_amgx_solver
 Circuitscape.solve_pairs!
 ```
 
@@ -107,6 +109,7 @@ Circuitscape.AMGSolver
 Circuitscape.CholmodSolver
 Circuitscape.PardisoSolver
 Circuitscape.AccelerateSolver
+Circuitscape.AMGXSolver
 Circuitscape.get_solver
 Circuitscape.residual_tolerance
 Circuitscape.solve_linear_system
