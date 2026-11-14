@@ -104,8 +104,6 @@ jobs:
       - uses: actions/checkout@v7
         with:
           repository: Circuitscape/Omniscape.jl
-          # Omniscape main supports Circuitscape 6 since
-          # Circuitscape/Omniscape.jl#171.
           ref: main
           path: downstream/Omniscape
       - uses: julia-actions/setup-julia@v3
