@@ -14,11 +14,13 @@ rejects values it does not recognise rather than falling back to a default.
 `Dict{String,String}(cfg)` converts back to INI strings, and
 `CSConfig(cfg; field = value, ...)` returns a copy with fields replaced.
 
-Field names match the INI keys documented in the options reference. Notable
-defaults: `data_type = dt_raster`, `solver = st_cg_amg`, `precision =
-pr_double`, `cholmod_batch_size = 32`, `residual_tolerance = 0.0` (meaning
-automatic: `1e-4` in double, `1e-3` in single), `log_level = Logging.Info`.
-`scenario` has no usable default and must be set.
+Field names match the INI keys documented in the options reference. The
+field defaults are the one statement of the default configuration;
+[`init_config`](@ref) is them written as INI strings. Notable defaults:
+`data_type = dt_raster`, `solver = st_cg_amg`, `precision = pr_double`,
+`cholmod_batch_size = 32`, `residual_tolerance = 0.0` (meaning automatic:
+`1e-4` in double, `1e-3` in single), `log_level = Logging.Info`. `scenario`
+has no usable default and must be set.
 """
 Base.@kwdef struct CSConfig
     version::String = "unknown"
@@ -69,122 +71,133 @@ Base.@kwdef struct CSConfig
     suppress_messages::Bool = false
 end
 
-# Every parser below rejects values it does not recognise. Falling back to a
-# default silently turned typos into different runs: `solver = cholmodd` ran
-# cg+amg, `scenario = pairwsie` ran pairwise, `write_cur_maps = Ture` wrote
-# nothing (issues #246, #341, #436).
-_bad_value(key, val, valid) =
-    throw(ArgumentError("$key = \"$val\" is not recognised; expected one of: $(join(valid, ", "))"))
-
-function _parse_bool(dict, key, default="false")
-    v = get(dict, key, default)
-    v in TRUELIST && return true
-    v in FALSELIST && return false
-    _bad_value(key, v, ["True", "False"])
-end
-
-function _parse_data_type(s)
-    s in RASTER ? dt_raster :
-    s in NETWORK ? dt_network : _bad_value("data_type", s, ["raster", "network"])
-end
-
-function _parse_scenario(s)
-    s == "not entered" && throw(ArgumentError("scenario is not set; expected one of: pairwise, advanced, one-to-all, all-to-one"))
-    s in PAIRWISE ? sc_pairwise :
-    s in ADVANCED ? sc_advanced :
-    s in ONETOALL ? sc_onetoall :
-    s in ALLTOONE ? sc_alltoone :
-    _bad_value("scenario", s, ["pairwise", "advanced", "one-to-all", "all-to-one"])
-end
-
-function _parse_solver(s)
-    s in AMG ? st_cg_amg :
-    s in CHOLMOD ? st_cholmod :
-    s in PARDISO ? st_pardiso :
-    s in ACCELERATE ? st_accelerate :
-    s in AMGX_GPU ? st_amgx :
-    _bad_value("solver", s, ["cg+amg", "cholmod", "pardiso", "accelerate", "amgx"])
-end
-
-function _parse_precision(s)
-    s in SINGLE ? pr_single :
-    s in DOUBLE ? pr_double : _bad_value("precision", s, ["single", "double"])
-end
-
-_parse_tolerance(s) = s in ("auto", "Auto", "AUTO", "None", "") ? 0.0 : parse(Float64, s)
-_tolerance_str(v) = v > 0 ? string(v) : "auto"
-
-function _parse_log_level(s)
-    # Circuitscape 4 accepted Python's level names; keep reading them.
-    l = lowercase(s)
-    l == "debug" ? Logging.Debug :
-    l == "info" ? Logging.Info :
-    l in ("warn", "warning") ? Logging.Warn :
-    l in ("error", "critical") ? Logging.Error :
-    _bad_value("log_level", s, ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"])
-end
-
-function _parse_remove_policy(s)
+# The INI spellings each boolean and enumerated value is read from; the first
+# is the one written. Every parser rejects values it does not recognise.
+# Falling back to a default silently turned typos into different runs:
+# `solver = cholmodd` ran cg+amg, `scenario = pairwsie` ran pairwise,
+# `write_cur_maps = Ture` wrote nothing (issues #246, #341, #436).
+const INI_NAMES = [
+    Bool => [true => ["True", "true", "1"], false => ["False", "false", "0"]],
+    DataType => [dt_raster => ["raster", "Raster"], dt_network => ["network", "Network"]],
+    Scenario => [sc_pairwise => ["pairwise", "Pairwise"],
+                 sc_advanced => ["advanced", "Advanced"],
+                 sc_onetoall => ["one-to-all", "one_to_all"],
+                 sc_alltoone => ["all-to-one", "all_to_one"]],
+    SolverType => [st_cg_amg => ["cg+amg", "amg+cg"],
+                   st_cholmod => ["cholmod", "cholesky", "cholfact"],
+                   st_pardiso => ["pardiso", "mklpardiso", "MKLPardiso", "PARDISO"],
+                   st_accelerate => ["accelerate", "Accelerate", "ACCELERATE", "apple_accelerate"],
+                   st_amgx => ["amgx", "AMGX"]],
+    Precision => [pr_single => ["single", "Single"], pr_double => ["double", "Double"]],
     # Circuitscape 4 wrote "not entered" for the default policy
-    s in ("keepall", "not entered") ? rp_keepall :
-    s == "rmvsrc" ? rp_rmvsrc :
-    s == "rmvgnd" ? rp_rmvgnd :
-    s == "rmvall" ? rp_rmvall :
-    _bad_value("remove_src_or_gnd", s, ["keepall", "rmvsrc", "rmvgnd", "rmvall"])
+    RemovePolicy => [rp_keepall => ["keepall", "not entered"], rp_rmvsrc => ["rmvsrc"],
+                     rp_rmvgnd => ["rmvgnd"], rp_rmvall => ["rmvall"]],
+    # Matched in any case. Circuitscape 4 took Python's level names; keep them.
+    Logging.LogLevel => [Logging.Debug => ["DEBUG"], Logging.Info => ["INFO"],
+                         Logging.Warn => ["WARNING", "WARN"],
+                         Logging.Error => ["ERROR", "CRITICAL"]],
+]
+const Named = Union{Bool, Enum, Logging.LogLevel}
+# A method per type, so that parsing a field does no table lookup at run time.
+for (T, names) in INI_NAMES
+    @eval _names(::Type{$T}) = $names
 end
+
+# `_from_ini(T, key, s)` reads the INI string `s` of `key` as a `T`;
+# `_to_ini(v)` writes `v` back.
+function _from_ini(::Type{T}, key, s) where {T<:Named}
+    t = T === Logging.LogLevel ? uppercase(s) : s
+    for (v, names) in _names(T)
+        t in names && return v
+    end
+    valid = join((first(names) for (_, names) in _names(T)), ", ")
+    # init_config leaves `scenario` as "not entered"
+    s == "not entered" && throw(ArgumentError("$key is not set; expected one of: $valid"))
+    throw(ArgumentError("$key = \"$s\" is not recognised; expected one of: $valid"))
+end
+_to_ini(v::T) where {T<:Named} = first(only(names for (x, names) in _names(T) if x == v))
+
+# "None" is how Circuitscape 4 (Python) wrote an unset path.
+_from_ini(::Type{String}, key, s) = s == "None" ? "" : String(s)
+_to_ini(v::String) = v == "" ? "None" : v
+
+_from_ini(::Type{Int}, key, s) =
+    @something(tryparse(Int, s), throw(ArgumentError("$key = \"$s\" is not an integer")))
+_to_ini(v::Int) = string(v)
+
+# residual_tolerance, the only real-valued option: 0 means automatic.
+_from_ini(::Type{Float64}, key, s) =
+    s in ("auto", "Auto", "AUTO", "None", "") ? 0.0 :
+    @something(tryparse(Float64, s), throw(ArgumentError("$key = \"$s\" is not a number or auto")))
+_to_ini(v::Float64) = v > 0 ? string(v) : "auto"
+
+# The sections of the INI file `write_config` writes, and the keys in each, in
+# the order Circuitscape 4 wrote them. Sections mean nothing when reading.
+# Every CSConfig field appears exactly once.
+const INI_SECTIONS = [
+    "Circuitscape Mode" => [:data_type, :scenario],
+    "Version" => [:version],
+    "Habitat raster or graph" => [:habitat_file, :habitat_map_is_resistances],
+    "Options for reclassification of habitat data" => [:use_reclass_table, :reclass_file],
+    "Connection Scheme for raster habitat data" =>
+        [:connect_four_neighbors_only, :connect_using_avg_resistances],
+    "Short circuit regions (aka polygons)" => [:use_polygons, :polygon_file],
+    "Options for advanced mode" =>
+        [:ground_file_is_resistances, :source_file, :remove_src_or_gnd, :ground_file,
+         :use_unit_currents, :use_direct_grounds],
+    "Mask file" => [:use_mask, :mask_file],
+    "Options for one-to-all and all-to-one modes" =>
+        [:use_variable_source_strengths, :variable_source_file],
+    "Options for pairwise and one-to-all and all-to-one modes" =>
+        [:included_pairs_file, :use_included_pairs, :point_file],
+    "Calculation options" =>
+        [:solver, :residual_tolerance, :precision, :parallelize, :use_64bit_indexing,
+         :cholmod_batch_size, :low_memory_mode, :preemptive_memory_release],
+    "Output options" =>
+        [:write_cum_cur_map_only, :log_transform_maps, :output_file, :write_max_cur_maps,
+         :write_volt_maps, :set_null_currents_to_nodata, :set_null_voltages_to_nodata,
+         :compress_grids, :write_cur_maps, :set_focal_node_currents_to_zero, :write_as_tif],
+    "Logging Options" => [:log_level, :log_file, :suppress_messages],
+]
+
+# Where `init_config` differs from the CSConfig defaults: the INI Builder's
+# placeholders, which `validate` treats as unset, and Circuitscape 4 keys that
+# are accepted, so that old INI files load without warnings, and do nothing.
+const INI_PLACEHOLDERS = Dict(
+    "scenario" => "not entered",
+    "habitat_file" => "(Browse for a resistance file)",
+    "polygon_file" => "(Browse for a short-circuit region file)",
+    "source_file" => "(Browse for a current source file)",
+    "ground_file" => "(Browse for a ground point file)",
+    "included_pairs_file" => "(Browse for a file with pairs to include or exclude)",
+    "point_file" => "(Browse for file with locations of focal points or regions)",
+    "reclass_file" => "(Browse for file with reclassification data)",
+    "output_file" => "(Choose a base name for output files)",
+    "print_timings" => "False",
+    "print_rusages" => "False",
+    "screenprint_log" => "False",
+    "profiler_log_file" => "None",
+)
+
+Base.Dict{String,String}(cfg::CSConfig) =
+    Dict{String,String}(String(f) => _to_ini(getfield(cfg, f)) for f in fieldnames(CSConfig))
+
+const INI_DEFAULTS = merge(Dict{String,String}(CSConfig()), INI_PLACEHOLDERS)
 
 function CSConfig(dict::Dict{String,String})
-    unknown = setdiff(keys(dict), keys(init_config()))
+    unknown = sort!([k for k in keys(dict) if !haskey(INI_DEFAULTS, k)])
     isempty(unknown) ||
-        @warn("Ignoring unrecognised configuration keys: $(join(sort!(collect(unknown)), ", "))")
-    CSConfig(
-        version = get(dict, "version", "unknown"),
-        data_type = _parse_data_type(get(dict, "data_type", "raster")),
-        scenario = _parse_scenario(get(dict, "scenario", "not entered")),
-        habitat_file = get(dict, "habitat_file", ""),
-        habitat_map_is_resistances = _parse_bool(dict, "habitat_map_is_resistances", "True"),
-        connect_four_neighbors_only = _parse_bool(dict, "connect_four_neighbors_only"),
-        connect_using_avg_resistances = _parse_bool(dict, "connect_using_avg_resistances"),
-        use_polygons = _parse_bool(dict, "use_polygons"),
-        polygon_file = get(dict, "polygon_file", ""),
-        source_file = get(dict, "source_file", ""),
-        ground_file = get(dict, "ground_file", ""),
-        ground_file_is_resistances = _parse_bool(dict, "ground_file_is_resistances", "True"),
-        use_unit_currents = _parse_bool(dict, "use_unit_currents"),
-        use_direct_grounds = _parse_bool(dict, "use_direct_grounds"),
-        remove_src_or_gnd = _parse_remove_policy(get(dict, "remove_src_or_gnd", "keepall")),
-        use_mask = _parse_bool(dict, "use_mask"),
-        mask_file = get(dict, "mask_file", ""),
-        solver = _parse_solver(get(dict, "solver", "cg+amg")),
-        parallelize = _parse_bool(dict, "parallelize"),
-        precision = _parse_precision(get(dict, "precision", "Double")),
-        use_64bit_indexing = _parse_bool(dict, "use_64bit_indexing", "false"),
-        cholmod_batch_size = parse(Int, get(dict, "cholmod_batch_size", "32")),
-        residual_tolerance = _parse_tolerance(get(dict, "residual_tolerance", "auto")),
-        low_memory_mode = _parse_bool(dict, "low_memory_mode"),
-        preemptive_memory_release = _parse_bool(dict, "preemptive_memory_release"),
-        use_variable_source_strengths = _parse_bool(dict, "use_variable_source_strengths"),
-        variable_source_file = get(dict, "variable_source_file", ""),
-        use_included_pairs = _parse_bool(dict, "use_included_pairs"),
-        included_pairs_file = get(dict, "included_pairs_file", ""),
-        point_file = get(dict, "point_file", ""),
-        use_reclass_table = _parse_bool(dict, "use_reclass_table"),
-        reclass_file = get(dict, "reclass_file", ""),
-        output_file = get(dict, "output_file", ""),
-        write_cur_maps = _parse_bool(dict, "write_cur_maps"),
-        write_volt_maps = _parse_bool(dict, "write_volt_maps"),
-        write_cum_cur_map_only = _parse_bool(dict, "write_cum_cur_map_only"),
-        write_max_cur_maps = _parse_bool(dict, "write_max_cur_maps"),
-        set_null_currents_to_nodata = _parse_bool(dict, "set_null_currents_to_nodata"),
-        set_null_voltages_to_nodata = _parse_bool(dict, "set_null_voltages_to_nodata"),
-        set_focal_node_currents_to_zero = _parse_bool(dict, "set_focal_node_currents_to_zero"),
-        compress_grids = _parse_bool(dict, "compress_grids"),
-        log_transform_maps = _parse_bool(dict, "log_transform_maps"),
-        write_as_tif = _parse_bool(dict, "write_as_tif"),
-        log_file = let v = get(dict, "log_file", "None"); v == "None" ? "" : v end,
-        log_level = _parse_log_level(get(dict, "log_level", "INFO")),
-        suppress_messages = _parse_bool(dict, "suppress_messages"),
-    )
+        @warn("Ignoring unrecognised configuration keys: $(join(unknown, ", "))")
+    _parse_fields(dict)
+end
+
+# One positional constructor call with every field's parser known statically,
+# as in `_copy_with` below. A key absent from `dict` takes its init_config value.
+@generated function _parse_fields(dict::Dict{String,String})
+    args = [:(_from_ini($(fieldtype(CSConfig, f)), $(String(f)),
+                        get(dict, $(String(f)), INI_DEFAULTS[$(String(f))])))
+            for f in fieldnames(CSConfig)]
+    :(CSConfig($(args...)))
 end
 
 """
@@ -259,50 +272,6 @@ function validate(cfg::CSConfig)
     cfg
 end
 
-# String converters for CSConfig fields
-_bool_str(v::Bool) = v ? "True" : "False"
-
-function _data_type_str(v::DataType)
-    v == dt_raster ? "raster" : "network"
-end
-
-function _scenario_str(v::Scenario)
-    v == sc_pairwise ? "pairwise" :
-    v == sc_advanced ? "advanced" :
-    v == sc_onetoall ? "one-to-all" :
-    v == sc_alltoone ? "all-to-one" : "pairwise"
-end
-
-function _solver_str(v::SolverType)
-    v == st_cg_amg ? "cg+amg" :
-    v == st_cholmod ? "cholmod" :
-    v == st_pardiso ? "mklpardiso" :
-    v == st_accelerate ? "accelerate" :
-    v == st_amgx ? "amgx" : "cg+amg"
-end
-
-_precision_str(v::Precision) = v == pr_single ? "single" : "double"
-
-function _log_level_str(v::Logging.LogLevel)
-    v == Logging.Debug ? "DEBUG" :
-    v == Logging.Warn ? "WARNING" :
-    v == Logging.Error ? "ERROR" : "INFO"
-end
-
-function _remove_policy_str(v::RemovePolicy)
-    v == rp_keepall ? "keepall" :
-    v == rp_rmvsrc ? "rmvsrc" :
-    v == rp_rmvgnd ? "rmvgnd" :
-    v == rp_rmvall ? "rmvall" : "keepall"
-end
-
-function _remove_policy_symbol(v::RemovePolicy)
-    v == rp_keepall ? :keepall :
-    v == rp_rmvsrc ? :rmvsrc :
-    v == rp_rmvgnd ? :rmvgnd :
-    v == rp_rmvall ? :rmvall : :keepall
-end
-
 # Predicates on a CSConfig. These replace the RasterFlags / NetworkFlags /
 # OutputFlags structs that used to be rebuilt from cfg at every entry point:
 # with a single representation there is no second copy for an option to be
@@ -313,7 +282,7 @@ is_pairwise(cfg::CSConfig) = cfg.scenario == sc_pairwise
 is_advanced(cfg::CSConfig) = cfg.scenario == sc_advanced
 is_onetoall(cfg::CSConfig) = cfg.scenario == sc_onetoall
 is_alltoone(cfg::CSConfig) = cfg.scenario == sc_alltoone
-policy(cfg::CSConfig) = _remove_policy_symbol(cfg.remove_src_or_gnd)
+policy(cfg::CSConfig) = Symbol(_to_ini(cfg.remove_src_or_gnd))
 
 """
     CSConfig(cfg::CSConfig; field = value, ...)
@@ -338,81 +307,30 @@ CSConfig(cfg::CSConfig; kwargs...) = _copy_with(cfg, values(kwargs))
     :(CSConfig($(args...)))
 end
 
-function Base.Dict{String,String}(cfg::CSConfig)
-    a = Dict{String,String}()
-    a["version"] = cfg.version
-    a["data_type"] = _data_type_str(cfg.data_type)
-    a["scenario"] = _scenario_str(cfg.scenario)
-    a["habitat_file"] = cfg.habitat_file
-    a["habitat_map_is_resistances"] = _bool_str(cfg.habitat_map_is_resistances)
-    a["connect_four_neighbors_only"] = _bool_str(cfg.connect_four_neighbors_only)
-    a["connect_using_avg_resistances"] = _bool_str(cfg.connect_using_avg_resistances)
-    a["use_polygons"] = _bool_str(cfg.use_polygons)
-    a["polygon_file"] = cfg.polygon_file
-    a["source_file"] = cfg.source_file
-    a["ground_file"] = cfg.ground_file
-    a["ground_file_is_resistances"] = _bool_str(cfg.ground_file_is_resistances)
-    a["use_unit_currents"] = _bool_str(cfg.use_unit_currents)
-    a["use_direct_grounds"] = _bool_str(cfg.use_direct_grounds)
-    a["remove_src_or_gnd"] = _remove_policy_str(cfg.remove_src_or_gnd)
-    a["use_mask"] = _bool_str(cfg.use_mask)
-    a["mask_file"] = cfg.mask_file
-    a["solver"] = _solver_str(cfg.solver)
-    a["parallelize"] = _bool_str(cfg.parallelize)
-    a["precision"] = _precision_str(cfg.precision)
-    a["use_64bit_indexing"] = _bool_str(cfg.use_64bit_indexing)
-    a["cholmod_batch_size"] = string(cfg.cholmod_batch_size)
-    a["residual_tolerance"] = _tolerance_str(cfg.residual_tolerance)
-    a["low_memory_mode"] = _bool_str(cfg.low_memory_mode)
-    a["preemptive_memory_release"] = _bool_str(cfg.preemptive_memory_release)
-    a["use_variable_source_strengths"] = _bool_str(cfg.use_variable_source_strengths)
-    a["variable_source_file"] = cfg.variable_source_file
-    a["use_included_pairs"] = _bool_str(cfg.use_included_pairs)
-    a["included_pairs_file"] = cfg.included_pairs_file
-    a["point_file"] = cfg.point_file
-    a["use_reclass_table"] = _bool_str(cfg.use_reclass_table)
-    a["reclass_file"] = cfg.reclass_file
-    a["output_file"] = cfg.output_file
-    a["write_cur_maps"] = _bool_str(cfg.write_cur_maps)
-    a["write_volt_maps"] = _bool_str(cfg.write_volt_maps)
-    a["write_cum_cur_map_only"] = _bool_str(cfg.write_cum_cur_map_only)
-    a["write_max_cur_maps"] = _bool_str(cfg.write_max_cur_maps)
-    a["set_null_currents_to_nodata"] = _bool_str(cfg.set_null_currents_to_nodata)
-    a["set_null_voltages_to_nodata"] = _bool_str(cfg.set_null_voltages_to_nodata)
-    a["set_focal_node_currents_to_zero"] = _bool_str(cfg.set_focal_node_currents_to_zero)
-    a["compress_grids"] = _bool_str(cfg.compress_grids)
-    a["log_transform_maps"] = _bool_str(cfg.log_transform_maps)
-    a["write_as_tif"] = _bool_str(cfg.write_as_tif)
-    a["log_file"] = cfg.log_file == "" ? "None" : cfg.log_file
-    a["log_level"] = _log_level_str(cfg.log_level)
-    a["suppress_messages"] = _bool_str(cfg.suppress_messages)
-    a
-end
-
 """
-    parse_config(path::String) -> CSConfig
+    parse_config(path::AbstractString) -> CSConfig
 
-Read a Circuitscape INI file. Section headers are ignored; every `key = value`
-line is parsed on top of the defaults from [`init_config`](@ref), so keys that
-are absent take their default value. Unrecognised values for `solver`,
+Read a Circuitscape INI file as Circuitscape 4 (Python's ConfigParser) did:
+each line is `key = value` or `key: value`, keys are case-insensitive, and
+blank lines, comment lines (starting with `#` or `;`) and section headers are
+skipped; any other line is an error naming the file and line. Every key is
+parsed on top of the defaults from [`init_config`](@ref), so keys that are
+absent take their default value. Unrecognised values for `solver`,
 `scenario`, `data_type`, `precision`, `log_level`, `remove_src_or_gnd` and any
 boolean raise an `ArgumentError` naming the key; unknown keys produce a
 warning and are ignored. File existence is not checked here but in
 [`validate`](@ref).
 """
-function parse_config(path::String)
+function parse_config(path::AbstractString)
     cf = init_config()
-    f = open(path, "r")
-    for i in eachline(f, keep = true)
-        if first(i) == '['
-            continue
-        end
-        idx = something(findfirst(isequal('='), i), 0)
-        var = rstrip(i[1:idx-1])
-        val = strip(i[idx+1:end])
-        cf[var] = val
+    for (n, line) in enumerate(eachline(path))
+        s = strip(line)
+        (isempty(s) || first(s) in "#;[") && continue
+        i = findfirst(in("=:"), s)
+        (i === nothing || i == 1) &&
+            throw(ArgumentError("$path, line $n: expected `key = value`, got \"$s\""))
+        cf[lowercase(rstrip(s[1:prevind(s, i)]))] = strip(s[nextind(s, i):end])
     end
-    close(f)
     CSConfig(cf)
 end
 
@@ -427,63 +345,7 @@ placeholders such as `"(Browse for a resistance file)"`, which
 (`print_timings`, `print_rusages`, `screenprint_log`, `profiler_log_file`) are
 present so that old INI files load without warnings; they have no effect.
 """
-function init_config()
-    a = Dict{String, String}()
-
-    a["version"] = "unknown"
-    a["connect_four_neighbors_only"] =  "False"
-    a["connect_using_avg_resistances"] = "False"
-    a["use_polygons"] =  "False"
-    a["polygon_file"] = "(Browse for a short-circuit region file)"
-    a["source_file"] = "(Browse for a current source file)"
-    a["ground_file"]  = "(Browse for a ground point file)"
-    a["ground_file_is_resistances"] = "True"
-    a["use_unit_currents"] = "False"
-    a["use_direct_grounds"] = "False"
-    a["remove_src_or_gnd"]  = "keepall"
-    a["mask_file"] =  "None"
-    a["use_mask"] = "False"
-    a["preemptive_memory_release"] = "False"
-    a["low_memory_mode"] = "False"
-    a["parallelize"] =  "False"
-    a["print_timings"] = "False"
-    a["print_rusages"] = "False"
-    a["solver"] =  "cg+amg"
-    a["use_variable_source_strengths"] = "False"
-    a["variable_source_file"] =  "None"
-    a["set_null_currents_to_nodata"] = "False"
-    a["output_file"] = "(Choose a base name for output files)"
-    a["write_cum_cur_map_only"] =  "False"
-    a["log_transform_maps"] = "False"
-    a["write_max_cur_maps"] = "False"
-    a["compress_grids"] = "False"
-    a["set_null_voltages_to_nodata"] = "False"
-    a["set_focal_node_currents_to_zero"] = "False"
-    a["write_volt_maps"] = "False"
-    a["write_cur_maps"] = "False"
-    a["habitat_map_is_resistances"] = "True"
-    a["habitat_file"] = "(Browse for a resistance file)"
-    a["scenario"] = "not entered"
-    a["data_type"] = "raster"
-    a["use_included_pairs"] = "False"
-    a["included_pairs_file"] = "(Browse for a file with pairs to include or exclude)"
-    a["point_file"] = "(Browse for file with locations of focal points or regions)"
-    a["use_reclass_table"] = "False"
-    a["reclass_file"] = "(Browse for file with reclassification data)"
-    a["profiler_log_file"]  = "None"
-    a["log_file"] = "None"
-    a["log_level"] = "INFO"
-    a["screenprint_log"] = "False"
-    a["precision"] = "Double"
-    a["log_file"] = "None"
-    a["log_level"] = "INFO"
-    a["cholmod_batch_size"] = "32"
-    a["residual_tolerance"] = "auto"
-    a["use_64bit_indexing"] = "false"
-    a["write_as_tif"] = "false"
-    a["suppress_messages"] = "false"
-    a
-end
+init_config() = copy(INI_DEFAULTS)
 
 """
     update!(cfg::Dict{String,String}, new) -> cfg
@@ -527,80 +389,15 @@ section records the writer, not `cfg.version`).
 the INI being run, which is never overwritten.
 """
 function write_config(cfg::CSConfig, path::AbstractString = cfg.output_file)
-    open(path, "w") do f
-        write(f, """
-        [Circuitscape Mode]
-        data_type = $(_data_type_str(cfg.data_type))
-        scenario = $(_scenario_str(cfg.scenario))
-
-        [Version]
-        version = 5.0.0
-
-        [Habitat raster or graph]
-        habitat_file = $(cfg.habitat_file)
-        habitat_map_is_resistances = $(cfg.habitat_map_is_resistances)
-
-        [Options for reclassification of habitat data]
-        use_reclass_table = $(cfg.use_reclass_table)
-        reclass_file = $(cfg.reclass_file)
-
-        [Connection Scheme for raster habitat data]
-        connect_four_neighbors_only = $(cfg.connect_four_neighbors_only)
-        connect_using_avg_resistances = $(cfg.connect_using_avg_resistances)
-
-        [Short circuit regions (aka polygons)]
-        use_polygons = $(cfg.use_polygons)
-        polygon_file = $(cfg.polygon_file)
-
-        [Options for advanced mode]
-        ground_file_is_resistances = $(cfg.ground_file_is_resistances)
-        source_file = $(cfg.source_file)
-        remove_src_or_gnd = $(_remove_policy_str(cfg.remove_src_or_gnd))
-        ground_file = $(cfg.ground_file)
-        use_unit_currents = $(cfg.use_unit_currents)
-        use_direct_grounds = $(cfg.use_direct_grounds)
-
-        [Mask file]
-        use_mask = $(cfg.use_mask)
-        mask_file = $(cfg.mask_file)
-
-        [Options for one-to-all and all-to-one modes]
-        use_variable_source_strengths = $(cfg.use_variable_source_strengths)
-        variable_source_file = $(cfg.variable_source_file)
-
-        [Options for pairwise and one-to-all and all-to-one modes]
-        included_pairs_file = $(cfg.included_pairs_file)
-        use_included_pairs = $(cfg.use_included_pairs)
-        point_file = $(cfg.point_file)
-
-        [Calculation options]
-        solver = $(_solver_str(cfg.solver))
-        residual_tolerance = $(_tolerance_str(cfg.residual_tolerance))
-        precision = $(_precision_str(cfg.precision))
-        parallelize = $(cfg.parallelize)
-        use_64bit_indexing = $(cfg.use_64bit_indexing)
-        cholmod_batch_size = $(cfg.cholmod_batch_size)
-        low_memory_mode = $(cfg.low_memory_mode)
-        preemptive_memory_release = $(cfg.preemptive_memory_release)
-
-        [Output options]
-        write_cum_cur_map_only = $(cfg.write_cum_cur_map_only)
-        log_transform_maps = $(cfg.log_transform_maps)
-        output_file = $(cfg.output_file)
-        write_max_cur_maps = $(cfg.write_max_cur_maps)
-        write_volt_maps = $(cfg.write_volt_maps)
-        set_null_currents_to_nodata = $(cfg.set_null_currents_to_nodata)
-        set_null_voltages_to_nodata = $(cfg.set_null_voltages_to_nodata)
-        compress_grids = $(cfg.compress_grids)
-        write_cur_maps = $(cfg.write_cur_maps)
-        set_focal_node_currents_to_zero = $(cfg.set_focal_node_currents_to_zero)
-        write_as_tif = $(cfg.write_as_tif)
-
-        [Logging Options]
-        log_level = $(_log_level_str(cfg.log_level))
-        log_file = $(cfg.log_file == "" ? "None" : cfg.log_file)
-        suppress_messages = $(cfg.suppress_messages)
-        """)
+    open(path, "w") do io
+        for (n, (section, keys)) in enumerate(INI_SECTIONS)
+            n > 1 && println(io)
+            println(io, "[", section, "]")
+            for key in keys
+                value = key === :version ? "5.0.0" : _to_ini(getfield(cfg, key))
+                println(io, key, " = ", value)
+            end
+        end
     end
 end
 

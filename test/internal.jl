@@ -647,6 +647,40 @@ end
     @test Dict{String,String}(cfg2)["scenario"] == "advanced"
 end
 
+# INI files are read as Circuitscape 4 (Python's ConfigParser) read them.
+# Before, a comment or blank line became a key "", `precision: single` was
+# dropped (running double) and `Solver = cholmod` was ignored (running cg+amg).
+@testset "INI syntax" begin
+    ini = joinpath(mktempdir(), "job.ini")
+    write(ini, "[Circuitscape Mode]\n# a comment\n; another\n\n" *
+               "Scenario = pairwise\nSOLVER = cholmod\nprecision: single\n" *
+               "habitat_file = C:\\data\\cell map.asc\r\n" *
+               "  output_file =  out/job.out  \n" *
+               "clé = x\n")
+    Logging.disable_logging(Logging.Debug)
+    cfg = try
+        # the only warning is for the unknown key: no "" key from comments
+        @test_logs (:warn, "Ignoring unrecognised configuration keys: clé") Circuitscape.parse_config(ini)
+    finally
+        Logging.disable_logging(Logging.Warn)
+    end
+    @test cfg.scenario == Circuitscape.sc_pairwise
+    @test cfg.solver == Circuitscape.st_cholmod
+    @test cfg.precision == Circuitscape.pr_single
+    @test cfg.habitat_file == "C:\\data\\cell map.asc"
+    @test cfg.output_file == "out/job.out"
+
+    # A line that is not `key = value`, a comment or a section is an error
+    for bad in ("precision single", "= single")
+        write(ini, "scenario = pairwise\n$bad\n")
+        @test_throws "job.ini, line 2: expected `key = value`" Circuitscape.parse_config(ini)
+    end
+
+    # write_config lays out every option once, in Circuitscape 4's sections
+    keys = reduce(vcat, last.(Circuitscape.INI_SECTIONS))
+    @test allunique(keys) && sort(keys) == sort(collect(fieldnames(Circuitscape.CSConfig)))
+end
+
 # Issue 342: set_focal_node_currents_to_zero
 @testset "set_focal_node_currents_to_zero (#342)" begin
     dir = mktempdir()

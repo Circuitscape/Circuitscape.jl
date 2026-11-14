@@ -4,6 +4,8 @@
 
 All Circuitscape configuration is done through an `.ini` file. Below is a complete reference of all arguments, organized by section, with their types, default values, and descriptions.
 
+The file is read as Circuitscape 4 read it. Each line is `key = value` or `key: value`, and keys are case-insensitive (`Solver` is `solver`). Blank lines and lines starting with `#` or `;` are skipped. Section headers such as `[Calculation options]` lay out the file but do not affect how it is read, so a key may appear under any section. Any other line is an error naming the file and line number.
+
 ### Circuitscape Mode
 
 | Argument | Type | Default | Description |
@@ -142,7 +144,7 @@ ArgumentError: Invalid configuration:
 
 **Unknown keys** produce a warning (`Ignoring unrecognised configuration keys: ...`) and are otherwise ignored, so a misspelt key is visible without breaking old INI files.
 
-**Circuitscape 4 spellings** still work: `remove_src_or_gnd = not entered` means `keepall`, Python log level names (`WARNING`, `CRITICAL`, any case) are read, and `residual_tolerance = None` means automatic.
+**Circuitscape 4 spellings** still work: `remove_src_or_gnd = not entered` means `keepall`, Python log level names (`WARNING`, `CRITICAL`, any case) are read, `residual_tolerance = None` means automatic, and `None` for a file path means not set.
 
 ## Data Type
 
