@@ -363,10 +363,17 @@ end
 
 import Circuitscape: resolve_conflicts
 
-@test resolve_conflicts([1.,0.,0.], [1.,0.,0.], :rmvgnd) == ([1, 0, 0], [0, 0, 0], [1, 0, 0])
+# The finite grounds are those left after the conflicts are resolved (a
+# removed ground does not stay on the solver diagonal), and rmvall removes
+# both sides; -9999 marks "no finite grounds".
+@test resolve_conflicts([1.,0.,0.], [1.,0.,0.], :rmvgnd) == ([1, 0, 0], [0, 0, 0], [-9999])
 @test resolve_conflicts([1.,0.,0.], [1.,0.,0.], :rmvsrc) == ([0, 0, 0], [1, 0, 0], [1, 0, 0])
 @test resolve_conflicts([1.,0.,0.], [1.,0.,0.], :keepall) == ([1, 0, 0], [1, 0, 0], [1, 0, 0])
-@test resolve_conflicts([1.,0.,0.], [1.,0.,0.], :rmvall) == ([0, 0, 0], [1, 0, 0], [1, 0, 0])
+@test resolve_conflicts([1.,0.,0.], [1.,0.,0.], :rmvall) == ([0, 0, 0], [0, 0, 0], [-9999])
+@test resolve_conflicts([1.,1.,0.], [1.,0.,2.], :rmvgnd) == ([1, 1, 0], [0, 0, 2], [0, 0, 2])
+@test resolve_conflicts([1.,1.,0.], [1.,0.,2.], :rmvall) == ([0, 1, 0], [0, 0, 2], [0, 0, 2])
+# A direct ground under a source is removed whatever the source's sign
+@test resolve_conflicts([-1.,1.,0.], [Inf,0.,2.], :keepall) == ([-1, 1, 0], [0, 0, 2], [0, 0, 2])
 
 # Construct graph
 import Circuitscape: construct_graph
@@ -690,6 +697,131 @@ end
     ota_cum = read_map("ota_cum_curmap.asc")
     @test all(ota_cum[i, j] == 0 for (i, j) in focal)
     @test any(ota_cum .> 0)
+end
+
+# Advanced mode resolves source/ground conflicts the way Python does: on the
+# raster cell maps as they are read (rmvall drops both sides), then on the
+# nodes; a component is solved as long as it has a nonzero source and ground.
+@testset "advanced conflict policies" begin
+    dir = mktempdir()
+    hdr = "ncols 3\nnrows 3\nxllcorner 0\nyllcorner 0\ncellsize 1\nNODATA_value -9999\n"
+    asc(rows) = hdr * join((join(r, " ") for r in rows), "\n") * "\n"
+    write(joinpath(dir, "cell.asc"), asc(fill([1, 1, 1], 3)))
+    # (2,2) is both a source and a finite ground; (1,1) a plain source and
+    # (3,3) a plain ground.
+    write(joinpath(dir, "src.asc"), asc([[1, 0, 0], [0, 1, 0], [0, 0, 0]]))
+    write(joinpath(dir, "gnd.asc"), asc([[0, 0, 0], [0, 0.5, 0], [0, 0, 2]]))
+    function config(; kw...)
+        d = Circuitscape.init_config()
+        d["data_type"] = "raster"; d["scenario"] = "advanced"
+        d["habitat_file"] = joinpath(dir, "cell.asc")
+        d["source_file"] = joinpath(dir, "src.asc")
+        d["ground_file"] = joinpath(dir, "gnd.asc")
+        d["ground_file_is_resistances"] = "False"
+        d["connect_four_neighbors_only"] = "True"
+        d["output_file"] = joinpath(dir, "out.out")
+        for (k, v) in kw; d[string(k)] = v; end
+        d
+    end
+    function vectors(policy)
+        prob = Circuitscape.build_problem(Float64, Circuitscape.CSConfig(config(remove_src_or_gnd = policy)))
+        nm = prob.geometry.nodemap
+        at(v) = Dict(cell => v[nm[cell...]] for cell in ((1,1), (2,2), (3,3)))
+        at(prob.sources), at(prob.grounds), at(prob.finitegrounds)
+    end
+    s, g, f = vectors("keepall")
+    @test s == Dict((1,1) => 1, (2,2) => 1, (3,3) => 0)
+    @test g == Dict((1,1) => 0, (2,2) => 0.5, (3,3) => 2)
+    @test f == g
+    s, g, f = vectors("rmvsrc")
+    @test s == Dict((1,1) => 1, (2,2) => 0, (3,3) => 0)
+    @test g == Dict((1,1) => 0, (2,2) => 0.5, (3,3) => 2)
+    @test f == g
+    # rmvgnd removes the finite ground everywhere, the solver diagonal included
+    s, g, f = vectors("rmvgnd")
+    @test s == Dict((1,1) => 1, (2,2) => 1, (3,3) => 0)
+    @test g == Dict((1,1) => 0, (2,2) => 0, (3,3) => 2)
+    @test f == g
+    # rmvall removes both sides of the conflict
+    s, g, f = vectors("rmvall")
+    @test s == Dict((1,1) => 1, (2,2) => 0, (3,3) => 0)
+    @test g == Dict((1,1) => 0, (2,2) => 0, (3,3) => 2)
+    @test f == g
+
+    # rmvgnd is the same run as one without the conflicting ground
+    v_rmvgnd = compute(config(remove_src_or_gnd = "rmvgnd"))
+    write(joinpath(dir, "gnd_only33.asc"), asc([[0, 0, 0], [0, 0, 0], [0, 0, 2]]))
+    v_ref = compute(config(ground_file = joinpath(dir, "gnd_only33.asc")))
+    @test v_rmvgnd ≈ v_ref
+
+    # A map emptied by the read-time removal is an error, as in Python
+    write(joinpath(dir, "src22.asc"), asc([[0, 0, 0], [0, 1, 0], [0, 0, 0]]))
+    write(joinpath(dir, "gnd22.asc"), asc([[0, 0, 0], [0, 0.5, 0], [0, 0, 0]]))
+    @test_throws ErrorException("No valid sources detected. Please check source file") compute(
+        config(source_file = joinpath(dir, "src22.asc"), remove_src_or_gnd = "rmvsrc"))
+    @test_throws ErrorException("No valid grounds detected. Please check ground file") compute(
+        config(ground_file = joinpath(dir, "gnd22.asc"), remove_src_or_gnd = "rmvgnd"))
+    @test_throws ErrorException("No valid sources detected. Please check source file") compute(
+        config(source_file = joinpath(dir, "src22.asc"), remove_src_or_gnd = "rmvall"))
+    # keepall keeps both, and a source on a direct ground (the only ground of
+    # its component) leaves the node-level pass with nothing to solve
+    @test compute(config(source_file = joinpath(dir, "src22.asc"), remove_src_or_gnd = "keepall")) isa Matrix
+    @test_throws ErrorException compute(
+        config(source_file = joinpath(dir, "src22.asc"), ground_file = joinpath(dir, "gnd22.asc"),
+               use_direct_grounds = "True"))
+
+    # Sources of +1 and -1 sum to zero but are still sources
+    write(joinpath(dir, "srcpm.asc"), asc([[1, 0, -1], [0, 0, 0], [0, 0, 0]]))
+    v = compute(config(source_file = joinpath(dir, "srcpm.asc"), ground_file = joinpath(dir, "gnd_only33.asc")))
+    @test size(v) == (3, 3) && v[1, 1] > 0 && v[1, 3] < 0
+
+    # Network: building the problem twice from one NetworkData must not
+    # invert the ground resistances twice
+    write(joinpath(dir, "g.txt"), "1\t2\t1.0\n2\t3\t1.0\n")
+    write(joinpath(dir, "nsrc.txt"), "1\t1.0\n")
+    write(joinpath(dir, "ngnd.txt"), "3\t4.0\n")
+    d = Circuitscape.init_config()
+    d["data_type"] = "network"; d["scenario"] = "advanced"
+    d["habitat_file"] = joinpath(dir, "g.txt"); d["habitat_map_is_resistances"] = "True"
+    d["source_file"] = joinpath(dir, "nsrc.txt"); d["ground_file"] = joinpath(dir, "ngnd.txt")
+    d["ground_file_is_resistances"] = "True"; d["output_file"] = joinpath(dir, "n.out")
+    cfg = Circuitscape.CSConfig(d)
+    data = Circuitscape.load_data(Float64, cfg)
+    p1 = Circuitscape.build_problem(data, cfg)
+    p2 = Circuitscape.build_problem(data, cfg)
+    @test data.ground_map[1, 2] == 4.0
+    @test p1.grounds == p2.grounds && maximum(p1.grounds) ≈ 0.25
+
+    # Network conflicts are resolved on the nodes only. rmvgnd takes the
+    # ground off the solver diagonal too, and rmvall removes both sides (Python
+    # keeps the finite ground under rmvgnd and the ground under rmvall here).
+    write(joinpath(dir, "nsrc12.txt"), "1\t1.0\n2\t1.0\n")
+    write(joinpath(dir, "ngnd13.txt"), "1\t4.0\n3\t1.0\n")
+    write(joinpath(dir, "nsrc2.txt"), "2\t1.0\n")
+    write(joinpath(dir, "ngnd3.txt"), "3\t1.0\n")
+    function netrun(src, gnd, pol)
+        dd = copy(d)
+        dd["source_file"] = joinpath(dir, src); dd["ground_file"] = joinpath(dir, gnd)
+        dd["remove_src_or_gnd"] = pol
+        compute(dd)
+    end
+    @test netrun("nsrc12.txt", "ngnd13.txt", "rmvgnd") ≈ netrun("nsrc12.txt", "ngnd3.txt", "keepall")
+    @test netrun("nsrc12.txt", "ngnd13.txt", "rmvall") ≈ netrun("nsrc2.txt", "ngnd3.txt", "keepall")
+    @test netrun("nsrc12.txt", "ngnd13.txt", "rmvsrc") ≈ netrun("nsrc2.txt", "ngnd13.txt", "keepall")
+    # A component left with no source is an error in advanced mode
+    @test_throws ErrorException("All sources conflicted with grounds and were removed. There is nothing to solve.") netrun(
+        "nsrc.txt", "ngnd13.txt", "rmvsrc")
+
+    # One-to-all / all-to-one: a focal node short-circuited to every other
+    # focal node (here by a polygon) has nothing to solve and reports -1, as
+    # a lone focal node does, instead of ending the run.
+    write(joinpath(dir, "pts.asc"), asc([[1, 2, -9999], [-9999, -9999, -9999], [-9999, -9999, -9999]]))
+    write(joinpath(dir, "poly.asc"), asc([[5, 5, -9999], [-9999, -9999, -9999], [-9999, -9999, -9999]]))
+    for sc in ("one-to-all", "all-to-one")
+        dd = config(scenario = sc, point_file = joinpath(dir, "pts.asc"),
+                    use_polygons = "True", polygon_file = joinpath(dir, "poly.asc"))
+        @test compute(dd) == [1 -1; 2 -1]
+    end
 end
 
 # Issue 470: the residual gate is configurable, and an unreachable tolerance

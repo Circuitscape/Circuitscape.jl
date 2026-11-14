@@ -189,7 +189,7 @@ The source file (`source_file`) specifies locations and strengths, in amps, of c
 
 ### Ground Point File
 
-The ground file (`ground_file`) specifies locations of ground nodes and resistances or conductances of resistors tying them to ground. Either a raster or a text list may be used. Rasters must have the same cell size, projection, and extent as the resistance grid, and cells that do not contain grounds should be coded with NODATA values. If a direct (R = 0) ground connection conflicts with a current source, the ground will be removed unless `remove_src_or_gnd` is set to `rmvgnd` or `keepall`.
+The ground file (`ground_file`) specifies locations of ground nodes and resistances or conductances of resistors tying them to ground. Either a raster or a text list may be used. Rasters must have the same cell size, projection, and extent as the resistance grid, and cells that do not contain grounds should be coded with NODATA values. If a direct (R = 0) ground connection conflicts with a current source, the ground is removed unless `remove_src_or_gnd = rmvsrc`, which removes the source instead.
 
 Set `ground_file_is_resistances = False` if your ground point file specifies connections to ground in terms of conductance instead. To tie cells directly to ground, keep `ground_file_is_resistances = True` and set values in the ground point file to zero.
 
@@ -199,7 +199,9 @@ Set `use_unit_currents = True` to force all current sources to 1 Amp, regardless
 
 ### Source/Ground Conflicts
 
-When a cell is connected both to a current source and to ground, `remove_src_or_gnd` determines the behavior: `keepall` (default), `rmvsrc`, `rmvgnd`, or `rmvall`. When using `keepall`, if a source is tied directly to ground (zero resistance), the ground connection will be removed.
+When a cell is connected both to a current source and to ground, `remove_src_or_gnd` determines the behavior: `keepall` (default) keeps both, `rmvsrc` removes the source, `rmvgnd` removes the ground, and `rmvall` removes both. When using `keepall`, if a source is tied directly to ground (zero resistance), the ground connection will be removed. For a raster this is applied to the cells as the source and ground files are read, and again to the graph nodes (cells joined by a short-circuit region form one node); for a network it is applied to the nodes.
+
+In advanced mode a raster source or ground file left with no sources or grounds once conflicts are removed is an error, as is a connected component that had both sources and grounds but is left without one of them. One-to-all and all-to-one modes instead report `-1` for a focal node whose solve has nothing left to solve.
 
 ## Output Options
 
