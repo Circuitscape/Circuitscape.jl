@@ -16,13 +16,11 @@ file paths keep their case.
 `Dict{String,String}(cfg)` converts back to INI strings, and
 `CSConfig(cfg; field = value, ...)` returns a copy with fields replaced.
 
-Field names match the INI keys documented in the options reference. The
-field defaults are the one statement of the default configuration;
-[`init_config`](@ref) is them written as INI strings. Notable defaults:
-`data_type = dt_raster`, `solver = st_cg_amg`, `precision = pr_double`,
-`cholmod_batch_size = 32`, `residual_tolerance = 0.0` (meaning automatic:
-`1e-4` in double, `1e-3` in single), `log_level = Logging.Info`. `scenario`
-has no usable default and must be set.
+Field names match the INI keys documented in the options reference, which
+also gives their defaults. The field defaults are the one statement of the
+default configuration; [`init_config`](@ref) is them written as INI strings.
+`residual_tolerance = 0.0` means automatic (see [`residual_tolerance`](@ref)),
+and `scenario` has no usable default and must be set.
 """
 Base.@kwdef struct CSConfig
     version::String = "unknown"
@@ -187,10 +185,18 @@ const INI_PLACEHOLDERS = Dict(
     "profiler_log_file" => "None",
 )
 
+# An unset path: empty (as `None` is read), `None` in a CSConfig built
+# directly, or an INI Builder placeholder; every placeholder above starts
+# with "(" (checked in the tests).
+_is_unset(path) = isempty(path) || _same(path, "None") || startswith(path, "(")
+
 Base.Dict{String,String}(cfg::CSConfig) =
     Dict{String,String}(String(f) => _to_ini(getfield(cfg, f)) for f in fieldnames(CSConfig))
 
 const INI_DEFAULTS = merge(Dict{String,String}(CSConfig()), INI_PLACEHOLDERS)
+
+# INI keys are matched in any case, ignoring surrounding whitespace.
+_ini_key(k) = lowercase(strip(k))
 
 """
     normalize_config(dict) -> Dict{String,String}
@@ -205,7 +211,7 @@ keep theirs.
 function normalize_config(dict)
     d = Dict{String,String}()
     for (k, v) in dict
-        key = lowercase(strip(k))
+        key = _ini_key(k)
         val = String(strip(v))
         haskey(d, key) && d[key] != val &&
             throw(ArgumentError("configuration key $key is given twice, in different case, " *
@@ -237,6 +243,19 @@ end
     :(CSConfig($(args...)))
 end
 
+# Inputs read only when their flag is set.
+const OPTIONAL_FILES = (:use_polygons => :polygon_file, :use_mask => :mask_file,
+                        :use_included_pairs => :included_pairs_file,
+                        :use_variable_source_strengths => :variable_source_file,
+                        :use_reclass_table => :reclass_file)
+
+# Inputs that may be rasters, and so may need GDAL.
+const RASTER_FILES = (:habitat_file, :point_file, :polygon_file, :mask_file,
+                      :source_file, :ground_file)
+
+# Options parsed for INI compatibility with Circuitscape 4 but not implemented.
+const UNIMPLEMENTED = (:low_memory_mode, :preemptive_memory_release)
+
 """
     validate(cfg::CSConfig)
 
@@ -249,30 +268,27 @@ what to change.
 function validate(cfg::CSConfig)
     problems = String[]
 
-    # A "(Browse for ...)" value is the INI Builder placeholder, i.e. unset.
-    unset(path) = path == "" || path == "None" || startswith(path, "(")
-    function need(key, path)
-        if unset(path)
+    function need(key)
+        path = getfield(cfg, key)
+        if _is_unset(path)
             push!(problems, "$key is not set")
         elseif !isfile(path)
             push!(problems, "$key = \"$path\" does not exist")
         end
     end
 
-    is_advanced = cfg.scenario == sc_advanced
-    need("habitat_file", cfg.habitat_file)
-    is_advanced || need("point_file", cfg.point_file)
-    if is_advanced
-        need("source_file", cfg.source_file)
-        need("ground_file", cfg.ground_file)
+    need(:habitat_file)
+    if is_advanced(cfg)
+        need(:source_file)
+        need(:ground_file)
+    else
+        need(:point_file)
     end
-    cfg.use_polygons && need("polygon_file", cfg.polygon_file)
-    cfg.use_mask && need("mask_file", cfg.mask_file)
-    cfg.use_included_pairs && need("included_pairs_file", cfg.included_pairs_file)
-    cfg.use_variable_source_strengths && need("variable_source_file", cfg.variable_source_file)
-    cfg.use_reclass_table && need("reclass_file", cfg.reclass_file)
+    for (flag, key) in OPTIONAL_FILES
+        getfield(cfg, flag) && need(key)
+    end
 
-    if unset(cfg.output_file)
+    if _is_unset(cfg.output_file)
         push!(problems, "output_file is not set")
     elseif basename(cfg.output_file) == ""
         # A trailing slash names a directory, not a file: the outputs would
@@ -286,23 +302,19 @@ function validate(cfg::CSConfig)
 
     # GDAL is optional: only GeoTIFF (or other non-ASCII) rasters need it.
     if !gdal_loaded()
-        raster_paths = [("habitat_file", cfg.habitat_file), ("point_file", cfg.point_file),
-                        ("polygon_file", cfg.polygon_file), ("mask_file", cfg.mask_file),
-                        ("source_file", cfg.source_file), ("ground_file", cfg.ground_file)]
-        for (key, path) in raster_paths
-            unset(path) && continue
-            needs_gdal(path) &&
+        for key in RASTER_FILES
+            path = getfield(cfg, key)
+            _is_unset(path) || !needs_gdal(path) ||
                 push!(problems, gdal_missing_message("$key = \"$path\""))
         end
         cfg.write_as_tif &&
             push!(problems, gdal_missing_message("write_as_tif = True"))
     end
 
-    # Parsed for INI compatibility with Circuitscape 4 but not implemented.
-    cfg.low_memory_mode &&
-        push!(problems, "low_memory_mode is not implemented in Circuitscape.jl; remove it or set it to False")
-    cfg.preemptive_memory_release &&
-        push!(problems, "preemptive_memory_release is not implemented in Circuitscape.jl; remove it or set it to False")
+    for key in UNIMPLEMENTED
+        getfield(cfg, key) &&
+            push!(problems, "$key is not implemented in Circuitscape.jl; remove it or set it to False")
+    end
 
     isempty(problems) ||
         throw(ArgumentError("Invalid configuration:\n  - " * join(problems, "\n  - ")))
@@ -349,12 +361,12 @@ end
 
 Read a Circuitscape INI file as Circuitscape 4 (Python's ConfigParser) did:
 each line is `key = value` or `key: value`, keys and option values are
-case-insensitive (file paths keep their case), and blank lines, comment lines (starting with `#` or `;`) and section headers are
-skipped; any other line is an error naming the file and line. Every key is
-parsed on top of the defaults from [`init_config`](@ref), so keys that are
-absent take their default value. Unrecognised values for `solver`,
-`scenario`, `data_type`, `precision`, `log_level`, `remove_src_or_gnd` and any
-boolean raise an `ArgumentError` naming the key; unknown keys produce a
+case-insensitive (file paths keep their case), and blank lines, comment lines
+(starting with `#` or `;`) and section headers are skipped; any other line is
+an error naming the file and line. Every key is parsed on top of the defaults
+from [`init_config`](@ref), so keys that are absent take their default value.
+A value that an enumerated or boolean option does not accept raises an
+`ArgumentError` naming the key and the accepted values; unknown keys produce a
 warning and are ignored. File existence is not checked here but in
 [`validate`](@ref).
 """
@@ -366,7 +378,7 @@ function parse_config(path::AbstractString)
         i = findfirst(in("=:"), s)
         (i === nothing || i == 1) &&
             throw(ArgumentError("$path, line $n: expected `key = value`, got \"$s\""))
-        cf[lowercase(rstrip(s[1:prevind(s, i)]))] = strip(s[nextind(s, i):end])
+        cf[_ini_key(s[1:prevind(s, i)])] = s[nextind(s, i):end]
     end
     CSConfig(cf)
 end
@@ -378,9 +390,9 @@ The default configuration as INI strings, one entry per key `compute` accepts.
 Modify the entries you need and pass the dictionary to [`compute`](@ref), or
 convert it with `CSConfig(dict)`. File paths default to INI Builder
 placeholders such as `"(Browse for a resistance file)"`, which
-[`validate`](@ref) treats as unset. A few Circuitscape 4 keys
-(`print_timings`, `print_rusages`, `screenprint_log`, `profiler_log_file`) are
-present so that old INI files load without warnings; they have no effect.
+[`validate`](@ref) treats as unset. The Circuitscape 4 keys that
+Circuitscape.jl ignores are present too, so that old INI files load without
+warnings; the options reference lists them.
 """
 init_config() = copy(INI_DEFAULTS)
 
@@ -397,7 +409,7 @@ values are parsed or checked here (that happens in `CSConfig(cfg)`).
 """
 function update!(cfg, new)
     for (key,val) in new
-        cfg[lowercase(strip(key))] = val
+        cfg[_ini_key(key)] = val
     end
     cfg
 end
@@ -421,7 +433,8 @@ output_prefix(output_file::AbstractString) = first(splitext(String(output_file))
 Write the configuration, in Circuitscape INI form, to `path`; by default the
 file named by `cfg.output_file`, as in every earlier release. The file holds
 every option, so `parse_config(path)` gives back `cfg` (the `[Version]`
-section records the writer, not `cfg.version`).
+section records the version of Circuitscape.jl that wrote it, not
+`cfg.version`).
 
 `compute` records the options of each run in `<prefix>.ini` (see
 [`output_prefix`](@ref)), as Circuitscape 4 did, except when that file is
@@ -433,7 +446,8 @@ function write_config(cfg::CSConfig, path::AbstractString = cfg.output_file)
             n > 1 && println(io)
             println(io, "[", section, "]")
             for key in keys
-                value = key === :version ? "5.0.0" : _to_ini(getfield(cfg, key))
+                value = key === :version ? string(pkgversion(@__MODULE__)) :
+                                           _to_ini(getfield(cfg, key))
                 println(io, key, " = ", value)
             end
         end
@@ -441,6 +455,5 @@ function write_config(cfg::CSConfig, path::AbstractString = cfg.output_file)
 end
 
 # Keep backward compat for Dict-based write_config
-function write_config(cfg::Dict{String,String}, path::AbstractString = CSConfig(cfg).output_file)
-    write_config(CSConfig(cfg), path)
-end
+write_config(cfg::Dict{String,String}) = write_config(CSConfig(cfg))
+write_config(cfg::Dict{String,String}, path::AbstractString) = write_config(CSConfig(cfg), path)

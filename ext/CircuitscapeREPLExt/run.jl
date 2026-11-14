@@ -1,5 +1,13 @@
 cfg = Circuitscape.init_config()
 
+# Menu choices, spelled as the INI file is written. A network has only the
+# pairwise and advanced modes; the solvers offered need no extra package.
+const CS = Circuitscape
+const DATA_TYPES = collect(CS._to_ini.(instances(CS.DataType)))
+const MODES = Dict(CS._to_ini(CS.dt_raster) => collect(CS._to_ini.(instances(CS.Scenario))),
+                   CS._to_ini(CS.dt_network) => CS._to_ini.([CS.sc_pairwise, CS.sc_advanced]))
+const SOLVERS = CS._to_ini.([CS.st_cg_amg, CS.st_cholmod])
+
 state = Dict{Int, Symbol}()
 for i = 1:10
     state[i] = Symbol("state" * string(i))
@@ -8,23 +16,16 @@ end
 function step1()
     println()
     println("Step 1: Choose Data Type")
-    dt = ["raster", "network"]
-    n = request(RadioMenu(vcat(dt)))
-    cfg["data_type"] = dt[n]
+    n = request(RadioMenu(DATA_TYPES))
+    cfg["data_type"] = DATA_TYPES[n]
     step2()
 end
 
 function step2()
     println()
     println("Step 2: Choose Modelling Mode")
-    is_raster = cfg["data_type"] == "raster"
-    if is_raster 
-        mm = ["PREVIOUS STEP", "pairwise", "advanced", "one-to-all", 
-                "all-to-one"]
-    else
-        mm = ["PREVIOUS STEP", "pairwise", "advanced"]
-    end
-    n = request(RadioMenu(vcat(mm)))
+    mm = ["PREVIOUS STEP"; MODES[cfg["data_type"]]]
+    n = request(RadioMenu(mm))
     n == 1 && step1()
     cfg["scenario"] = mm[n]
     step3()
@@ -43,13 +44,13 @@ function step3()
     is_res = ["PREVIOUS STEP", "resistance", "conductance"]
     n = request(RadioMenu(is_res))
     n == 1 && step2()
-    cfg["habitat_map_is_resistances"] = is_res[n] == "resistance" ? "true" : "false"
+    cfg["habitat_map_is_resistances"] = CS._to_ini(is_res[n] == "resistance")
     step4() 
 end
 
 function step4()
     println()
-    is_advanced = cfg["scenario"] == "advanced"
+    is_advanced = cfg["scenario"] == CS._to_ini(CS.sc_advanced)
     if !is_advanced
         println()
         println("Step 4: Enter path to focal nodes:")
@@ -80,7 +81,7 @@ end
 function step5()
     println()
     println("Step 5: Choose solver")
-    opt = ["PREVIOUS STEP", "cg+amg", "cholmod"]
+    opt = ["PREVIOUS STEP"; SOLVERS]
     n = request(RadioMenu(opt))
     n == 1 && step4()
     cfg["solver"] = opt[n]
@@ -93,7 +94,7 @@ function step6()
     println("Step 6: Choose number of parallel processes")
     opt = collect(1:Sys.CPU_THREADS) |> x -> string.(x)
     n = request(RadioMenu(opt))
-    n > 1 && (cfg["parallelize"] = "true")
+    n > 1 && (cfg["parallelize"] = CS._to_ini(true))
     step7()
 end
 
@@ -105,8 +106,8 @@ function step7()
     n == 1 && step6()
     opt = ["Current maps", "Voltage maps"]
     n = request(MultiSelectMenu(opt))
-    1 in n && (cfg["write_cur_maps"] = "true")
-    2 in n && (cfg["write_volt_maps"] = "true")
+    1 in n && (cfg["write_cur_maps"] = CS._to_ini(true))
+    2 in n && (cfg["write_volt_maps"] = CS._to_ini(true))
     step8()
 end
 
