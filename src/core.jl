@@ -777,6 +777,10 @@ from the solution it returned and asked for a further 100-fold reduction;
 that takes about 7 more iterations, where restarting from zero with a tighter
 `rtol` repeated the whole solve (34 iterations). Solves that pass first time
 are unaffected.
+
+One Krylov workspace and one residual buffer serve all attempts, so a solve
+allocates six vectors of the system's size (seven with a retry) rather than a
+fresh workspace per attempt plus two temporaries per residual check.
 """
 function solve_linear_system(
             G::SparseMatrixCSC{T,V},
@@ -785,17 +789,24 @@ function solve_linear_system(
     # actually stops CG, so it has to be tightened on every retry.
     atol = sqrt(eps(T))
     rtol = T === Float32 ? T(1e-5) : T(1e-6)
-    v, stats = Krylov.cg(G, curr, M=M, ldiv=true, atol=atol, rtol=rtol, itmax=100_000)
-    residual = norm(G*v .- curr) / norm(curr)
+    ws = Krylov.CgWorkspace(G, curr)
+    r = similar(curr)
+    bnorm = norm(curr)
+    relres(v) = (mul!(r, G, v); r .-= curr; norm(r) / bnorm)
+    Krylov.cg!(ws, G, curr; M=M, ldiv=true, atol=atol, rtol=rtol, itmax=100_000)
+    v, stats = ws.x, ws.stats
+    residual = relres(v)
     iters = stats.niter
     for retry in 1:2
         residual < tol && return v
         @debug("CG stopped after $(stats.niter) iterations ($(stats.status)) but the " *
                "relative residual $residual exceeds $tol; continuing from that solution")
-        # Restarted from `v`, rtol is relative to the residual of `v`.
+        # Restarted from `v`, rtol is relative to the residual of `v`. Krylov
+        # copies the starting point into its own buffer before overwriting
+        # `ws.x`, so the workspace's solution can be passed back in.
         atol /= 100
-        v, stats = Krylov.cg(G, curr, v; M=M, ldiv=true, atol=atol, rtol=T(1e-2), itmax=100_000)
-        residual = norm(G*v .- curr) / norm(curr)
+        Krylov.cg!(ws, G, curr, v; M=M, ldiv=true, atol=atol, rtol=T(1e-2), itmax=100_000)
+        residual = relres(v)
         iters += stats.niter
     end
     residual < tol && return v
